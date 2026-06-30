@@ -1445,22 +1445,29 @@
     <div class="estepbar"><div class="estepdot done"></div><div class="estepdot active"></div><div class="estepdot"></div><div class="estepdot"></div><div class="estepdot"></div></div>
     <div style="padding:20px;max-width:560px;margin:0 auto;width:100%">
       <p style="font-size:14px;font-weight:600;color:#f0f0f0;margin-bottom:4px">Documentos del cliente</p>
-      <p style="font-size:12px;color:#666;margin-bottom:14px">Toca para registrar cada documento</p>
-      <div class="edoc-slot" id="ep-doc-cc" onclick="epCapturaDoc('ep-doc-cc','Cedula capturada OK')">
+      <p style="font-size:12px;color:#666;margin-bottom:14px">Toca para tomar foto con la cámara o elegir desde archivos</p>
+
+      <label class="edoc-slot" id="ep-doc-cc">
+        <input type="file" accept="image/*" capture="environment" style="display:none" onchange="epCargarDoc(event,'ep-doc-cc','cedula')">
         <span style="font-size:20px">&#128667;</span>
-        <div><div style="font-size:12px;font-weight:500;color:#f0f0f0">Cedula de ciudadania</div><div style="font-size:11px;color:#666">Frontal y posterior</div></div>
-      </div>
-      <div class="edoc-slot" id="ep-doc-lic" onclick="epCapturaDoc('ep-doc-lic','Licencia capturada OK')">
+        <div><div style="font-size:12px;font-weight:500;color:#f0f0f0" id="ep-doc-cc-label">Cédula de ciudadanía</div><div style="font-size:11px;color:#666">Toca para tomar foto o subir archivo</div></div>
+      </label>
+
+      <label class="edoc-slot" id="ep-doc-lic">
+        <input type="file" accept="image/*" capture="environment" style="display:none" onchange="epCargarDoc(event,'ep-doc-lic','licencia')">
         <span style="font-size:20px">&#128664;</span>
-        <div><div style="font-size:12px;font-weight:500;color:#f0f0f0">Licencia de conduccion</div><div style="font-size:11px;color:#666">Categoria y vencimiento visibles</div></div>
-      </div>
-      <div class="edoc-slot" id="ep-doc-seg" onclick="epCapturaDoc('ep-doc-seg','Seguro capturado OK')">
+        <div><div style="font-size:12px;font-weight:500;color:#f0f0f0" id="ep-doc-lic-label">Licencia de conducción</div><div style="font-size:11px;color:#666">Toca para tomar foto o subir archivo</div></div>
+      </label>
+
+      <label class="edoc-slot" id="ep-doc-seg">
+        <input type="file" accept="image/*" capture="environment" style="display:none" onchange="epCargarDoc(event,'ep-doc-seg','seguro')">
         <span style="font-size:20px">&#128737;&#65039;</span>
-        <div><div style="font-size:12px;font-weight:500;color:#f0f0f0">Seguro / EPS (opcional)</div><div style="font-size:11px;color:#666">Para cobertura en viaje</div></div>
-      </div>
-      <div class="campo" style="margin-top:16px"><label>Numero de cedula</label><input type="text" id="ep-inp-cc" placeholder="1.234.567.890"/></div>
-      <div class="campo"><label>Licencia - categoria - vencimiento</label><input type="text" id="ep-inp-lic" placeholder="ej. 98321456 - B1 - 12/2027"/></div>
-      <div class="campo"><label>Telefono del cliente</label><input type="tel" id="ep-inp-tel" placeholder="310 000 0000"/></div>
+        <div><div style="font-size:12px;font-weight:500;color:#f0f0f0" id="ep-doc-seg-label">Seguro / EPS (opcional)</div><div style="font-size:11px;color:#666">Toca para tomar foto o subir archivo</div></div>
+      </label>
+
+      <div class="campo" style="margin-top:16px"><label>Número de cédula</label><input type="text" id="ep-inp-cc" placeholder="1.234.567.890"/></div>
+      <div class="campo"><label>Licencia - categoría - vencimiento</label><input type="text" id="ep-inp-lic" placeholder="ej. 98321456 - B1 - 12/2027"/></div>
+      <div class="campo"><label>Teléfono del cliente</label><input type="tel" id="ep-inp-tel" placeholder="310 000 0000"/></div>
       <button class="btn-primario full" style="margin-top:8px" onclick="epGo('ep-step2')">Continuar</button>
     </div>
   </div>
@@ -1472,23 +1479,22 @@
     </div>
     <div class="estepbar"><div class="estepdot done"></div><div class="estepdot done"></div><div class="estepdot active"></div><div class="estepdot"></div><div class="estepdot"></div></div>
     <div style="padding:20px;max-width:560px;margin:0 auto;width:100%">
-      <p style="font-size:14px;font-weight:600;color:#f0f0f0;margin-bottom:4px">Registro fotografico</p>
-      <p style="font-size:12px;color:#666;margin-bottom:4px">8 fotos obligatorias - toca para capturar</p>
+      <p style="font-size:14px;font-weight:600;color:#f0f0f0;margin-bottom:4px">Registro fotográfico</p>
+      <p style="font-size:12px;color:#666;margin-bottom:4px">8 fotos obligatorias — toca cada una para tomar foto o subir archivo</p>
       <div class="ephoto-grid">
-        <div class="ephoto-slot" id="eph-front" onclick="epFoto('eph-front','Frontal')"><span style="font-size:22px">&#128247;</span><span>Frontal</span></div>
-        <div class="ephoto-slot" id="eph-back" onclick="epFoto('eph-back','Trasera')"><span style="font-size:22px">&#128247;</span><span>Trasera</span></div>
-        <div class="ephoto-slot" id="eph-left" onclick="epFoto('eph-left','Lat. izq.')"><span style="font-size:22px">&#128247;</span><span>Lateral izq.</span></div>
-        <div class="ephoto-slot" id="eph-right" onclick="epFoto('eph-right','Lat. der.')"><span style="font-size:22px">&#128247;</span><span>Lateral der.</span></div>
-        <div class="ephoto-slot" id="eph-int" onclick="epFoto('eph-int','Interior')"><span style="font-size:22px">&#129681;</span><span>Interior</span></div>
-        <div class="ephoto-slot" id="eph-dash" onclick="epFoto('eph-dash','Tablero')"><span style="font-size:22px">&#128290;</span><span>Tablero / km</span></div>
-        <div class="ephoto-slot" id="eph-fuel" onclick="epFoto('eph-fuel','Combustible')"><span style="font-size:22px">&#9981;&#65039;</span><span>Combustible</span></div>
-        <div class="ephoto-slot" id="eph-trunk" onclick="epFoto('eph-trunk','Maletero')"><span style="font-size:22px">&#129523;</span><span>Maletero</span></div>
+        <label class="ephoto-slot" id="eph-front"><input type="file" accept="image/*" capture="environment" style="display:none" onchange="epCargarFoto(event,'eph-front','frontal')"><span style="font-size:22px">&#128247;</span><span>Frontal</span></label>
+        <label class="ephoto-slot" id="eph-back"><input type="file" accept="image/*" capture="environment" style="display:none" onchange="epCargarFoto(event,'eph-back','trasera')"><span style="font-size:22px">&#128247;</span><span>Trasera</span></label>
+        <label class="ephoto-slot" id="eph-left"><input type="file" accept="image/*" capture="environment" style="display:none" onchange="epCargarFoto(event,'eph-left','lateral_izq')"><span style="font-size:22px">&#128247;</span><span>Lateral izq.</span></label>
+        <label class="ephoto-slot" id="eph-right"><input type="file" accept="image/*" capture="environment" style="display:none" onchange="epCargarFoto(event,'eph-right','lateral_der')"><span style="font-size:22px">&#128247;</span><span>Lateral der.</span></label>
+        <label class="ephoto-slot" id="eph-int"><input type="file" accept="image/*" capture="environment" style="display:none" onchange="epCargarFoto(event,'eph-int','interior')"><span style="font-size:22px">&#129681;</span><span>Interior</span></label>
+        <label class="ephoto-slot" id="eph-dash"><input type="file" accept="image/*" capture="environment" style="display:none" onchange="epCargarFoto(event,'eph-dash','tablero')"><span style="font-size:22px">&#128290;</span><span>Tablero / km</span></label>
+        <label class="ephoto-slot" id="eph-fuel"><input type="file" accept="image/*" capture="environment" style="display:none" onchange="epCargarFoto(event,'eph-fuel','combustible')"><span style="font-size:22px">&#9981;&#65039;</span><span>Combustible</span></label>
+        <label class="ephoto-slot" id="eph-trunk"><input type="file" accept="image/*" capture="environment" style="display:none" onchange="epCargarFoto(event,'eph-trunk','maletero')"><span style="font-size:22px">&#129523;</span><span>Maletero</span></label>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <span id="ep-photo-count" style="font-size:12px;color:#666">0 / 8 fotos</span>
-        <button class="btn-secundario" style="font-size:11px;padding:7px 12px" onclick="epTodasFotos()">Capturar todas</button>
       </div>
-      <button class="btn-primario full" onclick="epGo('ep-step3')">Continuar</button>
+      <button class="btn-primario full" id="ep-step2-continuar" onclick="epGo('ep-step3')">Continuar</button>
     </div>
   </div>
 
@@ -3202,6 +3208,8 @@ function epSeleccionarIdx(idx) {
 
 function epIniciarFlujo() {
   epPhotos = new Set(); epDmg = new Set();
+  epDocsCargados = {}; epDocsUrls = {};
+  epFotosCargadas = {}; epFotosUrls = {};
   epSetFuel(50);
   epBuildDmg();
   var sub = epOrder.nombre + ' - ' + epOrder.vehiculo;
@@ -3214,26 +3222,92 @@ function epIniciarFlujo() {
   epGo('ep-step1');
 }
 
-function epCapturaDoc(id, label) {
-  var el = document.getElementById(id);
+/* ── Carga real de documentos del cliente ── */
+let epDocsCargados = {}; // { cedula: dataURL, licencia: dataURL, seguro: dataURL }
+let epDocsUrls = {};     // URLs ya subidas a Supabase
+
+async function epCargarDoc(event, slotId, tipo) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const el = document.getElementById(slotId);
+  const labelEl = document.getElementById(slotId + '-label');
+
+  // Preview inmediato local
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    epDocsCargados[tipo] = e.target.result;
+    el.style.backgroundImage = `url(${e.target.result})`;
+    el.style.backgroundSize = 'cover';
+    el.style.backgroundPosition = 'center';
+  };
+  reader.readAsDataURL(file);
+
   el.classList.add('done');
-  var nameEl = el.querySelector('div div:first-child');
-  if(nameEl) nameEl.textContent = label;
+  if (labelEl) labelEl.textContent = 'Subiendo...';
+
+  // Subir a Supabase Storage
+  try {
+    const ext = file.name.split('.').pop() || 'jpg';
+    const path = `${epOrder.id || 'orden'}_${(epOrder.nombre||'cliente').replace(/\s+/g,'_')}/${tipo}_${Date.now()}.${ext}`;
+    const url = await epSubirArchivoStorage(file, 'docs-clientes', path);
+    epDocsUrls[tipo] = url;
+    if (labelEl) labelEl.textContent = (tipo === 'cedula' ? 'Cédula' : tipo === 'licencia' ? 'Licencia' : 'Seguro') + ' cargada ✓';
+  } catch(e) {
+    console.error('Error subiendo documento:', e);
+    if (labelEl) labelEl.textContent = 'Guardado localmente (sin conexión)';
+  }
 }
 
-function epFoto(id, label) {
-  var el = document.getElementById(id);
+/* ── Carga real de fotos del vehículo ── */
+let epFotosCargadas = {}; // { frontal: dataURL, ... }
+let epFotosUrls = {};
+
+async function epCargarFoto(event, slotId, angulo) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const el = document.getElementById(slotId);
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    epFotosCargadas[angulo] = e.target.result;
+    el.style.backgroundImage = `url(${e.target.result})`;
+    el.style.backgroundSize = 'cover';
+    el.style.backgroundPosition = 'center';
+    el.querySelectorAll('span').forEach(s => s.style.display = 'none');
+  };
+  reader.readAsDataURL(file);
+
   el.classList.add('done');
-  el.innerHTML = '<span style="font-size:22px">&#10003;</span><span style="color:#C9A84C;font-size:11px">' + label + '</span>';
-  epPhotos.add(id);
-  var countEl = document.getElementById('ep-photo-count');
-  if(countEl) countEl.textContent = epPhotos.size + ' / 8 fotos';
+  epPhotos.add(slotId);
+  const countEl = document.getElementById('ep-photo-count');
+  if (countEl) countEl.textContent = epPhotos.size + ' / 8 fotos';
+
+  try {
+    const ext = file.name.split('.').pop() || 'jpg';
+    const path = `${epOrder.id || 'orden'}_${(epOrder.nombre||'cliente').replace(/\s+/g,'_')}/${angulo}_${Date.now()}.${ext}`;
+    const url = await epSubirArchivoStorage(file, 'entregas-fotos', path);
+    epFotosUrls[angulo] = url;
+  } catch(e) {
+    console.error('Error subiendo foto:', e);
+  }
 }
 
-function epTodasFotos() {
-  [['eph-front','Frontal'],['eph-back','Trasera'],['eph-left','Lat. izq.'],['eph-right','Lat. der.'],
-   ['eph-int','Interior'],['eph-dash','Tablero/km'],['eph-fuel','Combustible'],['eph-trunk','Maletero']]
-  .forEach(function(p) { epFoto(p[0], p[1]); });
+/* ── Subida genérica a Supabase Storage vía REST ── */
+async function epSubirArchivoStorage(file, bucket, path) {
+  const res = await fetch(`${SB_URL}/storage/v1/object/${bucket}/${path}`, {
+    method: 'POST',
+    headers: {
+      'apikey': SB_KEY,
+      'Authorization': `Bearer ${SB_KEY}`,
+      'Content-Type': file.type || 'image/jpeg',
+    },
+    body: file
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Error subiendo archivo: ${errText}`);
+  }
+  return `${SB_URL}/storage/v1/object/public/${bucket}/${path}`;
 }
 
 function epSetFuel(pct) {
@@ -3280,7 +3354,7 @@ function epPrepSummary() {
   epGo('ep-step5');
 }
 
-function epCompletar() {
+async function epCompletar() {
   var btn = document.getElementById('ep-btn-completar');
   var err = document.getElementById('ep-send-error');
   err.style.display = 'none';
@@ -3289,25 +3363,69 @@ function epCompletar() {
 
   try {
     var ordenNum = epOrder.id || ('CH-LOCAL-' + Date.now());
+    var km = document.getElementById('ep-inp-km').value;
+    var observaciones = document.getElementById('ep-inp-obs').value;
+    var emailCliente = document.getElementById('ep-inp-email-cli').value;
+    var zonasArr = Array.from(epDmg).sort(function(a,b){return a-b;});
+
+    // 1. Actualizar/crear cliente con datos de cédula y licencia (con docs subidos)
+    var clienteDoc = document.getElementById('ep-inp-cc').value.trim();
+    if (clienteDoc) {
+      try {
+        const existente = await sbSelect('clientes', `&documento=eq.${encodeURIComponent(clienteDoc)}`);
+        const clienteData = {
+          nombre: epOrder.nombre,
+          documento: clienteDoc,
+          licencia_num: document.getElementById('ep-inp-lic').value,
+          telefono: document.getElementById('ep-inp-tel').value,
+          email: emailCliente
+        };
+        if (existente && existente.length > 0) {
+          await sbUpdate('clientes', existente[0].id, clienteData);
+        } else {
+          await sbInsert('clientes', clienteData);
+        }
+      } catch(e2) { console.error('Error guardando cliente:', e2); }
+    }
+
+    // 2. Guardar registro de entrega en Supabase con URLs reales de fotos y documentos
+    try {
+      await sbInsert('entregas', {
+        orden_id: epOrder.esLocal ? null : epOrder.id,
+        km_salida: km ? parseInt(km) : null,
+        combustible_salida: epFuelPct,
+        zonas_dano: zonasArr,
+        observaciones: observaciones,
+        doc_cedula_url: epDocsUrls.cedula || null,
+        doc_licencia_url: epDocsUrls.licencia || null,
+        doc_seguro_url: epDocsUrls.seguro || null,
+        fotos: epFotosUrls,
+        correo_enviado: false
+      });
+    } catch(e3) { console.error('Error guardando entrega en Supabase:', e3); }
+
+    // 3. Respaldo local
     var entregaLocal = {
-      id: ordenNum,
-      orden: epOrder,
-      km: document.getElementById('ep-inp-km').value,
-      combustible: epFuelPct,
-      danos: Array.from(epDmg),
-      observaciones: document.getElementById('ep-inp-obs').value,
-      fecha: new Date().toISOString(),
-      agente: sesion ? sesion.nombre : '-'
+      id: ordenNum, orden: epOrder, km: km, combustible: epFuelPct,
+      danos: zonasArr, observaciones: observaciones,
+      fotos: epFotosUrls, documentos: epDocsUrls,
+      fecha: new Date().toISOString(), agente: sesion ? sesion.nombre : '-'
     };
     var entregas = [];
-    try { entregas = JSON.parse(localStorage.getItem('carhelp:entregas') || '[]'); } catch(e2){}
+    try { entregas = JSON.parse(localStorage.getItem('carhelp:entregas') || '[]'); } catch(e4){}
     entregas.unshift(entregaLocal);
     localStorage.setItem('carhelp:entregas', JSON.stringify(entregas.slice(0,100)));
+
+    // 4. Enviar correo automático al cliente con inventario y fotos reales
+    if (emailCliente) {
+      btn.textContent = 'Enviando correo...';
+      await epEnviarCorreoInventario(ordenNum, km, zonasArr, observaciones, emailCliente);
+    }
 
     var now = new Date();
     document.getElementById('ep-done-ref').textContent = ordenNum;
     document.getElementById('ep-done-hora').textContent = now.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
-    document.getElementById('ep-done-email').textContent = document.getElementById('ep-inp-email-cli').value || '-';
+    document.getElementById('ep-done-email').textContent = emailCliente || '-';
     mostrarToast('Entrega registrada: ' + ordenNum);
     epGo('ep-done');
   } catch(e) {
@@ -3316,6 +3434,62 @@ function epCompletar() {
   } finally {
     btn.textContent = 'Completar entrega';
     btn.disabled = false;
+  }
+}
+
+async function epEnviarCorreoInventario(ordenNum, km, zonasArr, observaciones, emailCliente) {
+  const ZONAS = {
+    1:'Capó / cofre', 2:'Guardabarro del. izq.', 3:'Guardabarro del. der.',
+    4:'Maletero', 5:'Techo', 6:'Puerta del. izq.', 7:'Puerta tras. izq.',
+    8:'Estribo izq.', 9:'Puerta del. der.', 10:'Puerta tras. der.',
+    11:'Estribo der.', 12:'Guardabarro tras. der.', 13:'Parachoque del.',
+    14:'Faro del. izq.', 15:'Faro del. der.', 16:'Parachoque tras.',
+    17:'Calavera izq.', 18:'Calavera der.'
+  };
+
+  const danosTexto = zonasArr.length > 0
+    ? zonasArr.map(n => `• ${ZONAS[n] || 'Zona '+n}`).join('\n')
+    : 'Sin daños preexistentes registrados';
+
+  const fotosUrlsList = Object.entries(epFotosUrls).filter(([,u]) => u);
+  const fotosTexto = fotosUrlsList.length > 0
+    ? '\n\nFotos del vehículo:\n' + fotosUrlsList.map(([k,u]) => `${k}: ${u}`).join('\n')
+    : '';
+
+  const cuerpo = `Estimado/a ${epOrder.nombre},
+
+Le confirmamos el recibido de su vehículo. A continuación el inventario de entrega:
+
+VEHÍCULO: ${epOrder.vehiculo} - ${epOrder.placa}
+ORDEN: ${ordenNum}
+KM DE SALIDA: ${km || '-'}
+COMBUSTIBLE: ${epFuelPct}%
+
+INVENTARIO DE DAÑOS PREEXISTENTES:
+${danosTexto}
+
+${observaciones ? 'OBSERVACIONES: ' + observaciones : ''}
+${fotosTexto}
+
+Al recibir el vehículo usted acepta el contrato de alquiler de Car Help S.A.S. Cualquier daño no registrado aquí será responsabilidad del arrendatario al momento de la devolución.
+
+Cualquier novedad, comuníquese al Cel. 310 743 6082.
+
+Car Help S.A.S — Pereira, Colombia`;
+
+  try {
+    await fetch(MAIL_API + '/api/enviar-correo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        para: emailCliente,
+        cc: 'reservascarhelp@gmail.com',
+        asunto: `Recibido del vehículo — ${ordenNum} — Car Help`,
+        cuerpo: cuerpo
+      })
+    });
+  } catch(e) {
+    console.error('Error enviando correo de inventario:', e);
   }
 }
 
