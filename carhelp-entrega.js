@@ -24,11 +24,16 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE)
 
 // Cliente Gmail via Nodemailer
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false,
   auth: {
     user: GMAIL_USER,
     pass: GMAIL_APP_PASS,   // NO es la contraseña normal — ver GUIA_CONFIGURACION.md
   },
+  connectionTimeout: 15000,
+  greetingTimeout: 15000,
+  socketTimeout: 15000,
 })
 
 // ============================================================
