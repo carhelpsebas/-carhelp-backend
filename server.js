@@ -8,6 +8,7 @@ import express          from 'express'
 import cors             from 'cors'
 import multer           from 'multer'
 import dotenv           from 'dotenv'
+import nodemailer       from 'nodemailer'
 import { Readable }     from 'stream'
 import {
   loginColaborador,
@@ -223,6 +224,56 @@ app.get('/api/entregas/:ordenId', requireAuth, async (req, res) => {
     if (error) return res.status(404).json({ error: 'Entrega no encontrada' })
     res.json(data)
   } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ============================================================
+// RUTA: ENVÍO DE CORREO SIMPLE (reservas, tours, seguridad)
+// ============================================================
+const transporterSimple = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_APP_PASSWORD,
+  },
+})
+
+// POST /api/enviar-correo
+app.post('/api/enviar-correo', async (req, res) => {
+  try {
+    const { para, cc, asunto, cuerpo } = req.body
+    if (!para || !asunto || !cuerpo) {
+      return res.status(400).json({ error: 'Faltan campos: para, asunto, cuerpo' })
+    }
+
+    const htmlBody = cuerpo
+      .split('\n')
+      .map(line => line.trim() === '' ? '<br>' : `<p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:14px;color:#1a1a1a;white-space:pre-wrap">${line}</p>`)
+      .join('')
+
+    const info = await transporterSimple.sendMail({
+      from: `"Car Help Rent a Car" <${process.env.GMAIL_USER}>`,
+      to: para,
+      cc: cc || undefined,
+      subject: asunto,
+      text: cuerpo,
+      html: `<div style="max-width:600px;margin:0 auto;font-family:Arial,sans-serif">
+        <div style="background:#0A0A0A;padding:20px;text-align:center">
+          <div style="color:#C9A84C;font-family:Georgia,serif;font-size:22px;font-weight:bold;letter-spacing:2px">CAR HELP</div>
+          <div style="color:#888;font-size:11px;letter-spacing:2px;margin-top:2px">RENT A CAR</div>
+        </div>
+        <div style="padding:24px;background:#fff">${htmlBody}</div>
+        <div style="background:#0A0A0A;padding:16px 24px;text-align:center;color:#888;font-size:11px">
+          Car Help S.A.S · NIT 901.697.903-5 · Pereira, Colombia<br>
+          Cel. 310 743 6082 · reservascarhelp@gmail.com
+        </div>
+      </div>`,
+    })
+
+    res.json({ ok: true, messageId: info.messageId })
+  } catch (err) {
+    console.error('[/api/enviar-correo] Error:', err)
     res.status(500).json({ error: err.message })
   }
 })
