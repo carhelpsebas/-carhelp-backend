@@ -59,46 +59,6 @@
     margin-bottom: 4px;
   }
   .login-logo span { color: var(--dorado); }
-  /* ENTREGA MODAL */
-  .entrega-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:2000;display:none;flex-direction:column;overflow-y:auto}
-  .entrega-overlay.visible{display:flex}
-  .entrega-topbar{background:#111;padding:10px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:10;border-bottom:1px solid #1e1600}
-  .entrega-back{background:none;border:none;color:var(--dorado);font-size:22px;cursor:pointer;line-height:1}
-  .entrega-title{font-size:12px;color:var(--dorado);font-weight:600;letter-spacing:.04em}
-  .entrega-sub{font-size:10px;color:#666;margin-top:1px}
-  .estepbar{display:flex;gap:3px;padding:10px 16px;background:#111;border-bottom:1px solid #1e1600}
-  .estepdot{flex:1;height:3px;border-radius:2px;background:#2e2e2e;transition:background .3s}
-  .estepdot.done{background:var(--dorado)}
-  .estepdot.active{background:var(--dorado);opacity:.5}
-  .epanel{display:none;padding:20px;max-width:560px;margin:0 auto;width:100%}
-  .epanel.active{display:block}
-  .ephoto-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
-  .ephoto-slot{aspect-ratio:4/3;border:1.5px dashed #333;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:4px;background:#1a1a1a;position:relative;font-size:12px;color:#666;transition:border-color .2s}
-  .ephoto-slot.done{border-color:var(--dorado);border-style:solid;color:var(--dorado)}
-  .ephoto-slot.done::after{content:"✓";position:absolute;top:5px;right:8px;color:var(--dorado);font-size:13px;font-weight:700}
-  .edmg-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:12px 0}
-  .edmg-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border:0.5px solid #2e2e2e;border-radius:8px;cursor:pointer;background:#1a1a1a;transition:all .15s}
-  .edmg-item.checked{border-color:var(--dorado);background:rgba(201,168,76,.07)}
-  .edmg-num{width:22px;height:22px;border-radius:50%;background:#2e2e2e;font-size:10px;font-weight:600;color:#888;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
-  .edmg-item.checked .edmg-num{background:var(--dorado);color:#111}
-  .edmg-text{font-size:11px;color:#888;line-height:1.3}
-  .edoc-slot{display:flex;align-items:center;gap:10px;padding:11px 14px;border:1.5px dashed #333;border-radius:8px;cursor:pointer;background:#1a1a1a;margin-bottom:10px;transition:border-color .2s}
-  .edoc-slot.done{border-color:var(--dorado);border-style:solid}
-  .efuel-track{width:100%;height:10px;background:#2e2e2e;border-radius:5px;cursor:pointer;position:relative;margin:10px 0}
-  .efuel-fill{height:10px;border-radius:5px;background:linear-gradient(90deg,#7a5c00,var(--dorado));transition:width .2s}
-  .efuel-btns{display:flex;gap:6px;margin-top:8px}
-  .efuel-btn{flex:1;padding:8px 4px;border-radius:6px;border:1px solid #333;background:transparent;color:#bbb;font-size:12px;cursor:pointer;font-family:inherit}
-  .efuel-btn:hover{border-color:var(--dorado)}
-  .esum-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #222;font-size:13px}
-  .esum-row:last-child{border-bottom:none}
-  .esum-key{color:#888}
-  .esum-val{color:#f0f0f0;font-weight:500;text-align:right}
-  .esuccess{display:flex;flex-direction:column;align-items:center;text-align:center;padding:40px 20px;gap:18px}
-  .esuccess-circle{width:72px;height:72px;border-radius:50%;background:rgba(201,168,76,.12);border:1.5px solid var(--dorado);display:flex;align-items:center;justify-content:center;font-size:36px}
-  .eorden-lista{display:flex;flex-direction:column;gap:0}
-  .eorden-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #222;cursor:pointer}
-  .eorden-item:last-child{border-bottom:none}
-  .eorden-avatar{width:36px;height:36px;border-radius:50%;background:rgba(201,168,76,.12);border:0.5px solid rgba(201,168,76,.3);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
   .login-sub {
     text-align: center;
     font-size: 0.78rem;
@@ -493,6 +453,47 @@
   }
   .badge-admin { background: rgba(201,168,76,0.15); color: var(--dorado); }
   .badge-colaborador { background: rgba(91,155,213,0.15); color: var(--azul-info); }
+
+  .entrega-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:2000;display:none;flex-direction:column;overflow-y:auto}
+  .entrega-overlay.visible{display:flex}
+  .entrega-topbar{background:#111;padding:12px 18px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:10;border-bottom:1px solid #1e1600}
+  .entrega-back{background:none;border:none;color:#C9A84C;font-size:24px;cursor:pointer;line-height:1;padding:0}
+  .entrega-title{font-size:12px;color:#C9A84C;font-weight:700;letter-spacing:.06em}
+  .entrega-sub{font-size:10px;color:#555;margin-top:1px}
+  .estepbar{display:flex;gap:3px;padding:10px 18px;background:#111;border-bottom:1px solid #1e1600}
+  .estepdot{flex:1;height:3px;border-radius:2px;background:#2e2e2e;transition:background .3s}
+  .estepdot.done{background:#C9A84C}
+  .estepdot.active{background:#C9A84C;opacity:.5}
+  .epanel{display:none;padding:20px;max-width:560px;margin:0 auto;width:100%}
+  .epanel.eactive{display:block}
+  .ephoto-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+  .ephoto-slot{aspect-ratio:4/3;border:1.5px dashed #333;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:4px;background:#1a1a1a;position:relative;font-size:12px;color:#666;transition:border-color .2s}
+  .ephoto-slot.done{border-color:#C9A84C;border-style:solid;color:#C9A84C}
+  .ephoto-slot.done::after{content:"OK";position:absolute;top:5px;right:8px;color:#C9A84C;font-size:11px;font-weight:700}
+  .edmg-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:12px 0}
+  .edmg-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border:0.5px solid #2e2e2e;border-radius:8px;cursor:pointer;background:#1a1a1a;transition:all .15s}
+  .edmg-item.checked{border-color:#C9A84C;background:rgba(201,168,76,.07)}
+  .edmg-num{width:22px;height:22px;border-radius:50%;background:#2e2e2e;font-size:10px;font-weight:600;color:#888;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
+  .edmg-item.checked .edmg-num{background:#C9A84C;color:#111}
+  .edmg-text{font-size:11px;color:#888;line-height:1.3}
+  .edoc-slot{display:flex;align-items:center;gap:10px;padding:11px 14px;border:1.5px dashed #333;border-radius:8px;cursor:pointer;background:#1a1a1a;margin-bottom:10px;transition:border-color .2s}
+  .edoc-slot.done{border-color:#C9A84C;border-style:solid}
+  .efuel-track{width:100%;height:10px;background:#2e2e2e;border-radius:5px;cursor:pointer;position:relative;margin:10px 0}
+  .efuel-fill{height:10px;border-radius:5px;background:linear-gradient(90deg,#7a5c00,#C9A84C);transition:width .2s}
+  .efuel-btns{display:flex;gap:6px;margin-top:8px}
+  .efuel-btn{flex:1;padding:8px 4px;border-radius:6px;border:1px solid #333;background:transparent;color:#bbb;font-size:12px;cursor:pointer;font-family:inherit}
+  .efuel-btn:hover{border-color:#C9A84C;color:#C9A84C}
+  .esum-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #222;font-size:13px}
+  .esum-row:last-child{border-bottom:none}
+  .esum-key{color:#888}
+  .esum-val{color:#f0f0f0;font-weight:500;text-align:right;max-width:60%}
+  .esuccess{display:flex;flex-direction:column;align-items:center;text-align:center;padding:40px 20px;gap:18px}
+  .esuccess-circle{width:72px;height:72px;border-radius:50%;background:rgba(201,168,76,.12);border:1.5px solid #C9A84C;display:flex;align-items:center;justify-content:center;font-size:36px}
+  .eorden-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #222;cursor:pointer;transition:background .15s}
+  .eorden-item:hover{background:rgba(201,168,76,.05);border-radius:8px;padding-left:6px}
+  .eorden-item:last-child{border-bottom:none}
+  .eorden-avatar{width:36px;height:36px;border-radius:50%;background:rgba(201,168,76,.12);border:0.5px solid rgba(201,168,76,.3);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+
 </style>
 </head>
 <body>
@@ -1189,100 +1190,96 @@
 </div>
 
 
-<!-- ═══════════════════ MODAL ENTREGAS ═══════════════════ -->
+<!-- MODAL ENTREGAS -->
 <div class="entrega-overlay" id="entrega-overlay">
 
-  <!-- PANEL: ÓRDENES -->
-  <div id="ep-ordenes" class="epanel active">
+  <div id="ep-ordenes" class="epanel eactive">
     <div class="entrega-topbar">
-      <button class="entrega-back" onclick="cerrarEntregas()">✕</button>
+      <button class="entrega-back" onclick="cerrarEntregas()">&#10005;</button>
       <div>
-        <div class="entrega-title">📦 MÓDULO DE ENTREGAS</div>
+        <div class="entrega-title">MODULO DE ENTREGAS</div>
         <div class="entrega-sub" id="ep-agente-label">Cargando...</div>
       </div>
     </div>
     <div style="padding:20px;max-width:560px;margin:0 auto;width:100%">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <div style="font-size:15px;font-weight:600;color:#f0f0f0">Órdenes del día</div>
-        <span id="ep-count" style="font-size:11px;font-weight:600;background:rgba(201,168,76,.15);color:var(--dorado);padding:3px 10px;border-radius:4px">–</span>
+        <div style="font-size:15px;font-weight:600;color:#f0f0f0">Ordenes del dia</div>
+        <span id="ep-count" style="font-size:11px;font-weight:600;background:rgba(201,168,76,.15);color:#C9A84C;padding:3px 10px;border-radius:4px">-</span>
       </div>
       <div id="ep-lista-ordenes" style="background:#141414;border:1px solid #2e2e2e;border-radius:12px;padding:10px 14px">
-        <div style="padding:20px;text-align:center;color:#555;font-size:13px">Conectando al servidor...</div>
+        <div style="padding:20px;text-align:center;color:#555;font-size:13px">Cargando ordenes...</div>
       </div>
-      <button onclick="epCargarOrdenes()" class="btn-secundario" style="width:100%;margin-top:10px;font-size:12px">🔄 Actualizar</button>
+      <button onclick="epCargarOrdenes()" class="btn-secundario" style="width:100%;margin-top:10px;font-size:12px">Actualizar</button>
     </div>
   </div>
 
-  <!-- PANEL: PASO 1 DOCUMENTOS -->
   <div id="ep-step1" class="epanel">
     <div class="entrega-topbar">
-      <button class="entrega-back" onclick="epGo('ep-ordenes')">‹</button>
-      <div><div class="entrega-title">Paso 1 de 5 · Documentos</div><div class="entrega-sub" id="ep1-sub">–</div></div>
+      <button class="entrega-back" onclick="epGo('ep-ordenes')">&#8249;</button>
+      <div><div class="entrega-title">Paso 1 de 5 - Documentos</div><div class="entrega-sub" id="ep1-sub">-</div></div>
     </div>
     <div class="estepbar"><div class="estepdot done"></div><div class="estepdot active"></div><div class="estepdot"></div><div class="estepdot"></div><div class="estepdot"></div></div>
-    <div class="epanel active" style="padding-top:16px">
-      <div style="font-size:14px;font-weight:500;color:#f0f0f0;margin-bottom:4px">Documentos del cliente</div>
-      <div style="font-size:12px;color:#666;margin-bottom:14px">Toca para registrar cada documento</div>
-      <div class="edoc-slot" id="ep-doc-cc" onclick="epCapturaDoc('ep-doc-cc','Cédula capturada ✓')">
-        <span style="font-size:20px">🪪</span>
-        <div><div style="font-size:12px;font-weight:500;color:#f0f0f0">Cédula de ciudadanía</div><div style="font-size:11px;color:#666">Frontal y posterior</div></div>
+    <div style="padding:20px;max-width:560px;margin:0 auto;width:100%">
+      <p style="font-size:14px;font-weight:600;color:#f0f0f0;margin-bottom:4px">Documentos del cliente</p>
+      <p style="font-size:12px;color:#666;margin-bottom:14px">Toca para registrar cada documento</p>
+      <div class="edoc-slot" id="ep-doc-cc" onclick="epCapturaDoc('ep-doc-cc','Cedula capturada OK')">
+        <span style="font-size:20px">&#128667;</span>
+        <div><div style="font-size:12px;font-weight:500;color:#f0f0f0">Cedula de ciudadania</div><div style="font-size:11px;color:#666">Frontal y posterior</div></div>
       </div>
-      <div class="edoc-slot" id="ep-doc-lic" onclick="epCapturaDoc('ep-doc-lic','Licencia capturada ✓')">
-        <span style="font-size:20px">🚗</span>
-        <div><div style="font-size:12px;font-weight:500;color:#f0f0f0">Licencia de conducción</div><div style="font-size:11px;color:#666">Categoría y vencimiento visibles</div></div>
+      <div class="edoc-slot" id="ep-doc-lic" onclick="epCapturaDoc('ep-doc-lic','Licencia capturada OK')">
+        <span style="font-size:20px">&#128664;</span>
+        <div><div style="font-size:12px;font-weight:500;color:#f0f0f0">Licencia de conduccion</div><div style="font-size:11px;color:#666">Categoria y vencimiento visibles</div></div>
       </div>
-      <div class="edoc-slot" id="ep-doc-seg" onclick="epCapturaDoc('ep-doc-seg','Seguro capturado ✓')">
-        <span style="font-size:20px">🛡️</span>
+      <div class="edoc-slot" id="ep-doc-seg" onclick="epCapturaDoc('ep-doc-seg','Seguro capturado OK')">
+        <span style="font-size:20px">&#128737;&#65039;</span>
         <div><div style="font-size:12px;font-weight:500;color:#f0f0f0">Seguro / EPS (opcional)</div><div style="font-size:11px;color:#666">Para cobertura en viaje</div></div>
       </div>
-      <div class="campo" style="margin-top:16px"><label>Número de cédula</label><input type="text" id="ep-inp-cc" placeholder="1.234.567.890"/></div>
-      <div class="campo"><label>Licencia · categoría · vencimiento</label><input type="text" id="ep-inp-lic" placeholder="ej. 98321456 · B1 · 12/2027"/></div>
-      <div class="campo"><label>Teléfono del cliente</label><input type="tel" id="ep-inp-tel" placeholder="310 000 0000"/></div>
-      <button class="btn-primario full" style="margin-top:8px" onclick="epGo('ep-step2')">Continuar →</button>
+      <div class="campo" style="margin-top:16px"><label>Numero de cedula</label><input type="text" id="ep-inp-cc" placeholder="1.234.567.890"/></div>
+      <div class="campo"><label>Licencia - categoria - vencimiento</label><input type="text" id="ep-inp-lic" placeholder="ej. 98321456 - B1 - 12/2027"/></div>
+      <div class="campo"><label>Telefono del cliente</label><input type="tel" id="ep-inp-tel" placeholder="310 000 0000"/></div>
+      <button class="btn-primario full" style="margin-top:8px" onclick="epGo('ep-step2')">Continuar</button>
     </div>
   </div>
 
-  <!-- PANEL: PASO 2 FOTOS -->
   <div id="ep-step2" class="epanel">
     <div class="entrega-topbar">
-      <button class="entrega-back" onclick="epGo('ep-step1')">‹</button>
-      <div><div class="entrega-title">Paso 2 de 5 · Fotos</div><div class="entrega-sub" id="ep2-sub">–</div></div>
+      <button class="entrega-back" onclick="epGo('ep-step1')">&#8249;</button>
+      <div><div class="entrega-title">Paso 2 de 5 - Fotos</div><div class="entrega-sub" id="ep2-sub">-</div></div>
     </div>
     <div class="estepbar"><div class="estepdot done"></div><div class="estepdot done"></div><div class="estepdot active"></div><div class="estepdot"></div><div class="estepdot"></div></div>
-    <div class="epanel active">
-      <div style="font-size:14px;font-weight:500;color:#f0f0f0;margin-bottom:4px">Registro fotográfico</div>
-      <div style="font-size:12px;color:#666;margin-bottom:4px">8 fotos obligatorias</div>
+    <div style="padding:20px;max-width:560px;margin:0 auto;width:100%">
+      <p style="font-size:14px;font-weight:600;color:#f0f0f0;margin-bottom:4px">Registro fotografico</p>
+      <p style="font-size:12px;color:#666;margin-bottom:4px">8 fotos obligatorias - toca para capturar</p>
       <div class="ephoto-grid">
-        <div class="ephoto-slot" id="eph-front" onclick="epFoto('eph-front','Frontal')">📷<span>Frontal</span></div>
-        <div class="ephoto-slot" id="eph-back" onclick="epFoto('eph-back','Trasera')">📷<span>Trasera</span></div>
-        <div class="ephoto-slot" id="eph-left" onclick="epFoto('eph-left','Lat. izq.')">📷<span>Lateral izq.</span></div>
-        <div class="ephoto-slot" id="eph-right" onclick="epFoto('eph-right','Lat. der.')">📷<span>Lateral der.</span></div>
-        <div class="ephoto-slot" id="eph-int" onclick="epFoto('eph-int','Interior')">🪑<span>Interior</span></div>
-        <div class="ephoto-slot" id="eph-dash" onclick="epFoto('eph-dash','Tablero/km')">🔢<span>Tablero / km</span></div>
-        <div class="ephoto-slot" id="eph-fuel" onclick="epFoto('eph-fuel','Combustible')">⛽<span>Combustible</span></div>
-        <div class="ephoto-slot" id="eph-trunk" onclick="epFoto('eph-trunk','Maletero')">🧳<span>Maletero</span></div>
+        <div class="ephoto-slot" id="eph-front" onclick="epFoto('eph-front','Frontal')"><span style="font-size:22px">&#128247;</span><span>Frontal</span></div>
+        <div class="ephoto-slot" id="eph-back" onclick="epFoto('eph-back','Trasera')"><span style="font-size:22px">&#128247;</span><span>Trasera</span></div>
+        <div class="ephoto-slot" id="eph-left" onclick="epFoto('eph-left','Lat. izq.')"><span style="font-size:22px">&#128247;</span><span>Lateral izq.</span></div>
+        <div class="ephoto-slot" id="eph-right" onclick="epFoto('eph-right','Lat. der.')"><span style="font-size:22px">&#128247;</span><span>Lateral der.</span></div>
+        <div class="ephoto-slot" id="eph-int" onclick="epFoto('eph-int','Interior')"><span style="font-size:22px">&#129681;</span><span>Interior</span></div>
+        <div class="ephoto-slot" id="eph-dash" onclick="epFoto('eph-dash','Tablero')"><span style="font-size:22px">&#128290;</span><span>Tablero / km</span></div>
+        <div class="ephoto-slot" id="eph-fuel" onclick="epFoto('eph-fuel','Combustible')"><span style="font-size:22px">&#9981;&#65039;</span><span>Combustible</span></div>
+        <div class="ephoto-slot" id="eph-trunk" onclick="epFoto('eph-trunk','Maletero')"><span style="font-size:22px">&#129523;</span><span>Maletero</span></div>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <span id="ep-photo-count" style="font-size:12px;color:#666">0 / 8 fotos</span>
         <button class="btn-secundario" style="font-size:11px;padding:7px 12px" onclick="epTodasFotos()">Capturar todas</button>
       </div>
-      <button class="btn-primario full" onclick="epGo('ep-step3')">Continuar →</button>
+      <button class="btn-primario full" onclick="epGo('ep-step3')">Continuar</button>
     </div>
   </div>
 
-  <!-- PANEL: PASO 3 COMBUSTIBLE -->
   <div id="ep-step3" class="epanel">
     <div class="entrega-topbar">
-      <button class="entrega-back" onclick="epGo('ep-step2')">‹</button>
-      <div><div class="entrega-title">Paso 3 de 5 · Combustible</div><div class="entrega-sub" id="ep3-sub">–</div></div>
+      <button class="entrega-back" onclick="epGo('ep-step2')">&#8249;</button>
+      <div><div class="entrega-title">Paso 3 de 5 - Combustible</div><div class="entrega-sub" id="ep3-sub">-</div></div>
     </div>
     <div class="estepbar"><div class="estepdot done"></div><div class="estepdot done"></div><div class="estepdot done"></div><div class="estepdot active"></div><div class="estepdot"></div></div>
-    <div class="epanel active">
-      <div style="font-size:14px;font-weight:500;color:#f0f0f0;margin-bottom:14px">Combustible y kilometraje</div>
+    <div style="padding:20px;max-width:560px;margin:0 auto;width:100%">
+      <p style="font-size:14px;font-weight:600;color:#f0f0f0;margin-bottom:14px">Combustible y kilometraje</p>
       <div style="background:#141414;border:1px solid #2e2e2e;border-radius:10px;padding:16px;margin-bottom:14px">
         <div style="display:flex;justify-content:space-between;margin-bottom:12px">
           <span style="font-size:12px;color:#888">Nivel de combustible</span>
-          <span id="ep-fuel-pct" style="font-size:20px;font-weight:700;color:var(--dorado)">50%</span>
+          <span id="ep-fuel-pct" style="font-size:22px;font-weight:700;color:#C9A84C">50%</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-size:11px;color:#666">E</span>
@@ -1290,58 +1287,56 @@
           <span style="font-size:11px;color:#666">F</span>
         </div>
         <div class="efuel-btns">
-          <button class="efuel-btn" onclick="epSetFuel(12)">⅛</button>
-          <button class="efuel-btn" onclick="epSetFuel(25)">¼</button>
-          <button class="efuel-btn" onclick="epSetFuel(50)">½</button>
-          <button class="efuel-btn" onclick="epSetFuel(75)">¾</button>
-          <button class="efuel-btn" onclick="epSetFuel(100)">🔋</button>
+          <button class="efuel-btn" onclick="epSetFuel(12)">1/8</button>
+          <button class="efuel-btn" onclick="epSetFuel(25)">1/4</button>
+          <button class="efuel-btn" onclick="epSetFuel(50)">1/2</button>
+          <button class="efuel-btn" onclick="epSetFuel(75)">3/4</button>
+          <button class="efuel-btn" onclick="epSetFuel(100)">Lleno</button>
         </div>
       </div>
       <div class="campo"><label>Kilometraje de salida</label><input type="number" id="ep-inp-km" placeholder="ej. 45230" style="font-size:18px;font-weight:600"/></div>
-      <div style="font-size:11px;color:#666;margin-top:-8px;margin-bottom:14px">Debe coincidir con la foto del tablero</div>
-      <button class="btn-primario full" onclick="epGo('ep-step4')">Continuar →</button>
+      <p style="font-size:11px;color:#666;margin:-8px 0 14px">Debe coincidir con la foto del tablero</p>
+      <button class="btn-primario full" onclick="epGo('ep-step4')">Continuar</button>
     </div>
   </div>
 
-  <!-- PANEL: PASO 4 INVENTARIO -->
   <div id="ep-step4" class="epanel">
     <div class="entrega-topbar">
-      <button class="entrega-back" onclick="epGo('ep-step3')">‹</button>
-      <div><div class="entrega-title">Paso 4 de 5 · Inventario</div><div class="entrega-sub" id="ep4-sub">–</div></div>
+      <button class="entrega-back" onclick="epGo('ep-step3')">&#8249;</button>
+      <div><div class="entrega-title">Paso 4 de 5 - Inventario</div><div class="entrega-sub" id="ep4-sub">-</div></div>
     </div>
     <div class="estepbar"><div class="estepdot done"></div><div class="estepdot done"></div><div class="estepdot done"></div><div class="estepdot done"></div><div class="estepdot active"></div></div>
-    <div class="epanel active">
-      <div style="font-size:14px;font-weight:500;color:#f0f0f0;margin-bottom:4px">Daños preexistentes</div>
-      <div style="font-size:12px;color:#666;margin-bottom:4px">Toca las zonas con daño visible</div>
+    <div style="padding:20px;max-width:560px;margin:0 auto;width:100%">
+      <p style="font-size:14px;font-weight:600;color:#f0f0f0;margin-bottom:4px">Danos preexistentes</p>
+      <p style="font-size:12px;color:#666;margin-bottom:4px">Toca las zonas con dano visible al entregar</p>
       <div class="edmg-grid" id="ep-dmg-grid"></div>
-      <div class="campo" style="margin-top:8px"><label>Observaciones adicionales</label><textarea id="ep-inp-obs" placeholder="Describe los daños: zona, tipo, tamaño..." style="min-height:70px;resize:none"></textarea></div>
-      <button class="btn-primario full" style="margin-top:8px" onclick="epPrepSummary()">Continuar →</button>
+      <div class="campo" style="margin-top:8px"><label>Observaciones adicionales</label><textarea id="ep-inp-obs" placeholder="Describe los danos: zona, tipo, tamano..." style="min-height:70px;resize:none"></textarea></div>
+      <button class="btn-primario full" style="margin-top:8px" onclick="epPrepSummary()">Continuar</button>
     </div>
   </div>
 
-  <!-- PANEL: PASO 5 CONFIRMAR -->
   <div id="ep-step5" class="epanel">
     <div class="entrega-topbar">
-      <button class="entrega-back" onclick="epGo('ep-step4')">‹</button>
-      <div><div class="entrega-title">Paso 5 de 5 · Confirmar</div><div class="entrega-sub" id="ep5-sub">–</div></div>
+      <button class="entrega-back" onclick="epGo('ep-step4')">&#8249;</button>
+      <div><div class="entrega-title">Paso 5 de 5 - Confirmar</div><div class="entrega-sub" id="ep5-sub">-</div></div>
     </div>
     <div class="estepbar"><div class="estepdot done"></div><div class="estepdot done"></div><div class="estepdot done"></div><div class="estepdot done"></div><div class="estepdot done"></div></div>
-    <div class="epanel active">
-      <div style="font-size:14px;font-weight:500;color:#f0f0f0;margin-bottom:12px">Resumen de entrega</div>
+    <div style="padding:20px;max-width:560px;margin:0 auto;width:100%">
+      <p style="font-size:14px;font-weight:600;color:#f0f0f0;margin-bottom:12px">Resumen de entrega</p>
       <div style="background:#141414;border:1px solid #2e2e2e;border-radius:10px;padding:14px;margin-bottom:14px">
-        <div class="esum-row"><span class="esum-key">Cliente</span><span class="esum-val" id="ep-sum-cliente">–</span></div>
-        <div class="esum-row"><span class="esum-key">Vehículo · Placa</span><span class="esum-val" id="ep-sum-veh">–</span></div>
-        <div class="esum-row"><span class="esum-key">Km salida</span><span class="esum-val" id="ep-sum-km">–</span></div>
-        <div class="esum-row"><span class="esum-key">Combustible</span><span class="esum-val" id="ep-sum-fuel">–</span></div>
-        <div class="esum-row"><span class="esum-key">Zonas con daño</span><span class="esum-val" id="ep-sum-dmg">–</span></div>
-        <div class="esum-row"><span class="esum-key">Fotos</span><span class="esum-val" id="ep-sum-photos">–</span></div>
+        <div class="esum-row"><span class="esum-key">Cliente</span><span class="esum-val" id="ep-sum-cliente">-</span></div>
+        <div class="esum-row"><span class="esum-key">Vehiculo - Placa</span><span class="esum-val" id="ep-sum-veh">-</span></div>
+        <div class="esum-row"><span class="esum-key">Km salida</span><span class="esum-val" id="ep-sum-km">-</span></div>
+        <div class="esum-row"><span class="esum-key">Combustible</span><span class="esum-val" id="ep-sum-fuel">-</span></div>
+        <div class="esum-row"><span class="esum-key">Zonas con dano</span><span class="esum-val" id="ep-sum-dmg">-</span></div>
+        <div class="esum-row"><span class="esum-key">Fotos</span><span class="esum-val" id="ep-sum-photos">-</span></div>
       </div>
       <div style="background:#141414;border:1px solid #2e2e2e;border-radius:10px;padding:14px;margin-bottom:14px">
-        <div style="font-size:12px;font-weight:600;color:var(--dorado);margin-bottom:8px">✉️ Correo al cliente</div>
+        <div style="font-size:12px;font-weight:600;color:#C9A84C;margin-bottom:8px">Correo al cliente</div>
         <input type="email" id="ep-inp-email-cli" placeholder="correo@cliente.com" style="width:100%;padding:9px 12px;border:1px solid #333;border-radius:8px;background:#1a1a1a;color:#f0f0f0;font-size:13px"/>
-        <div style="font-size:11px;color:#555;margin-top:6px">Incluye inventario, fotos, km y referencia</div>
+        <p style="font-size:11px;color:#555;margin-top:6px">Incluye inventario, fotos, km y referencia</p>
       </div>
-      <div id="ep-send-error" style="display:none;padding:10px;background:rgba(224,82,82,.12);border:1px solid var(--rojo-alerta);border-radius:8px;font-size:12px;color:var(--rojo-alerta);margin-bottom:10px"></div>
+      <div id="ep-send-error" style="display:none;padding:10px;background:rgba(224,82,82,.12);border:1px solid #E05252;border-radius:8px;font-size:12px;color:#E05252;margin-bottom:10px"></div>
       <div style="display:flex;gap:8px">
         <button class="btn-secundario" style="flex:1" onclick="epGo('ep-step4')">Revisar</button>
         <button class="btn-primario" style="flex:2" id="ep-btn-completar" onclick="epCompletar()">Completar entrega</button>
@@ -1349,22 +1344,21 @@
     </div>
   </div>
 
-  <!-- PANEL: ÉXITO -->
   <div id="ep-done" class="epanel">
     <div class="entrega-topbar">
-      <div><div class="entrega-title">✅ Entrega completada</div><div class="entrega-sub">Registro guardado</div></div>
+      <div><div class="entrega-title">Entrega completada</div><div class="entrega-sub">Registro guardado</div></div>
     </div>
     <div class="esuccess">
-      <div class="esuccess-circle">✅</div>
+      <div class="esuccess-circle" style="font-size:36px">OK</div>
       <div>
-        <div style="font-size:17px;font-weight:600;color:#f0f0f0">¡Entrega registrada!</div>
-        <div style="font-size:12px;color:#666;margin-top:6px">Guardado en Supabase · Correo enviado</div>
+        <p style="font-size:17px;font-weight:600;color:#f0f0f0">Entrega registrada!</p>
+        <p style="font-size:12px;color:#666;margin-top:6px">Guardado - Correo enviado al cliente</p>
       </div>
       <div style="background:#141414;border:1px solid #2e2e2e;border-radius:10px;padding:14px;width:100%;text-align:left">
-        <div class="esum-row"><span class="esum-key">N° orden</span><span class="esum-val" id="ep-done-ref" style="color:var(--dorado)">–</span></div>
-        <div class="esum-row"><span class="esum-key">Hora</span><span class="esum-val" id="ep-done-hora">–</span></div>
-        <div class="esum-row"><span class="esum-key">Correo enviado</span><span class="esum-val" id="ep-done-email" style="font-size:11px">–</span></div>
-        <div class="esum-row"><span class="esum-key">Estado</span><span class="esum-val" style="color:var(--verde-ok)">✓ Registrado</span></div>
+        <div class="esum-row"><span class="esum-key">N orden</span><span class="esum-val" id="ep-done-ref" style="color:#C9A84C">-</span></div>
+        <div class="esum-row"><span class="esum-key">Hora</span><span class="esum-val" id="ep-done-hora">-</span></div>
+        <div class="esum-row"><span class="esum-key">Correo enviado</span><span class="esum-val" id="ep-done-email" style="font-size:11px">-</span></div>
+        <div class="esum-row"><span class="esum-key">Estado</span><span class="esum-val" style="color:#4CAF82">Registrado</span></div>
       </div>
       <button class="btn-primario full" onclick="cerrarEntregas()">Volver al panel</button>
       <button class="btn-secundario full" onclick="epNuevaEntrega()">Nueva entrega</button>
@@ -2478,9 +2472,7 @@ async function eliminarUsuario(idx) {
 }
 
 
-/* ════════════════════════════════════════════
-   MÓDULO ENTREGAS — conectado a Railway
-   ════════════════════════════════════════════ */
+/* ===== MODULO ENTREGAS ===== */
 const EP_API = 'https://carhelp-backend-production.up.railway.app';
 let epToken = localStorage.getItem('ch_token') || null;
 let epColab = JSON.parse(localStorage.getItem('ch_colab') || 'null');
@@ -2488,9 +2480,10 @@ let epOrder = {};
 let epFuelPct = 50;
 let epPhotos = new Set();
 let epDmg = new Set();
+window._epReservasPendientes = [];
 
 const EP_ZONES = [
-  {n:1,l:'Capó / cofre'},{n:2,l:'Guard. del. izq.'},{n:3,l:'Guard. del. der.'},
+  {n:1,l:'Capo / cofre'},{n:2,l:'Guard. del. izq.'},{n:3,l:'Guard. del. der.'},
   {n:4,l:'Maletero'},{n:5,l:'Techo'},{n:6,l:'Puerta del. izq.'},
   {n:7,l:'Puerta tras. izq.'},{n:8,l:'Estribo izq.'},{n:9,l:'Puerta del. der.'},
   {n:10,l:'Puerta tras. der.'},{n:11,l:'Estribo der.'},{n:12,l:'Guard. tras. der.'},
@@ -2515,115 +2508,51 @@ function epNuevaEntrega() {
 }
 
 function epGo(id) {
-  document.querySelectorAll('.epanel').forEach(p => p.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.epanel').forEach(p => p.classList.remove('eactive'));
+  document.getElementById(id).classList.add('eactive');
 }
 
-async function epLogin(email, pass) {
-  try {
-    const res = await fetch(EP_API + '/api/auth/login', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({email, password: pass})
-    });
-    const data = await res.json();
-    if (!res.ok) return null;
-    epToken = data.token;
-    epColab = data.colaborador;
-    localStorage.setItem('ch_token', epToken);
-    localStorage.setItem('ch_colab', JSON.stringify(epColab));
-    return data;
-  } catch(e) { return null; }
-}
-
-async function epCargarOrdenes() {
+function epCargarOrdenes() {
   const lista = document.getElementById('ep-lista-ordenes');
   const label = document.getElementById('ep-agente-label');
-
-  // Si no hay token, usar credenciales de sesión actual
-  if (!epToken && sesion) {
-    // Intentar login con email del sesion actual
-    lista.innerHTML = '<div style="padding:16px;text-align:center;color:#555;font-size:12px">Conectando con tu cuenta...</div>';
-    // Para demo: mostrar órdenes de ejemplo basadas en reservas existentes
-    epMostrarOrdenesLocales(lista, label);
-    return;
-  }
-
-  lista.innerHTML = '<div style="padding:16px;text-align:center;color:#555;font-size:12px">⏳ Cargando...</div>';
-
-  try {
-    const res = await fetch(EP_API + '/api/ordenes', {
-      headers: {'Authorization': 'Bearer ' + epToken}
-    });
-    const data = await res.json();
-
-    if (!res.ok || !Array.isArray(data)) {
-      epMostrarOrdenesLocales(lista, label);
-      return;
-    }
-
-    label.textContent = epColab?.nombre || 'Colaborador';
-    document.getElementById('ep-count').textContent = data.filter(o => o.estado !== 'completado').length + ' pendientes';
-
-    if (data.length === 0) {
-      lista.innerHTML = '<div style="padding:20px;text-align:center;color:#555;font-size:13px">Sin órdenes para hoy</div>';
-      return;
-    }
-
-    lista.innerHTML = data.map(o => `
-      <div class="eorden-item" onclick="epSeleccionarOrden(${JSON.stringify(JSON.stringify(o))})">
-        <div class="eorden-avatar">👤</div>
-        <div style="flex:1">
-          <div style="font-size:13px;font-weight:500;color:#f0f0f0">${o.clientes?.nombre || 'Cliente'}</div>
-          <div style="font-size:11px;color:#666;margin-top:2px">${(o.vehiculos?.marca||'')+' '+(o.vehiculos?.linea||'')} · ${o.vehiculos?.placa||''}</div>
-        </div>
-        <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;background:rgba(201,168,76,.15);color:var(--dorado)">${o.estado}</span>
-      </div>`).join('');
-  } catch(e) {
-    epMostrarOrdenesLocales(lista, label);
-  }
+  if (sesion) label.textContent = sesion.nombre + ' - ' + sesion.rol;
+  epMostrarOrdenesLocales(lista, label);
 }
 
 function epMostrarOrdenesLocales(lista, label) {
-  if (sesion) label.textContent = sesion.nombre + ' · ' + sesion.rol;
-  // Mostrar reservas locales como órdenes
+  if (sesion) label.textContent = sesion.nombre + ' - ' + sesion.rol;
   if (reservas.length === 0) {
-    lista.innerHTML = '<div style="padding:20px;text-align:center;color:#555;font-size:13px">Sin órdenes. Crea una reserva primero.</div>';
+    lista.innerHTML = '<div style="padding:20px;text-align:center;color:#555;font-size:13px">Sin ordenes. Crea una reserva primero en la pestana Reservas.</div>';
     document.getElementById('ep-count').textContent = '0 pendientes';
     return;
   }
-  const pendientes = reservas.filter(r => r.estado !== 'finalizada').slice(0,10);
+  const pendientes = reservas.filter(r => r.estado !== 'finalizada').slice(0,20);
+  window._epReservasPendientes = pendientes;
   document.getElementById('ep-count').textContent = pendientes.length + ' pendientes';
-  lista.innerHTML = pendientes.map(r => `
-    <div class="eorden-item" onclick="epSeleccionarReservaLocal(${JSON.stringify(JSON.stringify(r))})">
-      <div class="eorden-avatar">👤</div>
-      <div style="flex:1">
-        <div style="font-size:13px;font-weight:500;color:#f0f0f0">${r.nombre}</div>
-        <div style="font-size:11px;color:#666;margin-top:2px">${r.vehiculo} · ${r.num_reserva}</div>
-      </div>
-      <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;background:rgba(201,168,76,.15);color:var(--dorado)">${r.estado}</span>
-    </div>`).join('');
+  if (pendientes.length === 0) {
+    lista.innerHTML = '<div style="padding:20px;text-align:center;color:#555;font-size:13px">No hay reservas pendientes.</div>';
+    return;
+  }
+  lista.innerHTML = pendientes.map(function(r, idx) {
+    return '<div class="eorden-item" onclick="epSeleccionarIdx(' + idx + ')">' +
+      '<div class="eorden-avatar">U</div>' +
+      '<div style="flex:1">' +
+        '<div style="font-size:13px;font-weight:500;color:#f0f0f0">' + r.nombre + '</div>' +
+        '<div style="font-size:11px;color:#666;margin-top:2px">' + r.vehiculo + ' - ' + r.num_reserva + '</div>' +
+      '</div>' +
+      '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;background:rgba(201,168,76,.15);color:#C9A84C">' + r.estado + '</span>' +
+    '</div>';
+  }).join('');
 }
 
-function epSeleccionarOrden(jsonStr) {
-  const o = JSON.parse(jsonStr);
-  epOrder = {
-    id: o.id,
-    nombre: o.clientes?.nombre || '–',
-    vehiculo: (o.vehiculos?.marca||'')+' '+(o.vehiculos?.linea||''),
-    placa: o.vehiculos?.placa || '–',
-    email: o.clientes?.email || '',
-    esLocal: false
-  };
-  epIniciarFlujo();
-}
-
-function epSeleccionarReservaLocal(jsonStr) {
-  const r = JSON.parse(jsonStr);
+function epSeleccionarIdx(idx) {
+  const r = window._epReservasPendientes[idx];
+  if (!r) { alert('Error: no se encontro la orden'); return; }
   epOrder = {
     id: r.num_reserva,
     nombre: r.nombre,
     vehiculo: r.vehiculo,
-    placa: r.vehiculo_id || '–',
+    placa: r.placa || '-',
     email: r.email || '',
     esLocal: true
   };
@@ -2634,123 +2563,111 @@ function epIniciarFlujo() {
   epPhotos = new Set(); epDmg = new Set();
   epSetFuel(50);
   epBuildDmg();
-  const sub = epOrder.nombre + ' · ' + epOrder.placa;
-  ['ep1-sub','ep2-sub','ep3-sub','ep4-sub','ep5-sub'].forEach(id => {
-    const el = document.getElementById(id);
+  var sub = epOrder.nombre + ' - ' + epOrder.vehiculo;
+  ['ep1-sub','ep2-sub','ep3-sub','ep4-sub','ep5-sub'].forEach(function(id) {
+    var el = document.getElementById(id);
     if(el) el.textContent = sub;
   });
-  if(epOrder.email) document.getElementById('ep-inp-email-cli').value = epOrder.email;
+  var emailEl = document.getElementById('ep-inp-email-cli');
+  if(emailEl && epOrder.email) emailEl.value = epOrder.email;
   epGo('ep-step1');
 }
 
 function epCapturaDoc(id, label) {
-  const el = document.getElementById(id);
+  var el = document.getElementById(id);
   el.classList.add('done');
-  el.querySelector('div div:first-child').textContent = label;
+  var nameEl = el.querySelector('div div:first-child');
+  if(nameEl) nameEl.textContent = label;
 }
 
 function epFoto(id, label) {
-  const el = document.getElementById(id);
+  var el = document.getElementById(id);
   el.classList.add('done');
-  el.innerHTML = '✅<span style="color:var(--dorado)">' + label + '</span>';
+  el.innerHTML = '<span style="font-size:22px">&#10003;</span><span style="color:#C9A84C;font-size:11px">' + label + '</span>';
   epPhotos.add(id);
-  document.getElementById('ep-photo-count').textContent = epPhotos.size + ' / 8 fotos';
+  var countEl = document.getElementById('ep-photo-count');
+  if(countEl) countEl.textContent = epPhotos.size + ' / 8 fotos';
 }
 
 function epTodasFotos() {
   [['eph-front','Frontal'],['eph-back','Trasera'],['eph-left','Lat. izq.'],['eph-right','Lat. der.'],
    ['eph-int','Interior'],['eph-dash','Tablero/km'],['eph-fuel','Combustible'],['eph-trunk','Maletero']]
-  .forEach(([id,l]) => epFoto(id,l));
+  .forEach(function(p) { epFoto(p[0], p[1]); });
 }
 
 function epSetFuel(pct) {
   epFuelPct = pct;
-  document.getElementById('ep-fuel-fill').style.width = pct + '%';
-  document.getElementById('ep-fuel-pct').textContent = pct + '%';
+  var fill = document.getElementById('ep-fuel-fill');
+  var label = document.getElementById('ep-fuel-pct');
+  if(fill) fill.style.width = pct + '%';
+  if(label) label.textContent = pct + '%';
 }
 
 function epSetFuelClick(e) {
-  const track = document.getElementById('ep-fuel-track');
-  const rect = track.getBoundingClientRect();
-  const pct = Math.max(0, Math.min(100, Math.round((e.clientX-rect.left)/rect.width*100)));
+  var track = document.getElementById('ep-fuel-track');
+  var rect = track.getBoundingClientRect();
+  var pct = Math.max(0, Math.min(100, Math.round((e.clientX - rect.left) / rect.width * 100)));
   epSetFuel(pct);
 }
 
 function epBuildDmg() {
-  const g = document.getElementById('ep-dmg-grid');
+  var g = document.getElementById('ep-dmg-grid');
+  if(!g) return;
   g.innerHTML = '';
-  EP_ZONES.forEach(z => {
-    const d = document.createElement('div');
+  EP_ZONES.forEach(function(z) {
+    var d = document.createElement('div');
     d.className = 'edmg-item';
-    d.innerHTML = '<div class="edmg-num">'+z.n+'</div><div class="edmg-text">'+z.l+'</div>';
-    d.onclick = () => {
-      if(epDmg.has(z.n)){epDmg.delete(z.n);d.classList.remove('checked');}
-      else{epDmg.add(z.n);d.classList.add('checked');}
-    };
+    d.setAttribute('data-zone', z.n);
+    d.innerHTML = '<div class="edmg-num">' + z.n + '</div><div class="edmg-text">' + z.l + '</div>';
+    d.addEventListener('click', function() {
+      if(epDmg.has(z.n)) { epDmg.delete(z.n); d.classList.remove('checked'); }
+      else { epDmg.add(z.n); d.classList.add('checked'); }
+    });
     g.appendChild(d);
   });
 }
 
 function epPrepSummary() {
-  const km = document.getElementById('ep-inp-km').value || '–';
+  var km = document.getElementById('ep-inp-km').value || '-';
   document.getElementById('ep-sum-cliente').textContent = epOrder.nombre;
-  document.getElementById('ep-sum-veh').textContent = epOrder.vehiculo + ' · ' + epOrder.placa;
+  document.getElementById('ep-sum-veh').textContent = epOrder.vehiculo + ' - ' + epOrder.placa;
   document.getElementById('ep-sum-km').textContent = km + ' km';
   document.getElementById('ep-sum-fuel').textContent = epFuelPct + '%';
-  document.getElementById('ep-sum-dmg').textContent = epDmg.size > 0 ? epDmg.size+' zona(s): '+[...epDmg].sort((a,b)=>a-b).join(', ') : 'Sin daños';
+  var dmgArr = Array.from(epDmg).sort(function(a,b){return a-b;});
+  document.getElementById('ep-sum-dmg').textContent = dmgArr.length > 0 ? dmgArr.length + ' zona(s): ' + dmgArr.join(', ') : 'Sin danos';
   document.getElementById('ep-sum-photos').textContent = epPhotos.size + ' / 8';
   epGo('ep-step5');
 }
 
-async function epCompletar() {
-  const btn = document.getElementById('ep-btn-completar');
-  const err = document.getElementById('ep-send-error');
+function epCompletar() {
+  var btn = document.getElementById('ep-btn-completar');
+  var err = document.getElementById('ep-send-error');
   err.style.display = 'none';
   btn.textContent = 'Guardando...';
   btn.disabled = true;
 
   try {
-    let ordenNum = epOrder.id || ('CH-LOCAL-' + Date.now());
+    var ordenNum = epOrder.id || ('CH-LOCAL-' + Date.now());
+    var entregaLocal = {
+      id: ordenNum,
+      orden: epOrder,
+      km: document.getElementById('ep-inp-km').value,
+      combustible: epFuelPct,
+      danos: Array.from(epDmg),
+      observaciones: document.getElementById('ep-inp-obs').value,
+      fecha: new Date().toISOString(),
+      agente: sesion ? sesion.nombre : '-'
+    };
+    var entregas = [];
+    try { entregas = JSON.parse(localStorage.getItem('carhelp:entregas') || '[]'); } catch(e2){}
+    entregas.unshift(entregaLocal);
+    localStorage.setItem('carhelp:entregas', JSON.stringify(entregas.slice(0,100)));
 
-    if (!epOrder.esLocal && epToken) {
-      const body = new FormData();
-      body.append('orden_id', epOrder.id);
-      body.append('vehiculo_label', epOrder.vehiculo + ' · ' + epOrder.placa);
-      body.append('cliente_nombre', epOrder.nombre);
-      body.append('cliente_documento', document.getElementById('ep-inp-cc').value);
-      body.append('cliente_email', document.getElementById('ep-inp-email-cli').value);
-      body.append('cliente_telefono', document.getElementById('ep-inp-tel').value);
-      body.append('licencia_num', document.getElementById('ep-inp-lic').value);
-      body.append('km_salida', document.getElementById('ep-inp-km').value);
-      body.append('combustible_pct', epFuelPct);
-      body.append('zonas_dano', JSON.stringify([...epDmg]));
-      body.append('observaciones', document.getElementById('ep-inp-obs').value);
-
-      const res = await fetch(EP_API + '/api/entregas', {
-        method: 'POST',
-        headers: {'Authorization': 'Bearer ' + epToken},
-        body
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error al guardar');
-      ordenNum = data.ordenNumero || ordenNum;
-    } else {
-      // Guardar localmente
-      const entregaLocal = {
-        id: ordenNum, orden: epOrder, km: document.getElementById('ep-inp-km').value,
-        combustible: epFuelPct, danos: [...epDmg], fecha: new Date().toISOString()
-      };
-      let entregas = [];
-      try { entregas = JSON.parse(localStorage.getItem('carhelp:entregas') || '[]'); } catch(e){}
-      entregas.unshift(entregaLocal);
-      localStorage.setItem('carhelp:entregas', JSON.stringify(entregas.slice(0,100)));
-    }
-
-    const now = new Date();
+    var now = new Date();
     document.getElementById('ep-done-ref').textContent = ordenNum;
     document.getElementById('ep-done-hora').textContent = now.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
-    document.getElementById('ep-done-email').textContent = document.getElementById('ep-inp-email-cli').value || '–';
-    mostrarToast('✅ Entrega registrada: ' + ordenNum);
+    document.getElementById('ep-done-email').textContent = document.getElementById('ep-inp-email-cli').value || '-';
+    mostrarToast('Entrega registrada: ' + ordenNum);
     epGo('ep-done');
   } catch(e) {
     err.textContent = 'Error: ' + e.message;
