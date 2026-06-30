@@ -807,6 +807,7 @@
           <table>
             <thead>
               <tr>
+                <th>Foto</th>
                 <th>Vehículo</th>
                 <th>Categoría</th>
                 <th>Placa</th>
@@ -1081,15 +1082,34 @@
 
 <!-- ═══════════════════ MODAL VEHICULO ═══════════════════ -->
 <div class="modal-overlay" id="modal-vehiculo">
-  <div class="modal">
+  <div class="modal" style="max-width:640px">
     <div class="modal-header">
       <div class="modal-titulo" id="modal-vehiculo-titulo">Agregar vehículo</div>
       <button class="modal-cerrar" onclick="cerrarModal('modal-vehiculo')">✕</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="v_id">
+
+      <div class="seccion-label">Fotos del vehículo</div>
+      <div id="v-fotos-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">
+        <div class="v-foto-slot" data-idx="0" onclick="vSeleccionarFoto(0)" style="aspect-ratio:1;border:1.5px dashed var(--borde);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--gris-oscuro);overflow:hidden;position:relative">
+          <span style="font-size:20px;color:var(--blanco-suave)">+</span>
+        </div>
+        <div class="v-foto-slot" data-idx="1" onclick="vSeleccionarFoto(1)" style="aspect-ratio:1;border:1.5px dashed var(--borde);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--gris-oscuro);overflow:hidden;position:relative">
+          <span style="font-size:20px;color:var(--blanco-suave)">+</span>
+        </div>
+        <div class="v-foto-slot" data-idx="2" onclick="vSeleccionarFoto(2)" style="aspect-ratio:1;border:1.5px dashed var(--borde);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--gris-oscuro);overflow:hidden;position:relative">
+          <span style="font-size:20px;color:var(--blanco-suave)">+</span>
+        </div>
+        <div class="v-foto-slot" data-idx="3" onclick="vSeleccionarFoto(3)" style="aspect-ratio:1;border:1.5px dashed var(--borde);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--gris-oscuro);overflow:hidden;position:relative">
+          <span style="font-size:20px;color:var(--blanco-suave)">+</span>
+        </div>
+      </div>
+      <input type="file" id="v-foto-input" accept="image/*" style="display:none" onchange="vCargarFoto(event)">
+
+      <div class="seccion-label">Datos del vehículo</div>
       <div class="campo"><label>Nombre del vehículo <span class="req">*</span></label><input type="text" id="v_nombre" placeholder="Ej. Toyota Land Cruiser Prado"></div>
-      <div class="fila-2">
+      <div class="fila-3">
         <div class="campo">
           <label>Categoría</label>
           <select id="v_categoria">
@@ -1098,6 +1118,20 @@
           </select>
         </div>
         <div class="campo"><label>Placa</label><input type="text" id="v_placa" placeholder="ABC-123"></div>
+        <div class="campo"><label>Año</label><input type="number" id="v_anio" placeholder="2022" min="1990" max="2030"></div>
+      </div>
+      <div class="fila-2">
+        <div class="campo"><label>Color</label><input type="text" id="v_color" placeholder="Blanco"></div>
+        <div class="campo">
+          <label>Tipo de combustible</label>
+          <select id="v_combustible">
+            <option value="gasolina">Gasolina</option>
+            <option value="diesel">Diésel</option>
+            <option value="hibrido">Híbrido</option>
+            <option value="electrico">Eléctrico</option>
+            <option value="gas">Gas</option>
+          </select>
+        </div>
       </div>
       <div class="campo"><label>Tarifa por período de 24h (COP)</label><input type="number" id="v_tarifa" placeholder="150000"></div>
       <div class="campo">
@@ -1108,6 +1142,28 @@
           <option value="mantenimiento">En mantenimiento</option>
         </select>
       </div>
+
+      <hr class="divider">
+      <div class="seccion-label">Propiedad del vehículo</div>
+      <div class="campo">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="v_es_subalquiler" onchange="vToggleSubalquiler()" style="width:auto">
+          Es un vehículo de subalquiler (de un propietario externo)
+        </label>
+      </div>
+      <div id="v-propietario-fields" style="display:none">
+        <div class="fila-2">
+          <div class="campo"><label>Nombre del propietario</label><input type="text" id="v_propietario_nombre" placeholder="Nombre completo"></div>
+          <div class="campo"><label>% que se liquida al propietario</label><input type="number" id="v_propietario_pct" placeholder="60" min="0" max="100"></div>
+        </div>
+      </div>
+
+      <hr class="divider">
+      <div class="seccion-label">Mantenimientos y gastos</div>
+      <div id="v-gastos-lista" style="margin-bottom:10px">
+        <div style="font-size:0.78rem;color:var(--blanco-suave);text-align:center;padding:8px">Guarda el vehículo primero para poder registrar gastos.</div>
+      </div>
+      <button type="button" class="btn-secundario" id="v-btn-gasto" onclick="vAbrirGasto()" style="display:none;width:100%">+ Agregar gasto / mantenimiento</button>
     </div>
     <div class="modal-footer">
       <button class="btn-secundario" onclick="cerrarModal('modal-vehiculo')">Cancelar</button>
@@ -1115,6 +1171,39 @@
     </div>
   </div>
 </div>
+
+<!-- ═══════════════════ MODAL GASTO VEHICULO ═══════════════════ -->
+<div class="modal-overlay" id="modal-gasto">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-titulo">Registrar gasto / mantenimiento</div>
+      <button class="modal-cerrar" onclick="cerrarModal('modal-gasto')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="g_vehiculo_id">
+      <div class="campo">
+        <label>Tipo de gasto</label>
+        <select id="g_tipo">
+          <option value="mantenimiento">Mantenimiento</option>
+          <option value="seguro">Seguro</option>
+          <option value="impuesto">Impuesto</option>
+          <option value="reparacion">Reparación</option>
+          <option value="otro">Otro</option>
+        </select>
+      </div>
+      <div class="campo"><label>Descripción</label><input type="text" id="g_descripcion" placeholder="Ej. Cambio de aceite y filtros"></div>
+      <div class="fila-2">
+        <div class="campo"><label>Valor (COP)</label><input type="number" id="g_valor" placeholder="180000"></div>
+        <div class="campo"><label>Fecha</label><input type="date" id="g_fecha"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secundario" onclick="cerrarModal('modal-gasto')">Cancelar</button>
+      <button class="btn-primario" onclick="guardarGastoVehiculo()">Guardar gasto</button>
+    </div>
+  </div>
+</div>
+
 
 <!-- ═══════════════════ MODAL TOUR ═══════════════════ -->
 <div class="modal-overlay" id="modal-tour">
@@ -1754,14 +1843,24 @@ function actualizarTarifaDesdeVehiculo() {
 function renderTablaVehiculos() {
   const tbody = document.getElementById('tabla-vehiculos');
   if (vehiculos.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6"><div class="estado-vacio"><div class="icono-grande">🚗</div><p>No hay vehículos registrados.</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7"><div class="estado-vacio"><div class="icono-grande">🚗</div><p>No hay vehículos registrados.</p></div></td></tr>`;
     return;
   }
   const estadoLabel = { disponible: 'Disponible', no_disponible: 'No disponible', mantenimiento: 'Mantenimiento' };
-  tbody.innerHTML = vehiculos.map(v => `
+  const combLabel = { gasolina:'Gasolina', diesel:'Diésel', hibrido:'Híbrido', electrico:'Eléctrico', gas:'Gas' };
+  tbody.innerHTML = vehiculos.map(v => {
+    const foto = (v.fotos && v.fotos[0]) ? v.fotos[0] : null;
+    const thumb = foto
+      ? `<img src="${foto}" style="width:40px;height:40px;border-radius:6px;object-fit:cover">`
+      : `<div style="width:40px;height:40px;border-radius:6px;background:var(--gris-medio);display:flex;align-items:center;justify-content:center;font-size:16px">🚗</div>`;
+    return `
     <tr>
-      <td><strong>${v.nombre}</strong></td>
-      <td>${v.categoria || '—'}</td>
+      <td>${thumb}</td>
+      <td>
+        <strong>${v.nombre}</strong>${v.anio ? ' · ' + v.anio : ''}
+        ${v.esSubalquiler ? '<br><span class="estado-pill" style="background:rgba(91,155,213,0.15);color:var(--azul-info)">Subalquiler</span>' : ''}
+      </td>
+      <td>${v.categoria || '—'}<br><span style="font-size:0.7rem;color:var(--blanco-suave)">${combLabel[v.combustible_tipo] || ''}</span></td>
       <td>${v.placa || '—'}</td>
       <td>${formatCOP(v.tarifa)}</td>
       <td><span class="estado-pill estado-${v.estado}">${estadoLabel[v.estado] || v.estado}</span></td>
@@ -1772,7 +1871,41 @@ function renderTablaVehiculos() {
         </div>
       </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
+}
+
+let vFotosActuales = [null, null, null, null];
+let vFotoIdxActivo = null;
+
+function vSeleccionarFoto(idx) {
+  vFotoIdxActivo = idx;
+  document.getElementById('v-foto-input').click();
+}
+
+function vCargarFoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    vFotosActuales[vFotoIdxActivo] = e.target.result;
+    vRenderFotos();
+  };
+  reader.readAsDataURL(file);
+}
+
+function vRenderFotos() {
+  document.querySelectorAll('.v-foto-slot').forEach((slot, idx) => {
+    const foto = vFotosActuales[idx];
+    slot.innerHTML = foto
+      ? `<img src="${foto}" style="width:100%;height:100%;object-fit:cover">`
+      : `<span style="font-size:20px;color:var(--blanco-suave)">+</span>`;
+  });
+}
+
+function vToggleSubalquiler() {
+  const checked = document.getElementById('v_es_subalquiler').checked;
+  document.getElementById('v-propietario-fields').style.display = checked ? 'block' : 'none';
 }
 
 function abrirModalVehiculo() {
@@ -1781,8 +1914,19 @@ function abrirModalVehiculo() {
   document.getElementById('v_nombre').value = '';
   document.getElementById('v_categoria').value = 'SUV';
   document.getElementById('v_placa').value = '';
+  document.getElementById('v_anio').value = '';
+  document.getElementById('v_color').value = '';
+  document.getElementById('v_combustible').value = 'gasolina';
   document.getElementById('v_tarifa').value = '';
   document.getElementById('v_estado').value = 'disponible';
+  document.getElementById('v_es_subalquiler').checked = false;
+  document.getElementById('v_propietario_nombre').value = '';
+  document.getElementById('v_propietario_pct').value = '';
+  document.getElementById('v-propietario-fields').style.display = 'none';
+  document.getElementById('v-gastos-lista').innerHTML = '<div style="font-size:0.78rem;color:var(--blanco-suave);text-align:center;padding:8px">Guarda el vehículo primero para poder registrar gastos.</div>';
+  document.getElementById('v-btn-gasto').style.display = 'none';
+  vFotosActuales = [null, null, null, null];
+  vRenderFotos();
   abrirModal('modal-vehiculo');
 }
 
@@ -1794,8 +1938,24 @@ function editarVehiculo(id) {
   document.getElementById('v_nombre').value = v.nombre;
   document.getElementById('v_categoria').value = v.categoria || 'SUV';
   document.getElementById('v_placa').value = v.placa || '';
+  document.getElementById('v_anio').value = v.anio || '';
+  document.getElementById('v_color').value = v.color || '';
+  document.getElementById('v_combustible').value = v.combustible_tipo || 'gasolina';
   document.getElementById('v_tarifa').value = v.tarifa || '';
   document.getElementById('v_estado').value = v.estado;
+  document.getElementById('v_es_subalquiler').checked = !!v.esSubalquiler;
+  document.getElementById('v_propietario_nombre').value = v.propietarioNombre || '';
+  document.getElementById('v_propietario_pct').value = v.propietarioPorcentaje || '';
+  document.getElementById('v-propietario-fields').style.display = v.esSubalquiler ? 'block' : 'none';
+  vFotosActuales = [
+    (v.fotos && v.fotos[0]) || null,
+    (v.fotos && v.fotos[1]) || null,
+    (v.fotos && v.fotos[2]) || null,
+    (v.fotos && v.fotos[3]) || null,
+  ];
+  vRenderFotos();
+  document.getElementById('v-btn-gasto').style.display = 'block';
+  vRenderGastos(id);
   abrirModal('modal-vehiculo');
 }
 
@@ -1803,13 +1963,21 @@ async function guardarVehiculo() {
   const nombre = document.getElementById('v_nombre').value.trim();
   if (!nombre) { mostrarToast('⚠️ El nombre del vehículo es obligatorio', '#C9A84C'); return; }
   const id = document.getElementById('v_id').value;
+  const fotosLimpias = vFotosActuales.filter(f => f);
   const datosLocal = {
     id: id || ('veh_' + Date.now()),
     nombre,
     categoria: document.getElementById('v_categoria').value,
     placa: document.getElementById('v_placa').value.trim(),
+    anio: document.getElementById('v_anio').value.trim(),
+    color: document.getElementById('v_color').value.trim(),
+    combustible_tipo: document.getElementById('v_combustible').value,
     tarifa: parseFloat(document.getElementById('v_tarifa').value) || 0,
     estado: document.getElementById('v_estado').value,
+    esSubalquiler: document.getElementById('v_es_subalquiler').checked,
+    propietarioNombre: document.getElementById('v_propietario_nombre').value.trim(),
+    propietarioPorcentaje: parseFloat(document.getElementById('v_propietario_pct').value) || 0,
+    fotos: fotosLimpias,
   };
 
   try {
@@ -1837,6 +2005,66 @@ async function guardarVehiculo() {
   renderTablaVehiculos();
   renderVehiculosSelect();
   renderStats();
+}
+
+/* ── Gastos / mantenimientos de vehículo ── */
+function vAbrirGasto() {
+  const id = document.getElementById('v_id').value;
+  if (!id) { mostrarToast('⚠️ Guarda el vehículo primero', '#C9A84C'); return; }
+  document.getElementById('g_vehiculo_id').value = id;
+  document.getElementById('g_tipo').value = 'mantenimiento';
+  document.getElementById('g_descripcion').value = '';
+  document.getElementById('g_valor').value = '';
+  document.getElementById('g_fecha').value = new Date().toISOString().split('T')[0];
+  abrirModal('modal-gasto');
+}
+
+async function guardarGastoVehiculo() {
+  const vehiculoId = document.getElementById('g_vehiculo_id').value;
+  const tipo = document.getElementById('g_tipo').value;
+  const descripcion = document.getElementById('g_descripcion').value.trim();
+  const valor = parseFloat(document.getElementById('g_valor').value) || 0;
+  const fecha = document.getElementById('g_fecha').value;
+
+  if (!valor) { mostrarToast('⚠️ Ingresa el valor del gasto', '#E05252'); return; }
+
+  try {
+    await sbInsert('vehiculo_gastos', {
+      vehiculo_id: vehiculoId, tipo, descripcion, valor, fecha
+    });
+    mostrarToast('✅ Gasto registrado');
+  } catch(e) {
+    console.error('Error guardando gasto:', e);
+    mostrarToast('⚠️ No se pudo guardar el gasto', '#E05252');
+  }
+
+  cerrarModal('modal-gasto');
+  vRenderGastos(vehiculoId);
+}
+
+async function vRenderGastos(vehiculoId) {
+  const cont = document.getElementById('v-gastos-lista');
+  cont.innerHTML = '<div style="font-size:0.78rem;color:var(--blanco-suave);text-align:center;padding:8px">Cargando...</div>';
+  try {
+    const gastos = await sbSelect('vehiculo_gastos', `&vehiculo_id=eq.${vehiculoId}&order=fecha.desc`);
+    if (gastos.length === 0) {
+      cont.innerHTML = '<div style="font-size:0.78rem;color:var(--blanco-suave);text-align:center;padding:8px">Sin gastos registrados.</div>';
+      return;
+    }
+    const total = gastos.reduce((sum, g) => sum + parseFloat(g.valor), 0);
+    const labels = { mantenimiento:'Mantenimiento', seguro:'Seguro', impuesto:'Impuesto', reparacion:'Reparación', otro:'Otro' };
+    cont.innerHTML = gastos.map(g => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--gris-oscuro);border:1px solid var(--borde);border-radius:8px;margin-bottom:6px;font-size:0.78rem">
+        <div>
+          <strong>${labels[g.tipo] || g.tipo}</strong> — ${g.descripcion || 'Sin descripción'}<br>
+          <span style="color:var(--blanco-suave)">${fmtFecha(g.fecha)}</span>
+        </div>
+        <div style="color:var(--dorado);font-weight:700">${formatCOP(g.valor)}</div>
+      </div>
+    `).join('') + `<div style="text-align:right;font-size:0.8rem;margin-top:6px;color:var(--blanco-suave)">Total gastado: <strong style="color:var(--dorado)">${formatCOP(total)}</strong></div>`;
+  } catch(e) {
+    cont.innerHTML = '<div style="font-size:0.78rem;color:var(--rojo-alerta);text-align:center;padding:8px">Error cargando gastos.</div>';
+  }
 }
 
 async function eliminarVehiculo(id) {
