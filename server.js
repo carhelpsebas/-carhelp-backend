@@ -232,11 +232,16 @@ app.get('/api/entregas/:ordenId', requireAuth, async (req, res) => {
 // RUTA: ENVÍO DE CORREO SIMPLE (reservas, tours, seguridad)
 // ============================================================
 const transporterSimple = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false, // true para 465, false para otros puertos como 587
   auth: {
     user: process.env.GMAIL_USER,
     pass: process.env.GMAIL_APP_PASSWORD,
   },
+  connectionTimeout: 15000,
+  greetingTimeout: 15000,
+  socketTimeout: 15000,
 })
 
 // POST /api/enviar-correo
