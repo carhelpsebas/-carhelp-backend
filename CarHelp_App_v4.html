@@ -1372,6 +1372,44 @@
 
 <script>
 /* ════════════════════════════════════════════
+   CONEXIÓN SUPABASE — API REST directa
+   ════════════════════════════════════════════ */
+const SB_URL = 'https://bfsgiflzaeiljbpmgzsy.supabase.co';
+const SB_KEY = 'sb_publishable_DcZBu7ZEtKt_TeU4CCOnog_EJqJANLB';
+
+async function sbFetch(path, options = {}) {
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      'apikey': SB_KEY,
+      'Authorization': `Bearer ${SB_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': options.prefer || 'return=representation',
+      ...(options.headers || {})
+    }
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Supabase error (${res.status}): ${errText}`);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+async function sbSelect(table, query = '') {
+  return sbFetch(`${table}?select=*${query}`);
+}
+async function sbInsert(table, data) {
+  return sbFetch(table, { method: 'POST', body: JSON.stringify(data) });
+}
+async function sbUpdate(table, id, data) {
+  return sbFetch(`${table}?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+}
+async function sbDelete(table, id) {
+  return sbFetch(`${table}?id=eq.${id}`, { method: 'DELETE', prefer: 'return=minimal' });
+}
+
+/* ════════════════════════════════════════════
    ESTADO GLOBAL
    ════════════════════════════════════════════ */
 let sesion = null;
@@ -1384,23 +1422,11 @@ let solicitudesClientes = [];
 let usuarios = [];
 let correosReservaActual = [];
 let tabCorreoActual = 0;
-
-const USUARIOS_DEFAULT = [
-  { usuario: 'admin', pass: 'carhelp2026', nombre: 'Administrador', rol: 'administrador' },
-  { usuario: 'colaborador', pass: 'carhelp2026', nombre: 'Colaborador', rol: 'colaborador' },
-];
-
-const VEHICULOS_DEFAULT = [
-  { id: 'veh_1', nombre: 'Toyota Land Cruiser Prado', categoria: 'SUV', placa: '', tarifa: 350000, estado: 'disponible' },
-  { id: 'veh_2', nombre: 'Toyota Fortuner', categoria: 'SUV', placa: '', tarifa: 280000, estado: 'disponible' },
-  { id: 'veh_3', nombre: 'Renault Duster', categoria: 'Camioneta 4x4', placa: '', tarifa: 150000, estado: 'disponible' },
-  { id: 'veh_4', nombre: 'Chevrolet Tracker', categoria: 'SUV', placa: '', tarifa: 170000, estado: 'disponible' },
-  { id: 'veh_5', nombre: 'Vehículo Blindado', categoria: 'Blindado', placa: '', tarifa: 900000, estado: 'disponible' },
-];
+let cargandoDatos = false;
 
 /* ════════════════════════════════════════════
-   STORAGE HELPERS — localStorage del navegador
-   (persiste entre actualizaciones de la app y recargas)
+   CARGA DE DATOS DESDE SUPABASE
+   (con respaldo local mientras carga / si falla conexión)
    ════════════════════════════════════════════ */
 function lsGet(clave) {
   try {
@@ -1410,24 +1436,181 @@ function lsGet(clave) {
 }
 function lsSet(clave, datos) {
   try { localStorage.setItem(clave, JSON.stringify(datos)); }
-  catch(e) { console.error('Error guardando', clave, e); }
+  catch(e) { console.error('Error guardando local', clave, e); }
+}
+
+// Adaptadores: convierten formato Supabase <-> formato que usa el panel
+function adaptarVehiculoDesdeSB(v) {
+  return {
+    id: v.id,
+    nombre: `${v.marca} ${v.linea}`.trim(),
+    marca: v.marca,
+    linea: v.linea,
+    categoria: v.categoria || 'SUV',
+    placa: v.placa || '',
+    color: v.color || '',
+    anio: v.anio || '',
+    combustible_tipo: v.combustible_tipo || 'gasolina',
+    tarifa: v.tarifa_24h || 0,
+    estado: v.estado_operativo || 'disponible',
+    esSubalquiler: v.es_subalquiler || false,
+    propietarioNombre: v.propietario_nombre || '',
+    propietarioPorcentaje: v.propietario_porcentaje || 0,
+    fotos: v.fotos || [],
+    activo: v.activo
+  };
+}
+function adaptarVehiculoHaciaSB(v) {
+  const partes = (v.nombre || '').split(' ');
+  return {
+    marca: v.marca || partes[0] || v.nombre || 'Vehiculo',
+    linea: v.linea || partes.slice(1).join(' ') || '',
+    categoria: v.categoria || 'SUV',
+    placa: v.placa || null,
+    color: v.color || null,
+    anio: v.anio ? parseInt(v.anio) : null,
+    combustible_tipo: v.combustible_tipo || 'gasolina',
+    tarifa_24h: parseFloat(v.tarifa) || 0,
+    estado_operativo: v.estado || 'disponible',
+    es_subalquiler: !!v.esSubalquiler,
+    propietario_nombre: v.propietarioNombre || null,
+    propietario_porcentaje: v.propietarioPorcentaje ? parseFloat(v.propietarioPorcentaje) : null,
+    fotos: v.fotos || []
+  };
 }
 
 async function cargarDatos() {
-  usuarios = lsGet('carhelp:usuarios') || USUARIOS_DEFAULT;
-  if (!lsGet('carhelp:usuarios')) lsSet('carhelp:usuarios', usuarios);
+  if (cargandoDatos) return;
+  cargandoDatos = true;
 
-  vehiculos = lsGet('carhelp:vehiculos') || VEHICULOS_DEFAULT;
-  if (!lsGet('carhelp:vehiculos')) lsSet('carhelp:vehiculos', vehiculos);
+  // Usuarios (colaboradores)
+  try {
+    const data = await sbSelect('colaboradores');
+    usuarios = data.map(u => ({
+      id: u.id,
+      usuario: u.usuario_login,
+      pass: u.password_hash,
+      nombre: u.nombre,
+      rol: u.rol === 'administrador' ? 'administrador' : 'colaborador',
+      permisos: u.permisos || {}
+    })).filter(u => u.usuario);
+    lsSet('carhelp:usuarios', usuarios);
+  } catch(e) {
+    console.error('Error cargando usuarios de Supabase:', e);
+    usuarios = lsGet('carhelp:usuarios') || [
+      { usuario: 'admin', pass: 'carhelp2026', nombre: 'Administrador', rol: 'administrador', permisos: {} },
+      { usuario: 'colaborador', pass: 'carhelp2026', nombre: 'Colaborador', rol: 'colaborador', permisos: {} },
+    ];
+  }
 
-  reservas = lsGet('carhelp:reservas') || [];
-  tours = lsGet('carhelp:tours') || [];
-  reservasTour = lsGet('carhelp:reservas_tour') || [];
-  solicitudesSeguridad = lsGet('carhelp:seguridad') || [];
-  solicitudesClientes = lsGet('carhelp:solicitudes_clientes') || [];
+  // Vehículos
+  try {
+    const data = await sbSelect('vehiculos', '&activo=eq.true&order=created_at.desc');
+    vehiculos = data.map(adaptarVehiculoDesdeSB);
+    lsSet('carhelp:vehiculos', vehiculos);
+  } catch(e) {
+    console.error('Error cargando vehículos de Supabase:', e);
+    vehiculos = lsGet('carhelp:vehiculos') || [];
+  }
+
+  // Reservas (ordenes)
+  try {
+    const data = await sbSelect('ordenes', '&order=created_at.desc');
+    reservas = await Promise.all(data.map(async (o) => {
+      let cliente = {};
+      try {
+        if (o.cliente_id) {
+          const cdata = await sbSelect('clientes', `&id=eq.${o.cliente_id}`);
+          cliente = cdata[0] || {};
+        }
+      } catch(e2) {}
+      const veh = vehiculos.find(v => v.id === o.vehiculo_id) || {};
+      return {
+        id: o.id,
+        num_reserva: o.numero,
+        nombre: cliente.nombre || '',
+        tipo_doc: cliente.tipo_doc || '',
+        num_doc: cliente.documento || '',
+        celular: cliente.telefono || '',
+        email: cliente.email || '',
+        direccion: cliente.direccion || '',
+        vehiculo: veh.nombre || '',
+        vehiculo_id: o.vehiculo_id,
+        placa: veh.placa || '',
+        fecha_inicio: o.fecha_salida ? o.fecha_salida.split('T')[0] : '',
+        hora_inicio: o.fecha_salida ? o.fecha_salida.split('T')[1]?.substring(0,5) : '',
+        fecha_fin: o.fecha_retorno ? o.fecha_retorno.split('T')[0] : '',
+        hora_fin: o.fecha_retorno ? o.fecha_retorno.split('T')[1]?.substring(0,5) : '',
+        lugar_entrega: '',
+        lugar_devolucion: '',
+        tarifa: o.tarifa_diaria || 0,
+        deposito: o.deposito || 0,
+        total: (o.tarifa_diaria || 0) + (o.deposito || 0),
+        notas: o.notas || '',
+        estado: o.estado || 'pendiente',
+        creada: o.created_at
+      };
+    }));
+    lsSet('carhelp:reservas', reservas);
+  } catch(e) {
+    console.error('Error cargando reservas de Supabase:', e);
+    reservas = lsGet('carhelp:reservas') || [];
+  }
+
+  // Tours
+  try {
+    const data = await sbSelect('tours', '&activo=eq.true');
+    tours = data.map(t => ({
+      id: t.id, nombre: t.nombre, descripcion: t.descripcion,
+      vehiculo: t.vehiculo_id, duracion: t.duracion, precio: t.precio_persona
+    }));
+    lsSet('carhelp:tours', tours);
+  } catch(e) { tours = lsGet('carhelp:tours') || []; }
+
+  // Reservas de tour
+  try {
+    const data = await sbSelect('reservas_tour', '&order=created_at.desc');
+    reservasTour = data.map(r => ({
+      num_reserva: r.num_reserva, nombre: r.cliente_nombre, email: r.cliente_email,
+      celular: r.cliente_celular, personas: r.personas, tour: r.tour_id,
+      fecha: r.fecha, hora: r.hora, vehiculo_asignado: r.vehiculo_asignado, estado: r.estado
+    }));
+    lsSet('carhelp:reservas_tour', reservasTour);
+  } catch(e) { reservasTour = lsGet('carhelp:reservas_tour') || []; }
+
+  // Seguridad
+  try {
+    const data = await sbSelect('solicitudes_seguridad', '&order=created_at.desc');
+    solicitudesSeguridad = data.map(s => ({
+      num_reserva: s.num_reserva, nombre: s.cliente_nombre, email: s.cliente_email,
+      celular: s.cliente_celular, escolta: s.escolta, arma: s.arma,
+      origen: s.origen, destino: s.destino, fecha: s.fecha, hora: s.hora,
+      vehiculo: s.vehiculo, tarifa: s.tarifa, notas: s.notas
+    }));
+    lsSet('carhelp:seguridad', solicitudesSeguridad);
+  } catch(e) { solicitudesSeguridad = lsGet('carhelp:seguridad') || []; }
+
+  // Solicitudes de clientes
+  try {
+    const data = await sbSelect('solicitudes_clientes', '&order=created_at.desc');
+    solicitudesClientes = data.map(s => ({
+      num_reserva: s.num_reserva, nombre: s.nombre, tipo_doc: s.tipo_doc,
+      num_doc: s.num_doc, celular: s.celular, email: s.email, direccion: s.direccion,
+      fecha_entrega: s.fecha_entrega, hora_entrega: s.hora_entrega,
+      fecha_devolucion: s.fecha_devolucion, hora_devolucion: s.hora_devolucion,
+      notas: s.notas, atendida: s.atendida, recibido: s.created_at
+    }));
+    lsSet('carhelp:solicitudes_clientes', solicitudesClientes);
+  } catch(e) { solicitudesClientes = lsGet('carhelp:solicitudes_clientes') || []; }
+
+  cargandoDatos = false;
 }
 
+// Mantener compatibilidad con código existente que llama guardar(clave, datos)
+// Ahora cada función específica hace su propia llamada a Supabase (ver abajo)
 async function guardar(clave, datos) {
+  lsSet(clave, datos);
+}
   lsSet(clave, datos);
 }
 
@@ -1622,7 +1805,7 @@ async function guardarVehiculo() {
   const nombre = document.getElementById('v_nombre').value.trim();
   if (!nombre) { mostrarToast('⚠️ El nombre del vehículo es obligatorio', '#C9A84C'); return; }
   const id = document.getElementById('v_id').value;
-  const datos = {
+  const datosLocal = {
     id: id || ('veh_' + Date.now()),
     nombre,
     categoria: document.getElementById('v_categoria').value,
@@ -1630,23 +1813,42 @@ async function guardarVehiculo() {
     tarifa: parseFloat(document.getElementById('v_tarifa').value) || 0,
     estado: document.getElementById('v_estado').value,
   };
+
+  try {
+    const datosSB = adaptarVehiculoHaciaSB(datosLocal);
+    if (id) {
+      await sbUpdate('vehiculos', id, datosSB);
+    } else {
+      const creado = await sbInsert('vehiculos', { ...datosSB, activo: true });
+      datosLocal.id = creado[0]?.id || datosLocal.id;
+    }
+    mostrarToast('✅ Vehículo guardado en Supabase');
+  } catch(e) {
+    console.error('Error guardando en Supabase:', e);
+    mostrarToast('⚠️ Guardado solo localmente (sin conexión a Supabase)', '#BA7517');
+  }
+
   if (id) {
     const idx = vehiculos.findIndex(v => v.id === id);
-    vehiculos[idx] = datos;
+    if (idx >= 0) vehiculos[idx] = datosLocal;
   } else {
-    vehiculos.push(datos);
+    vehiculos.push(datosLocal);
   }
-  await guardar('carhelp:vehiculos', vehiculos);
+  lsSet('carhelp:vehiculos', vehiculos);
   cerrarModal('modal-vehiculo');
   renderTablaVehiculos();
   renderVehiculosSelect();
   renderStats();
-  mostrarToast('✅ Vehículo guardado');
 }
 
 async function eliminarVehiculo(id) {
+  try {
+    await sbDelete('vehiculos', id);
+  } catch(e) {
+    console.error('Error eliminando de Supabase:', e);
+  }
   vehiculos = vehiculos.filter(v => v.id !== id);
-  await guardar('carhelp:vehiculos', vehiculos);
+  lsSet('carhelp:vehiculos', vehiculos);
   renderTablaVehiculos();
   renderVehiculosSelect();
   renderStats();
@@ -1772,8 +1974,42 @@ async function generarReserva() {
     notas, email_interno, estado: 'pendiente', creada: new Date().toISOString(),
   };
 
+  // Guardar en Supabase: primero el cliente, luego la orden
+  try {
+    const clienteSB = await sbInsert('clientes', {
+      nombre: valores.nombre,
+      documento: valores.num_doc,
+      tipo_doc: valores.tipo_doc === 'Cédula de ciudadanía' ? 'CC' : (valores.tipo_doc === 'Pasaporte' ? 'PAS' : 'CE'),
+      telefono: valores.celular,
+      email: valores.email,
+      direccion: valores.direccion
+    }).catch(async () => {
+      // Si ya existe (documento duplicado), buscarlo
+      const existente = await sbSelect('clientes', `&documento=eq.${encodeURIComponent(valores.num_doc)}`);
+      return existente;
+    });
+    const clienteId = clienteSB[0]?.id;
+
+    const ordenSB = await sbInsert('ordenes', {
+      numero: numReserva,
+      cliente_id: clienteId,
+      vehiculo_id: valores.vehiculo_id,
+      fecha_salida: `${valores.fecha_inicio}T${valores.hora_inicio}:00`,
+      fecha_retorno: `${valores.fecha_fin}T${valores.hora_fin}:00`,
+      tarifa_diaria: tarifa,
+      deposito: deposito,
+      estado: 'pendiente',
+      notas: notas
+    });
+    nuevaReserva.id = ordenSB[0]?.id;
+    mostrarToast('✅ Reserva creada y guardada en Supabase: ' + numReserva);
+  } catch(e) {
+    console.error('Error guardando reserva en Supabase:', e);
+    mostrarToast('⚠️ Reserva creada solo localmente. Revisa la conexión a Supabase.', '#BA7517');
+  }
+
   reservas.unshift(nuevaReserva);
-  await guardar('carhelp:reservas', reservas);
+  lsSet('carhelp:reservas', reservas);
 
   // Generar correos
   correosReservaActual = construirCorreosReserva(nuevaReserva);
@@ -2440,17 +2676,43 @@ async function guardarUsuario() {
     mostrarToast('⚠️ Ese nombre de usuario ya existe', '#E05252');
     return;
   }
-  usuarios.push({ usuario, pass, nombre, rol });
-  await guardar('carhelp:usuarios', usuarios);
+
+  const nuevoUsuario = { usuario, pass, nombre, rol };
+
+  try {
+    await sbInsert('colaboradores', {
+      nombre,
+      email: `${usuario}@carhelp.local`,
+      usuario_login: usuario,
+      password_hash: pass,
+      rol: rol === 'administrador' ? 'administrador' : 'colaborador',
+      activo: true
+    });
+    mostrarToast('✅ Usuario creado en Supabase');
+  } catch(e) {
+    console.error('Error creando usuario en Supabase:', e);
+    mostrarToast('⚠️ Usuario creado solo localmente', '#BA7517');
+  }
+
+  usuarios.push(nuevoUsuario);
+  lsSet('carhelp:usuarios', usuarios);
   cerrarModal('modal-usuario');
   renderUsuarios();
-  mostrarToast('✅ Usuario creado');
 }
 
 async function eliminarUsuario(idx) {
   if (usuarios.length <= 1) { mostrarToast('⚠️ Debe existir al menos un usuario', '#E05252'); return; }
+  const u = usuarios[idx];
+
+  try {
+    const data = await sbSelect('colaboradores', `&usuario_login=eq.${encodeURIComponent(u.usuario)}`);
+    if (data[0]?.id) await sbDelete('colaboradores', data[0].id);
+  } catch(e) {
+    console.error('Error eliminando usuario de Supabase:', e);
+  }
+
   usuarios.splice(idx, 1);
-  await guardar('carhelp:usuarios', usuarios);
+  lsSet('carhelp:usuarios', usuarios);
   renderUsuarios();
   mostrarToast('🗑️ Usuario eliminado');
 }
