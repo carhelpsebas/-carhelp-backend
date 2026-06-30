@@ -8,7 +8,6 @@ import express          from 'express'
 import cors             from 'cors'
 import multer           from 'multer'
 import dotenv           from 'dotenv'
-import nodemailer       from 'nodemailer'
 import { Readable }     from 'stream'
 import {
   loginColaborador,
@@ -230,19 +229,10 @@ app.get('/api/entregas/:ordenId', requireAuth, async (req, res) => {
 
 // ============================================================
 // RUTA: ENVÍO DE CORREO SIMPLE (reservas, tours, seguridad)
+// Vía Resend API (HTTPS) — SMTP está bloqueado en Railway Free/Hobby
 // ============================================================
-const transporterSimple = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false, // true para 465, false para otros puertos como 587
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD,
-  },
-  connectionTimeout: 15000,
-  greetingTimeout: 15000,
-  socketTimeout: 15000,
-})
+const RESEND_API_KEY = process.env.RESEND_API_KEY
+const RESEND_FROM = process.env.RESEND_FROM || 'Car Help Rent a Car <reservas@carhelp.com.co>'
 
 // POST /api/enviar-correo
 app.post('/api/enviar-correo', async (req, res) => {
@@ -251,19 +241,16 @@ app.post('/api/enviar-correo', async (req, res) => {
     if (!para || !asunto || !cuerpo) {
       return res.status(400).json({ error: 'Faltan campos: para, asunto, cuerpo' })
     }
+    if (!RESEND_API_KEY) {
+      return res.status(500).json({ error: 'RESEND_API_KEY no está configurada en el servidor' })
+    }
 
     const htmlBody = cuerpo
       .split('\n')
       .map(line => line.trim() === '' ? '<br>' : `<p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:14px;color:#1a1a1a;white-space:pre-wrap">${line}</p>`)
       .join('')
 
-    const info = await transporterSimple.sendMail({
-      from: `"Car Help Rent a Car" <${process.env.GMAIL_USER}>`,
-      to: para,
-      cc: cc || undefined,
-      subject: asunto,
-      text: cuerpo,
-      html: `<div style="max-width:600px;margin:0 auto;font-family:Arial,sans-serif">
+    const html = `<div style="max-width:600px;margin:0 auto;font-family:Arial,sans-serif">
         <div style="background:#0A0A0A;padding:20px;text-align:center">
           <div style="color:#C9A84C;font-family:Georgia,serif;font-size:22px;font-weight:bold;letter-spacing:2px">CAR HELP</div>
           <div style="color:#888;font-size:11px;letter-spacing:2px;margin-top:2px">RENT A CAR</div>
@@ -273,10 +260,31 @@ app.post('/api/enviar-correo', async (req, res) => {
           Car Help S.A.S · NIT 901.697.903-5 · Pereira, Colombia<br>
           Cel. 310 743 6082 · reservascarhelp@gmail.com
         </div>
-      </div>`,
+      </div>`
+
+    const resendRes = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: RESEND_FROM,
+        to: [para],
+        cc: cc ? [cc] : undefined,
+        subject: asunto,
+        text: cuerpo,
+        html,
+      }),
     })
 
-    res.json({ ok: true, messageId: info.messageId })
+    const resendData = await resendRes.json()
+    if (!resendRes.ok) {
+      console.error('[/api/enviar-correo] Resend error:', resendData)
+      return res.status(500).json({ error: resendData.message || 'Error enviando correo con Resend' })
+    }
+
+    res.json({ ok: true, messageId: resendData.id })
   } catch (err) {
     console.error('[/api/enviar-correo] Error:', err)
     res.status(500).json({ error: err.message })
