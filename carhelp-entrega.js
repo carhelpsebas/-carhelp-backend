@@ -1,13 +1,10 @@
 // ============================================================
 // CAR HELP S.A.S — carhelp-entrega.js
-// Integración completa: Supabase + Gmail (Nodemailer)
+// Integración completa: Supabase + Resend (API de correo)
 // Entorno: Node.js 18+ / Backend (Express o serverless)
 // ============================================================
 
 import { createClient } from '@supabase/supabase-js'
-import nodemailer from 'nodemailer'
-import { readFileSync } from 'fs'
-import { join } from 'path'
 
 // ------------------------------------------------------------
 // CONFIGURACIÓN — usar variables de entorno (.env)
@@ -16,25 +13,10 @@ const SUPABASE_URL     = process.env.SUPABASE_URL       // https://xxxx.supabase
 const SUPABASE_KEY     = process.env.SUPABASE_ANON_KEY  // clave anon pública
 const SUPABASE_SERVICE = process.env.SUPABASE_SERVICE_KEY // clave service_role (solo backend)
 
-const GMAIL_USER       = process.env.GMAIL_USER          // carhelp@gmail.com
-const GMAIL_APP_PASS   = process.env.GMAIL_APP_PASSWORD  // contraseña de aplicación Google
+const GMAIL_USER       = process.env.GMAIL_USER          // correo de copia (cc) — reservascarhelp@gmail.com
 
 // Cliente Supabase (usar service_role en backend para saltar RLS cuando sea necesario)
 export const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE)
-
-// Cliente Gmail via Nodemailer
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false,
-  auth: {
-    user: GMAIL_USER,
-    pass: GMAIL_APP_PASS,   // NO es la contraseña normal — ver GUIA_CONFIGURACION.md
-  },
-  connectionTimeout: 15000,
-  greetingTimeout: 15000,
-  socketTimeout: 15000,
-})
 
 // ============================================================
 // MÓDULO 1 — AUTENTICACIÓN DE COLABORADORES
@@ -464,15 +446,30 @@ export async function enviarCorreoEntrega(params) {
 </body>
 </html>`
 
-  const info = await transporter.sendMail({
-    from:    `"Car Help Rent a Car" <${GMAIL_USER}>`,
-    to:      clienteEmail,
-    cc:      GMAIL_USER,           // copia a Car Help
-    subject: `✓ Recibido del vehículo — ${ordenNumero} · ${vehiculo}`,
-    html,
-    // Texto plano como fallback
-    text: `Car Help S.A.S — Orden ${ordenNumero}\nVehículo: ${vehiculo}\nKm salida: ${kmSalida}\nCombustible: ${combustibleLabel}\nDaños preexistentes: ${zonasDano.length > 0 ? zonasDano.join(', ') : 'Ninguno'}\nContacto: 310 743 6082`,
+  const RESEND_API_KEY = process.env.RESEND_API_KEY
+  const RESEND_FROM = process.env.RESEND_FROM || `Car Help Rent a Car <reservas@carhelp.com.co>`
+
+  const resendRes = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: RESEND_FROM,
+      to: [clienteEmail],
+      cc: [GMAIL_USER],
+      subject: `✓ Recibido del vehículo — ${ordenNumero} · ${vehiculo}`,
+      html,
+      text: `Car Help S.A.S — Orden ${ordenNumero}\nVehículo: ${vehiculo}\nKm salida: ${kmSalida}\nCombustible: ${combustibleLabel}\nDaños preexistentes: ${zonasDano.length > 0 ? zonasDano.join(', ') : 'Ninguno'}\nContacto: 310 743 6082`,
+    }),
   })
+
+  const resendData = await resendRes.json()
+  if (!resendRes.ok) {
+    throw new Error(resendData.message || 'Error enviando correo con Resend')
+  }
+  const info = { messageId: resendData.id }
 
   // Marcar correo como enviado en la BD
   await supabase
