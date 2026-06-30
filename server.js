@@ -23,7 +23,7 @@ dotenv.config()
 const app    = express()
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }) // 10 MB max
 
-app.use(cors({ origin: process.env.APP_URL || '*' }))
+app.use(cors({ origin: true, credentials: false }))
 app.use(express.json())
 
 // ------------------------------------------------------------
