@@ -546,6 +546,7 @@
     <button class="nav-tab" onclick="cambiarVista('seguridad', this)">🛡️ Seguridad</button>
     <button class="nav-tab" onclick="cambiarVista('solicitudes', this)">📥 Solicitudes</button>
     <button class="nav-tab" onclick="abrirEntregas()">📦 Entregas</button>
+    <button class="nav-tab admin-only" onclick="cambiarVista('contabilidad', this)">💰 Contabilidad</button>
     <button class="nav-tab admin-only" onclick="cambiarVista('usuarios', this)">👤 Usuarios</button>
   </div>
 
@@ -1054,6 +1055,137 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- ═══ VISTA: CONTABILIDAD (solo admin) ═══ -->
+  <div class="vista" id="vista-contabilidad">
+
+    <div class="stats-grid">
+      <div class="stat-card" style="border-color:rgba(76,175,130,0.3)">
+        <div class="stat-label">Ingresos de hoy</div>
+        <div class="stat-value" id="ct-ingresos-hoy" style="color:var(--verde-ok)">$ 0</div>
+        <div class="stat-extra" id="ct-ingresos-count">0 movimientos</div>
+      </div>
+      <div class="stat-card" style="border-color:rgba(224,82,82,0.3)">
+        <div class="stat-label">Egresos de hoy</div>
+        <div class="stat-value" id="ct-egresos-hoy" style="color:var(--rojo-alerta)">$ 0</div>
+        <div class="stat-extra" id="ct-egresos-count">0 movimientos</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Saldo del día</div>
+        <div class="stat-value" id="ct-saldo-hoy">$ 0</div>
+        <div class="stat-extra">Ingresos - Egresos</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Pendiente liquidar</div>
+        <div class="stat-value" id="ct-pendiente-liquidar" style="color:var(--azul-info)">$ 0</div>
+        <div class="stat-extra">a propietarios de subalquiler</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-titulo-wrap">
+          <div class="panel-icono">➕</div>
+          <div>
+            <div class="panel-titulo">Registrar movimiento</div>
+            <div class="panel-sub">Ingresos y egresos del negocio</div>
+          </div>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="fila-3">
+          <div class="campo">
+            <label>Tipo</label>
+            <select id="ct_tipo">
+              <option value="ingreso">Ingreso</option>
+              <option value="egreso">Egreso</option>
+            </select>
+          </div>
+          <div class="campo">
+            <label>Categoría</label>
+            <select id="ct_categoria">
+              <option value="renta">Renta de vehículo</option>
+              <option value="tour">Tour VIP</option>
+              <option value="seguridad">Seguridad / transporte</option>
+              <option value="mantenimiento">Mantenimiento</option>
+              <option value="liquidacion">Liquidación propietario</option>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+          <div class="campo">
+            <label>Método de pago</label>
+            <select id="ct_metodo">
+              <option value="efectivo">Efectivo</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="tarjeta">Tarjeta</option>
+            </select>
+          </div>
+        </div>
+        <div class="campo"><label>Concepto <span class="req">*</span></label><input type="text" id="ct_concepto" placeholder="Ej. Pago reserva CH-260629-219"></div>
+        <div class="fila-2">
+          <div class="campo"><label>Valor (COP) <span class="req">*</span></label><input type="number" id="ct_valor" placeholder="350000"></div>
+          <div class="campo"><label>Fecha</label><input type="date" id="ct_fecha"></div>
+        </div>
+        <div class="campo">
+          <label>Vincular a reserva (opcional)</label>
+          <select id="ct_orden"><option value="">— Ninguna —</option></select>
+        </div>
+        <div class="campo">
+          <label>Vincular a vehículo (opcional)</label>
+          <select id="ct_vehiculo"><option value="">— Ninguno —</option></select>
+        </div>
+        <div class="campo"><label>Notas</label><input type="text" id="ct_notas" placeholder="Observaciones adicionales"></div>
+        <button class="btn-primario full" onclick="guardarMovimientoContable()">Registrar movimiento</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-titulo-wrap">
+          <div class="panel-icono">🚙</div>
+          <div>
+            <div class="panel-titulo">Liquidación a propietarios — vehículos de subalquiler</div>
+            <div class="panel-sub">Ingresos por renta menos lo que corresponde a Car Help</div>
+          </div>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div id="ct-liquidaciones">
+          <div class="estado-vacio"><div class="icono-grande">🚙</div><p>No hay vehículos de subalquiler con movimientos.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-titulo-wrap">
+          <div class="panel-icono">📊</div>
+          <div>
+            <div class="panel-titulo">Movimientos registrados</div>
+            <div class="panel-sub" id="ct-movs-count">0 movimientos</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <input type="date" id="ct-filtro-desde" style="background:var(--gris-oscuro);border:1px solid var(--borde);border-radius:8px;color:var(--blanco);padding:8px 10px;font-size:0.78rem">
+          <input type="date" id="ct-filtro-hasta" style="background:var(--gris-oscuro);border:1px solid var(--borde);border-radius:8px;color:var(--blanco);padding:8px 10px;font-size:0.78rem">
+          <button class="btn-secundario" onclick="cargarMovimientosContables()">Filtrar</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="tabla-wrap">
+          <table>
+            <thead>
+              <tr><th>Fecha</th><th>Tipo</th><th>Categoría</th><th>Concepto</th><th>Método</th><th>Valor</th><th>Acciones</th></tr>
+            </thead>
+            <tbody id="tabla-movimientos">
+              <tr><td colspan="7"><div class="estado-vacio"><div class="icono-grande">💰</div><p>Cargando movimientos...</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- ═══ VISTA: USUARIOS (solo admin) ═══ -->
@@ -1752,6 +1884,7 @@ function cambiarVista(id, el) {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('activo'));
   el.classList.add('activo');
   if (id === 'solicitudes') cargarSolicitudes();
+  if (id === 'contabilidad') abrirContabilidad();
 }
 function cambiarVistaPorId(id) {
   const btn = Array.from(document.querySelectorAll('.nav-tab')).find(b => b.getAttribute('onclick').includes(`'${id}'`));
@@ -3187,9 +3320,219 @@ function epCompletar() {
 }
 
 /* ════════════════════════════════════════════
-   MODALES / TOAST
+   CONTABILIDAD Y ARQUEO
    ════════════════════════════════════════════ */
-function abrirModal(id) { document.getElementById(id).classList.add('visible'); }
+let movimientosContables = [];
+
+async function abrirContabilidad() {
+  // Poblar fecha por defecto y rango de filtro (mes actual)
+  const hoy = new Date().toISOString().split('T')[0];
+  const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+  if (!document.getElementById('ct_fecha').value) document.getElementById('ct_fecha').value = hoy;
+  if (!document.getElementById('ct-filtro-desde').value) document.getElementById('ct-filtro-desde').value = inicioMes;
+  if (!document.getElementById('ct-filtro-hasta').value) document.getElementById('ct-filtro-hasta').value = hoy;
+
+  // Poblar selects de orden y vehículo
+  const selOrden = document.getElementById('ct_orden');
+  selOrden.innerHTML = '<option value="">— Ninguna —</option>' +
+    reservas.map(r => `<option value="${r.id || r.num_reserva}">${r.num_reserva} — ${r.nombre}</option>`).join('');
+
+  const selVeh = document.getElementById('ct_vehiculo');
+  selVeh.innerHTML = '<option value="">— Ninguno —</option>' +
+    vehiculos.map(v => `<option value="${v.id}">${v.nombre}${v.placa ? ' ('+v.placa+')' : ''}</option>`).join('');
+
+  await cargarMovimientosContables();
+  await renderLiquidaciones();
+}
+
+async function cargarMovimientosContables() {
+  const tbody = document.getElementById('tabla-movimientos');
+  tbody.innerHTML = `<tr><td colspan="7"><div class="estado-vacio"><div class="icono-grande">⏳</div><p>Cargando...</p></div></td></tr>`;
+
+  const desde = document.getElementById('ct-filtro-desde').value;
+  const hasta = document.getElementById('ct-filtro-hasta').value;
+
+  try {
+    let query = '&order=fecha.desc,created_at.desc';
+    if (desde) query += `&fecha=gte.${desde}`;
+    if (hasta) query += `&fecha=lte.${hasta}`;
+    movimientosContables = await sbSelect('movimientos_contables', query);
+  } catch(e) {
+    console.error('Error cargando movimientos:', e);
+    tbody.innerHTML = `<tr><td colspan="7"><div class="estado-vacio"><div class="icono-grande">⚠️</div><p>Error cargando movimientos. Verifica la conexión a Supabase.</p></div></td></tr>`;
+    return;
+  }
+
+  renderResumenHoy();
+  renderTablaMovimientos();
+}
+
+function renderResumenHoy() {
+  const hoy = new Date().toISOString().split('T')[0];
+  const movsHoy = movimientosContables.filter(m => m.fecha === hoy);
+  const ingresos = movsHoy.filter(m => m.tipo === 'ingreso');
+  const egresos = movsHoy.filter(m => m.tipo === 'egreso');
+  const totalIngresos = ingresos.reduce((s, m) => s + parseFloat(m.valor), 0);
+  const totalEgresos = egresos.reduce((s, m) => s + parseFloat(m.valor), 0);
+
+  document.getElementById('ct-ingresos-hoy').textContent = formatCOP(totalIngresos);
+  document.getElementById('ct-ingresos-count').textContent = ingresos.length + ' movimiento(s)';
+  document.getElementById('ct-egresos-hoy').textContent = formatCOP(totalEgresos);
+  document.getElementById('ct-egresos-count').textContent = egresos.length + ' movimiento(s)';
+
+  const saldo = totalIngresos - totalEgresos;
+  const saldoEl = document.getElementById('ct-saldo-hoy');
+  saldoEl.textContent = formatCOP(saldo);
+  saldoEl.style.color = saldo >= 0 ? 'var(--verde-ok)' : 'var(--rojo-alerta)';
+}
+
+function renderTablaMovimientos() {
+  const tbody = document.getElementById('tabla-movimientos');
+  document.getElementById('ct-movs-count').textContent = movimientosContables.length + ' movimientos';
+
+  if (movimientosContables.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="estado-vacio"><div class="icono-grande">💰</div><p>No hay movimientos en el rango seleccionado.</p></div></td></tr>`;
+    return;
+  }
+
+  const catLabel = { renta:'Renta', tour:'Tour VIP', seguridad:'Seguridad', mantenimiento:'Mantenimiento', liquidacion:'Liquidación', otro:'Otro' };
+  const metLabel = { efectivo:'Efectivo', transferencia:'Transferencia', tarjeta:'Tarjeta' };
+
+  tbody.innerHTML = movimientosContables.map(m => `
+    <tr>
+      <td>${fmtFecha(m.fecha)}</td>
+      <td><span class="estado-pill" style="background:${m.tipo === 'ingreso' ? 'rgba(76,175,130,0.15)' : 'rgba(224,82,82,0.15)'};color:${m.tipo === 'ingreso' ? 'var(--verde-ok)' : 'var(--rojo-alerta)'}">${m.tipo === 'ingreso' ? 'Ingreso' : 'Egreso'}</span></td>
+      <td>${catLabel[m.categoria] || m.categoria || '—'}</td>
+      <td>${m.concepto}${m.notas ? `<br><span style="font-size:0.7rem;color:var(--blanco-suave)">${m.notas}</span>` : ''}</td>
+      <td>${metLabel[m.metodo_pago] || '—'}</td>
+      <td style="color:${m.tipo === 'ingreso' ? 'var(--verde-ok)' : 'var(--rojo-alerta)'};font-weight:700">${m.tipo === 'ingreso' ? '+' : '-'} ${formatCOP(m.valor)}</td>
+      <td><button class="btn-peligro" onclick="eliminarMovimientoContable('${m.id}')">Eliminar</button></td>
+    </tr>
+  `).join('');
+}
+
+async function guardarMovimientoContable() {
+  const tipo = document.getElementById('ct_tipo').value;
+  const categoria = document.getElementById('ct_categoria').value;
+  const concepto = document.getElementById('ct_concepto').value.trim();
+  const valor = parseFloat(document.getElementById('ct_valor').value) || 0;
+  const fecha = document.getElementById('ct_fecha').value;
+  const metodo_pago = document.getElementById('ct_metodo').value;
+  const orden_id = document.getElementById('ct_orden').value || null;
+  const vehiculo_id = document.getElementById('ct_vehiculo').value || null;
+  const notas = document.getElementById('ct_notas').value.trim();
+
+  if (!concepto) { mostrarToast('⚠️ Ingresa el concepto del movimiento', '#E05252'); return; }
+  if (!valor) { mostrarToast('⚠️ Ingresa el valor del movimiento', '#E05252'); return; }
+
+  try {
+    await sbInsert('movimientos_contables', {
+      tipo, categoria, concepto, valor, fecha, metodo_pago,
+      orden_id: orden_id || null, vehiculo_id: vehiculo_id || null, notas
+    });
+    mostrarToast('✅ Movimiento registrado');
+  } catch(e) {
+    console.error('Error guardando movimiento:', e);
+    mostrarToast('⚠️ No se pudo guardar el movimiento', '#E05252');
+    return;
+  }
+
+  document.getElementById('ct_concepto').value = '';
+  document.getElementById('ct_valor').value = '';
+  document.getElementById('ct_notas').value = '';
+
+  await cargarMovimientosContables();
+  await renderLiquidaciones();
+}
+
+async function eliminarMovimientoContable(id) {
+  try {
+    await sbDelete('movimientos_contables', id);
+    mostrarToast('🗑️ Movimiento eliminado');
+  } catch(e) {
+    console.error('Error eliminando movimiento:', e);
+    mostrarToast('⚠️ No se pudo eliminar', '#E05252');
+    return;
+  }
+  await cargarMovimientosContables();
+  await renderLiquidaciones();
+}
+
+async function renderLiquidaciones() {
+  const cont = document.getElementById('ct-liquidaciones');
+  const subalquiler = vehiculos.filter(v => v.esSubalquiler);
+
+  if (subalquiler.length === 0) {
+    cont.innerHTML = `<div class="estado-vacio"><div class="icono-grande">🚙</div><p>No hay vehículos marcados como subalquiler.</p></div>`;
+    document.getElementById('ct-pendiente-liquidar').textContent = '$ 0';
+    return;
+  }
+
+  let totalPendienteGlobal = 0;
+
+  const filas = await Promise.all(subalquiler.map(async (v) => {
+    let movs = [];
+    try {
+      movs = await sbSelect('movimientos_contables', `&vehiculo_id=eq.${v.id}&categoria=eq.renta&tipo=eq.ingreso`);
+    } catch(e) { movs = []; }
+
+    const totalIngresos = movs.reduce((s, m) => s + parseFloat(m.valor), 0);
+    const pctPropietario = v.propietarioPorcentaje || 0;
+    const debeAlPropietario = totalIngresos * (pctPropietario / 100);
+
+    let yaLiquidado = 0;
+    try {
+      const liqs = await sbSelect('movimientos_contables', `&vehiculo_id=eq.${v.id}&categoria=eq.liquidacion`);
+      yaLiquidado = liqs.reduce((s, m) => s + parseFloat(m.valor), 0);
+    } catch(e) {}
+
+    const pendiente = debeAlPropietario - yaLiquidado;
+    totalPendienteGlobal += pendiente;
+
+    return `
+      <div class="item-card">
+        <div class="item-info">
+          <div class="item-titulo">${v.nombre} ${v.placa ? '('+v.placa+')' : ''}</div>
+          <div class="item-detalle">Propietario: <strong>${v.propietarioNombre || 'Sin definir'}</strong> · ${pctPropietario}% de liquidación</div>
+          <div class="item-detalle">Ingresos totales por renta: <strong>${formatCOP(totalIngresos)}</strong> · Corresponde al propietario: <strong>${formatCOP(debeAlPropietario)}</strong></div>
+          <div class="item-detalle">Ya liquidado: <strong>${formatCOP(yaLiquidado)}</strong></div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:${pendiente > 0 ? 'var(--rojo-alerta)' : 'var(--verde-ok)'}">${formatCOP(pendiente)}</div>
+          <div style="font-size:0.7rem;color:var(--blanco-suave);margin-bottom:6px">pendiente</div>
+          ${pendiente > 0 ? `<button class="btn-secundario" onclick="liquidarPropietario('${v.id}', '${(v.propietarioNombre||'').replace(/'/g,"\\'")}', ${pendiente})" style="font-size:0.72rem">Registrar liquidación</button>` : ''}
+        </div>
+      </div>
+    `;
+  }));
+
+  cont.innerHTML = `<div class="lista-cards">${filas.join('')}</div>`;
+  document.getElementById('ct-pendiente-liquidar').textContent = formatCOP(totalPendienteGlobal);
+}
+
+async function liquidarPropietario(vehiculoId, propietarioNombre, valor) {
+  try {
+    await sbInsert('movimientos_contables', {
+      tipo: 'egreso',
+      categoria: 'liquidacion',
+      concepto: `Liquidación a ${propietarioNombre || 'propietario'}`,
+      valor: valor,
+      fecha: new Date().toISOString().split('T')[0],
+      metodo_pago: 'transferencia',
+      vehiculo_id: vehiculoId,
+      notas: 'Liquidación de ingresos por subalquiler'
+    });
+    mostrarToast('✅ Liquidación registrada');
+  } catch(e) {
+    console.error('Error registrando liquidación:', e);
+    mostrarToast('⚠️ No se pudo registrar la liquidación', '#E05252');
+    return;
+  }
+  await cargarMovimientosContables();
+  await renderLiquidaciones();
+}
+
+
 function cerrarModal(id) { document.getElementById(id).classList.remove('visible'); }
 
 function mostrarToast(msg, color) {
