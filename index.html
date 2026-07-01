@@ -633,6 +633,24 @@
     <div class="panel">
       <div class="panel-header">
         <div class="panel-titulo-wrap">
+          <div class="panel-icono">🚗</div>
+          <div>
+            <div class="panel-titulo">Rentas en curso</div>
+            <div class="panel-sub">Vehículos actualmente con el cliente</div>
+          </div>
+        </div>
+        <span id="stat-en-curso-badge" style="font-size:0.72rem;font-weight:700;background:rgba(46,204,113,0.15);color:#2ecc71;padding:3px 10px;border-radius:20px"></span>
+      </div>
+      <div class="panel-body">
+        <div class="lista-cards" id="lista-en-curso">
+          <div class="estado-vacio"><div class="icono-grande">🟢</div><p>No hay rentas en curso.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-titulo-wrap">
           <div class="panel-icono">🕐</div>
           <div>
             <div class="panel-titulo">Próximas entregas y devoluciones</div>
@@ -1940,6 +1958,7 @@ function cambiarVistaPorId(id) {
    ════════════════════════════════════════════ */
 function renderTodo() {
   renderStats();
+  renderEnCurso();
   renderProximas();
   renderVehiculosSelect();
   renderTablaVehiculos();
@@ -1974,6 +1993,46 @@ function renderStats() {
   document.getElementById('stat-reservas-activas').textContent = reservas.filter(r => r.estado !== 'finalizada').length;
   document.getElementById('stat-tours').textContent = tours.length;
   document.getElementById('stat-solicitudes').textContent = solicitudesClientes.filter(s => !s.atendida).length;
+}
+
+function renderEnCurso() {
+  const cont = document.getElementById('lista-en-curso');
+  if (!cont) return;
+  const enCurso = reservas.filter(r => r.estado === 'entregado');
+  const badge = document.getElementById('stat-en-curso-badge');
+  if (badge) badge.textContent = enCurso.length > 0 ? enCurso.length + ' activa' + (enCurso.length > 1 ? 's' : '') : '';
+
+  if (enCurso.length === 0) {
+    cont.innerHTML = `<div class="estado-vacio"><div class="icono-grande">🟢</div><p>No hay rentas en curso.</p></div>`;
+    return;
+  }
+  const hoy = new Date();
+  cont.innerHTML = enCurso.map(r => {
+    const devolucion = new Date(r.fecha_fin + 'T' + (r.hora_fin || '00:00'));
+    const diffMs = devolucion - hoy;
+    const diffH = Math.floor(diffMs / 3600000);
+    const diffD = Math.floor(diffH / 24);
+    let tiempoLabel = '';
+    let tiempoColor = 'var(--verde-ok)';
+    if (diffMs < 0) {
+      tiempoLabel = '⚠️ Vencida';
+      tiempoColor = 'var(--rojo-alerta)';
+    } else if (diffH < 24) {
+      tiempoLabel = `⏱ Devuelve en ${diffH}h`;
+      tiempoColor = '#E8C96A';
+    } else {
+      tiempoLabel = `📅 Devuelve en ${diffD} día${diffD > 1 ? 's' : ''}`;
+    }
+    return `
+    <div class="item-card" style="border-left:3px solid #2ecc71">
+      <div class="item-info">
+        <div class="item-titulo">${r.nombre} <span class="num-reserva">${r.num_reserva}</span></div>
+        <div class="item-detalle"><strong>${r.vehiculo}</strong> · Devolución: ${fmtFechaHora(r.fecha_fin, r.hora_fin)}</div>
+        <div class="item-detalle" style="color:${tiempoColor};font-weight:600;margin-top:2px">${tiempoLabel}</div>
+      </div>
+      <span class="estado-pill estado-entregado">En curso</span>
+    </div>`;
+  }).join('');
 }
 
 function renderProximas() {
@@ -2654,7 +2713,7 @@ function renderReservas() {
 
 async function cambiarEstadoReserva(num, estado) {
   const r = reservas.find(x => x.num_reserva === num);
-  if (r) { r.estado = estado; await guardar('carhelp:reservas', reservas); renderStats(); renderProximas(); renderReservas(); }
+  if (r) { r.estado = estado; await guardar('carhelp:reservas', reservas); renderStats(); renderEnCurso(); renderProximas(); renderReservas(); }
 }
 
 async function eliminarReserva(num) {
