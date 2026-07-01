@@ -3260,7 +3260,29 @@ function epIniciarFlujo() {
   epGo('ep-step1');
 }
 
-// ── Almacén de archivos reales capturados ──
+async function epSubirFotoStorage(slotId, ordenNum) {
+  const archivo = epArchivos[slotId];
+  if (!archivo || !archivo.file) return null;
+  try {
+    const ext = archivo.file.name.split('.').pop() || 'jpg';
+    const path = `${ordenNum}/${slotId}.${ext}`;
+    const res = await fetch(`${SB_URL}/storage/v1/object/entregas-fotos/${path}`, {
+      method: 'POST',
+      headers: {
+        'apikey': SB_KEY,
+        'Authorization': `Bearer ${SB_KEY}`,
+        'Content-Type': archivo.file.type || 'image/jpeg',
+        'x-upsert': 'true'
+      },
+      body: archivo.file
+    });
+    if (!res.ok) return null;
+    return `${SB_URL}/storage/v1/object/public/entregas-fotos/${path}`;
+  } catch(e) {
+    console.warn('Error subiendo foto:', slotId, e.message);
+    return null;
+  }
+}
 let epArchivos = {}; // { slotId: { file, dataUrl, label } }
 
 function epCapturaDoc(id, label) {
@@ -3389,7 +3411,18 @@ async function epCompletar() {
     var now = new Date();
     var ordenNum = epOrder.num_reserva || epOrder.id || ('CH-' + Date.now());
 
-    // 1. Guardar entrega en Supabase
+    // 1. Subir fotos a Supabase Storage
+    btn.textContent = 'Subiendo fotos...';
+    const slotsConFoto = ['eph-front','eph-back','eph-left','eph-right','eph-int','eph-dash','eph-fuel','eph-trunk'];
+    const fotosSubidas = [];
+    for (const slotId of slotsConFoto) {
+      if (epArchivos[slotId]) {
+        const url = await epSubirFotoStorage(slotId, ordenNum);
+        if (url) fotosSubidas.push({ slotId, url, label: epArchivos[slotId].label });
+      }
+    }
+
+    // 2. Guardar entrega en Supabase
     var entregaSB = {
       orden_id: epOrder.id || null,
       agente_id: sesion?.id || null,
@@ -3398,7 +3431,7 @@ async function epCompletar() {
       zonas_dano: Array.from(epDmg),
       observaciones: obs,
       cliente_email: emailCliente,
-      fotos_urls: [],
+      fotos_urls: fotosSubidas.map(f => f.url),
       fecha_entrega: now.toISOString(),
     };
     try {
@@ -3411,8 +3444,8 @@ async function epCompletar() {
     var correoEnviado = false;
     if (emailCliente) {
       btn.textContent = 'Enviando correo...';
-      var fotosHTML = epPhotos.size > 0
-        ? `<p style="color:#888;font-size:13px">📷 Se registraron ${epPhotos.size} foto(s) del vehículo en el momento de la entrega.</p>`
+      var fotosHTML = fotosSubidas.length > 0
+        ? `<p style="color:#888;font-size:13px">📷 Se registraron ${fotosSubidas.length} foto(s) del vehículo en el momento de la entrega.</p>`
         : '';
 
       var cuerpo = `Estimado/a ${epOrder.nombre},
@@ -3442,7 +3475,14 @@ RECOMENDACIONES PARA TU VIAJE
 
 Con aprecio,
 El equipo de Car Help S.A.S
-📞 310 743 6082 · reservascarhelp@gmail.com`;
+📞 310 743 6082 · reservascarhelp@gmail.com
+
+${fotosSubidas.length > 0 ? `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REGISTRO FOTOGRÁFICO DEL VEHÍCULO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${fotosSubidas.map(f => `${f.label}: ${f.url}`).join('\n')}
+` : ''}`;
 
       try {
         const resCorreo = await fetch(MAIL_API + '/api/enviar-correo', {
@@ -3452,6 +3492,7 @@ El equipo de Car Help S.A.S
             para: emailCliente,
             asunto: `✅ Entrega confirmada · ${epOrder.vehiculo} · Orden ${ordenNum} · Car Help`,
             cuerpo,
+            fotosUrls: fotosSubidas.map(f => ({ label: f.label, url: f.url })),
           })
         });
         if (resCorreo.ok) correoEnviado = true;
