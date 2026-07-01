@@ -663,9 +663,10 @@
 
         <div class="seccion-label">Datos del cliente <span style="color:var(--blanco-suave); text-transform:none; letter-spacing:0; font-weight:400;">— todos obligatorios</span></div>
 
-        <div class="campo">
+        <div class="campo" style="position:relative">
           <label>Nombre completo <span class="req">*</span></label>
-          <input type="text" id="r_nombre" placeholder="Ej. Juan Andrés Pérez Gómez">
+          <input type="text" id="r_nombre" placeholder="Ej. Juan Andrés Pérez Gómez" autocomplete="off" oninput="buscarClienteAutocomplete(this.value)">
+          <div id="r_nombre_sugerencias" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--gris-oscuro);border:1px solid var(--dorado);border-radius:8px;z-index:999;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.4)"></div>
         </div>
 
         <div class="fila-2">
@@ -3580,6 +3581,47 @@ async function liquidarPropietario(vehiculoId, propietarioNombre, valor) {
 
 function abrirModal(id) { document.getElementById(id).classList.add('visible'); }
 function cerrarModal(id) { document.getElementById(id).classList.remove('visible'); }
+
+// ── Autocomplete clientes en reservas ──
+let _autocompleteTimer = null;
+async function buscarClienteAutocomplete(q) {
+  const caja = document.getElementById('r_nombre_sugerencias');
+  if (!q || q.length < 3) { caja.style.display = 'none'; return; }
+  clearTimeout(_autocompleteTimer);
+  _autocompleteTimer = setTimeout(async () => {
+    try {
+      const data = await sbSelect('clientes', `&nombre=ilike.*${encodeURIComponent(q)}*&limit=6`);
+      if (!data || data.length === 0) { caja.style.display = 'none'; return; }
+      caja.innerHTML = data.map(c => `
+        <div onclick="seleccionarClienteAutocomplete(${JSON.stringify(c).replace(/"/g,'&quot;')})"
+          style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--borde);font-size:0.85rem;transition:background 0.15s"
+          onmouseover="this.style.background='var(--gris-medio)'" onmouseout="this.style.background=''">
+          <div style="font-weight:600;color:var(--blanco)">${c.nombre}</div>
+          <div style="color:var(--blanco-suave);font-size:0.75rem">${c.num_doc || ''} · ${c.celular || ''}</div>
+        </div>
+      `).join('');
+      caja.style.display = 'block';
+    } catch(e) { caja.style.display = 'none'; }
+  }, 300);
+}
+
+function seleccionarClienteAutocomplete(c) {
+  document.getElementById('r_nombre').value = c.nombre || '';
+  document.getElementById('r_tipo_doc').value = c.tipo_doc || '';
+  document.getElementById('r_num_doc').value = c.num_doc || '';
+  document.getElementById('r_celular').value = c.celular || '';
+  document.getElementById('r_email').value = c.email || '';
+  if (document.getElementById('r_direccion')) document.getElementById('r_direccion').value = c.direccion || '';
+  document.getElementById('r_nombre_sugerencias').style.display = 'none';
+}
+
+// Cerrar sugerencias al hacer clic fuera
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('#r_nombre_sugerencias') && e.target.id !== 'r_nombre') {
+    const caja = document.getElementById('r_nombre_sugerencias');
+    if (caja) caja.style.display = 'none';
+  }
+});
 
 async function actualizarVehiculos() {
   try {
