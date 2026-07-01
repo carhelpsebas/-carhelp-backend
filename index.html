@@ -1264,19 +1264,17 @@
     <div class="modal-body">
       <input type="hidden" id="v_id">
 
-      <div class="seccion-label">Fotos del vehículo</div>
-      <div id="v-fotos-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">
-        <div class="v-foto-slot" data-idx="0" onclick="vSeleccionarFoto(0)" style="aspect-ratio:1;border:1.5px dashed var(--borde);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--gris-oscuro);overflow:hidden;position:relative">
-          <span style="font-size:20px;color:var(--blanco-suave)">+</span>
+      <div class="seccion-label">Foto del vehículo</div>
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
+        <div id="v-foto-perfil" onclick="vSeleccionarFoto()" style="width:100px;height:100px;border:1.5px dashed var(--borde);border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--gris-oscuro);overflow:hidden;flex-shrink:0;position:relative">
+          <span style="font-size:28px;color:var(--blanco-suave)">+</span>
         </div>
-        <div class="v-foto-slot" data-idx="1" onclick="vSeleccionarFoto(1)" style="aspect-ratio:1;border:1.5px dashed var(--borde);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--gris-oscuro);overflow:hidden;position:relative">
-          <span style="font-size:20px;color:var(--blanco-suave)">+</span>
-        </div>
-        <div class="v-foto-slot" data-idx="2" onclick="vSeleccionarFoto(2)" style="aspect-ratio:1;border:1.5px dashed var(--borde);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--gris-oscuro);overflow:hidden;position:relative">
-          <span style="font-size:20px;color:var(--blanco-suave)">+</span>
-        </div>
-        <div class="v-foto-slot" data-idx="3" onclick="vSeleccionarFoto(3)" style="aspect-ratio:1;border:1.5px dashed var(--borde);border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--gris-oscuro);overflow:hidden;position:relative">
-          <span style="font-size:20px;color:var(--blanco-suave)">+</span>
+        <div>
+          <div style="font-size:0.8rem;color:var(--blanco-suave);margin-bottom:8px">Foto de perfil del vehículo</div>
+          <div style="display:flex;gap:8px">
+            <button type="button" class="btn-secundario" onclick="vSeleccionarFoto()" style="font-size:0.75rem;padding:6px 12px">📷 Cambiar foto</button>
+            <button type="button" class="btn-secundario" onclick="vEliminarFoto()" style="font-size:0.75rem;padding:6px 12px;color:var(--rojo-alerta);border-color:var(--rojo-alerta)">🗑 Eliminar</button>
+          </div>
         </div>
       </div>
       <input type="file" id="v-foto-input" accept="image/*" style="display:none" onchange="vCargarFoto(event)">
@@ -2054,12 +2052,15 @@ function renderTablaVehiculos() {
   }).join('');
 }
 
-let vFotosActuales = [null, null, null, null];
-let vFotoIdxActivo = null;
+let vFotosActuales = [null];
 
-function vSeleccionarFoto(idx) {
-  vFotoIdxActivo = idx;
+function vSeleccionarFoto() {
   document.getElementById('v-foto-input').click();
+}
+
+function vEliminarFoto() {
+  vFotosActuales[0] = null;
+  vRenderFotos();
 }
 
 function vCargarFoto(event) {
@@ -2067,19 +2068,20 @@ function vCargarFoto(event) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = function(e) {
-    vFotosActuales[vFotoIdxActivo] = e.target.result;
+    vFotosActuales[0] = e.target.result;
     vRenderFotos();
   };
   reader.readAsDataURL(file);
+  event.target.value = '';
 }
 
 function vRenderFotos() {
-  document.querySelectorAll('.v-foto-slot').forEach((slot, idx) => {
-    const foto = vFotosActuales[idx];
-    slot.innerHTML = foto
-      ? `<img src="${foto}" style="width:100%;height:100%;object-fit:cover">`
-      : `<span style="font-size:20px;color:var(--blanco-suave)">+</span>`;
-  });
+  const slot = document.getElementById('v-foto-perfil');
+  if (!slot) return;
+  const foto = vFotosActuales[0];
+  slot.innerHTML = foto
+    ? `<img src="${foto}" style="width:100%;height:100%;object-fit:cover">`
+    : `<span style="font-size:28px;color:var(--blanco-suave)">+</span>`;
 }
 
 function vToggleSubalquiler() {
@@ -2104,7 +2106,7 @@ function abrirModalVehiculo() {
   document.getElementById('v-propietario-fields').style.display = 'none';
   document.getElementById('v-gastos-lista').innerHTML = '<div style="font-size:0.78rem;color:var(--blanco-suave);text-align:center;padding:8px">Guarda el vehículo primero para poder registrar gastos.</div>';
   document.getElementById('v-btn-gasto').style.display = 'none';
-  vFotosActuales = [null, null, null, null];
+  vFotosActuales = [null];
   vRenderFotos();
   abrirModal('modal-vehiculo');
 }
@@ -2126,12 +2128,7 @@ function editarVehiculo(id) {
   document.getElementById('v_propietario_nombre').value = v.propietarioNombre || '';
   document.getElementById('v_propietario_pct').value = v.propietarioPorcentaje || '';
   document.getElementById('v-propietario-fields').style.display = v.esSubalquiler ? 'block' : 'none';
-  vFotosActuales = [
-    (v.fotos && v.fotos[0]) || null,
-    (v.fotos && v.fotos[1]) || null,
-    (v.fotos && v.fotos[2]) || null,
-    (v.fotos && v.fotos[3]) || null,
-  ];
+  vFotosActuales = [(v.fotos && v.fotos[0]) || null];
   vRenderFotos();
   document.getElementById('v-btn-gasto').style.display = 'block';
   vRenderGastos(id);
