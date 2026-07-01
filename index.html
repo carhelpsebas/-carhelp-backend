@@ -1307,7 +1307,7 @@
           </select>
         </div>
       </div>
-      <div class="campo"><label>Tarifa por período de 24h (COP)</label><input type="number" id="v_tarifa" placeholder="150000"></div>
+      <div class="campo"><label>Tarifa por período de 24h (COP)</label><input type="text" id="v_tarifa" placeholder="Ej: 320000 o 320.000"></div>
       <div class="campo">
         <label>Estado</label>
         <select id="v_estado">
@@ -2151,7 +2151,7 @@ async function guardarVehiculo() {
     anio: document.getElementById('v_anio').value.trim(),
     color: document.getElementById('v_color').value.trim(),
     combustible_tipo: document.getElementById('v_combustible').value,
-    tarifa: parseFloat(document.getElementById('v_tarifa').value) || 0,
+    tarifa: parseFloat(document.getElementById('v_tarifa').value.replace(/\./g, '').replace(',', '.')) || 0,
     estado: document.getElementById('v_estado').value,
     esSubalquiler: document.getElementById('v_es_subalquiler').checked,
     propietarioNombre: document.getElementById('v_propietario_nombre').value.trim(),
