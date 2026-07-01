@@ -3215,21 +3215,30 @@ function epMostrarOrdenesLocales(lista, label) {
     document.getElementById('ep-count').textContent = '0 pendientes';
     return;
   }
-  const pendientes = reservas.filter(r => r.estado !== 'finalizada').slice(0,20);
+  const pendientes = reservas.filter(r => r.estado !== 'finalizada' && r.estado !== 'entregado').slice(0,20);
   window._epReservasPendientes = pendientes;
   document.getElementById('ep-count').textContent = pendientes.length + ' pendientes';
   if (pendientes.length === 0) {
     lista.innerHTML = '<div style="padding:20px;text-align:center;color:#555;font-size:13px">No hay reservas pendientes.</div>';
     return;
   }
+  const estadoLabels = { pendiente: 'Pendiente', confirmada: 'Confirmada', entregado: 'Entrega realizada', finalizada: 'Finalizada' };
+  const estadoColores = {
+    pendiente: 'background:rgba(201,168,76,.15);color:#C9A84C',
+    confirmada: 'background:rgba(76,175,130,.15);color:#4CAF82',
+    entregado: 'background:rgba(46,204,113,.2);color:#2ecc71',
+    finalizada: 'background:rgba(255,255,255,.08);color:#999'
+  };
   lista.innerHTML = pendientes.map(function(r, idx) {
+    const estilo = estadoColores[r.estado] || 'background:rgba(201,168,76,.15);color:#C9A84C';
+    const label = estadoLabels[r.estado] || r.estado;
     return '<div class="eorden-item" onclick="epSeleccionarIdx(' + idx + ')">' +
       '<div class="eorden-avatar">U</div>' +
       '<div style="flex:1">' +
         '<div style="font-size:13px;font-weight:500;color:#f0f0f0">' + r.nombre + '</div>' +
         '<div style="font-size:11px;color:#666;margin-top:2px">' + r.vehiculo + ' - ' + r.num_reserva + '</div>' +
       '</div>' +
-      '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;background:rgba(201,168,76,.15);color:#C9A84C">' + r.estado + '</span>' +
+      '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px;' + estilo + '">' + label + '</span>' +
     '</div>';
   }).join('');
 }
