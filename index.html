@@ -3260,26 +3260,75 @@ function epIniciarFlujo() {
   epGo('ep-step1');
 }
 
+// ── Almacén de archivos reales capturados ──
+let epArchivos = {}; // { slotId: { file, dataUrl, label } }
+
 function epCapturaDoc(id, label) {
-  var el = document.getElementById(id);
-  el.classList.add('done');
-  var nameEl = el.querySelector('div div:first-child');
-  if(nameEl) nameEl.textContent = label;
+  epAbrirCaptura(id, label, 'doc');
 }
 
 function epFoto(id, label) {
-  var el = document.getElementById(id);
-  el.classList.add('done');
-  el.innerHTML = '<span style="font-size:22px">&#10003;</span><span style="color:#C9A84C;font-size:11px">' + label + '</span>';
-  epPhotos.add(id);
-  var countEl = document.getElementById('ep-photo-count');
-  if(countEl) countEl.textContent = epPhotos.size + ' / 8 fotos';
+  epAbrirCaptura(id, label, 'foto');
+}
+
+function epAbrirCaptura(id, label, tipo) {
+  // Crear input file oculto
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = tipo === 'doc' ? 'image/*,application/pdf' : 'image/*';
+  // En móvil: permitir cámara o archivo
+  input.capture = false; // No forzamos cámara para dar opción de archivo también
+  input.style.display = 'none';
+  document.body.appendChild(input);
+
+  input.onchange = function() {
+    var file = input.files[0];
+    if (!file) { document.body.removeChild(input); return; }
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      epArchivos[id] = { file, dataUrl: e.target.result, label };
+      // Marcar slot visualmente
+      var el = document.getElementById(id);
+      if (el) {
+        if (el.classList.contains('ephoto-slot')) {
+          // Es una foto de inventario
+          el.classList.add('done');
+          el.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:7px;position:absolute;inset:0"><span style="position:absolute;top:4px;right:6px;background:rgba(0,0,0,0.7);color:#C9A84C;font-size:10px;font-weight:700;padding:2px 5px;border-radius:4px">${label}</span>`;
+          epPhotos.add(id);
+          var countEl = document.getElementById('ep-photo-count');
+          if(countEl) countEl.textContent = epPhotos.size + ' / 8 fotos';
+        } else {
+          // Es un documento del cliente
+          el.classList.add('done');
+          var nameEl = el.querySelector('div div:first-child');
+          var esImagen = file.type.startsWith('image/');
+          if (nameEl) nameEl.textContent = '✅ ' + label;
+          // Mostrar miniatura si es imagen
+          if (esImagen) {
+            var thumb = el.querySelector('.doc-thumb');
+            if (!thumb) {
+              thumb = document.createElement('img');
+              thumb.className = 'doc-thumb';
+              thumb.style.cssText = 'width:40px;height:40px;object-fit:cover;border-radius:6px;flex-shrink:0';
+              el.insertBefore(thumb, el.firstChild);
+            }
+            thumb.src = e.target.result;
+          } else {
+            var nameEl2 = el.querySelector('div div:last-child');
+            if (nameEl2) nameEl2.textContent = '📄 ' + file.name;
+          }
+        }
+      }
+    };
+    reader.readAsDataURL(file);
+    document.body.removeChild(input);
+  };
+
+  input.click();
 }
 
 function epTodasFotos() {
-  [['eph-front','Frontal'],['eph-back','Trasera'],['eph-left','Lat. izq.'],['eph-right','Lat. der.'],
-   ['eph-int','Interior'],['eph-dash','Tablero/km'],['eph-fuel','Combustible'],['eph-trunk','Maletero']]
-  .forEach(function(p) { epFoto(p[0], p[1]); });
+  mostrarToast('Toca cada foto individualmente para capturarla', '#C9A84C');
 }
 
 function epSetFuel(pct) {
