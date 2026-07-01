@@ -237,7 +237,7 @@ const RESEND_FROM = process.env.RESEND_FROM || 'Car Help Rent a Car <reservas@ca
 // POST /api/enviar-correo
 app.post('/api/enviar-correo', async (req, res) => {
   try {
-    const { para, cc, asunto, cuerpo } = req.body
+    const { para, cc, asunto, cuerpo, fotosUrls } = req.body
     if (!para || !asunto || !cuerpo) {
       return res.status(400).json({ error: 'Faltan campos: para, asunto, cuerpo' })
     }
@@ -250,12 +250,27 @@ app.post('/api/enviar-correo', async (req, res) => {
       .map(line => line.trim() === '' ? '<br>' : `<p style="margin:0 0 6px;font-family:Arial,sans-serif;font-size:14px;color:#1a1a1a;white-space:pre-wrap">${line}</p>`)
       .join('')
 
+    // Grid de fotos si vienen URLs
+    const fotosHtml = fotosUrls && fotosUrls.length > 0 ? `
+      <div style="margin-top:24px;border-top:2px solid #C9A84C;padding-top:20px">
+        <p style="font-family:Georgia,serif;font-size:15px;font-weight:bold;color:#0A0A0A;margin:0 0 4px">📷 Registro fotográfico del vehículo</p>
+        <p style="font-size:12px;color:#888;margin:0 0 14px">Fotos tomadas en el momento de la entrega como evidencia del estado del vehículo.</p>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
+          ${fotosUrls.map(f => `
+            <div style="text-align:center">
+              <img src="${f.url}" alt="${f.label}" style="width:100%;max-width:260px;height:160px;object-fit:cover;border-radius:8px;border:1px solid #eee;display:block;margin:0 auto">
+              <p style="font-size:11px;color:#666;margin:4px 0 0;font-family:Arial,sans-serif">${f.label}</p>
+            </div>
+          `).join('')}
+        </div>
+      </div>` : ''
+
     const html = `<div style="max-width:600px;margin:0 auto;font-family:Arial,sans-serif">
         <div style="background:#0A0A0A;padding:20px;text-align:center">
           <div style="color:#C9A84C;font-family:Georgia,serif;font-size:22px;font-weight:bold;letter-spacing:2px">CAR HELP</div>
           <div style="color:#888;font-size:11px;letter-spacing:2px;margin-top:2px">RENT A CAR</div>
         </div>
-        <div style="padding:24px;background:#fff">${htmlBody}</div>
+        <div style="padding:24px;background:#fff">${htmlBody}${fotosHtml}</div>
         <div style="background:#0A0A0A;padding:16px 24px;text-align:center;color:#888;font-size:11px">
           Car Help S.A.S · NIT 901.697.903-5 · Pereira, Colombia<br>
           Cel. 310 743 6082 · reservascarhelp@gmail.com
