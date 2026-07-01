@@ -2144,7 +2144,7 @@ async function guardarVehiculo() {
   const id = document.getElementById('v_id').value;
   const fotosLimpias = vFotosActuales.filter(f => f);
   const datosLocal = {
-    id: id || ('veh_' + Date.now()),
+    id: id || null,
     nombre,
     categoria: document.getElementById('v_categoria').value,
     placa: document.getElementById('v_placa').value.trim(),
@@ -2161,16 +2161,20 @@ async function guardarVehiculo() {
 
   try {
     const datosSB = adaptarVehiculoHaciaSB(datosLocal);
+    // Nunca mandamos ID local a Supabase — dejamos que genere su UUID
+    delete datosSB.id;
     if (id) {
       await sbUpdate('vehiculos', id, datosSB);
+      datosLocal.id = id;
     } else {
       const creado = await sbInsert('vehiculos', { ...datosSB, activo: true });
-      datosLocal.id = creado[0]?.id || datosLocal.id;
+      datosLocal.id = creado[0]?.id;
     }
     mostrarToast('✅ Vehículo guardado en Supabase');
   } catch(e) {
     console.error('Error guardando en Supabase:', e);
-    mostrarToast('⚠️ Guardado solo localmente (sin conexión a Supabase)', '#BA7517');
+    mostrarToast('⚠️ Error guardando: ' + e.message, '#E05252');
+    return; // No continuar si falló Supabase
   }
 
   if (id) {
