@@ -840,7 +840,10 @@
             <div class="panel-sub">Agrega, edita o marca como no disponibles</div>
           </div>
         </div>
-        <button class="btn-primario" onclick="abrirModalVehiculo()">+ Agregar vehículo</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn-secundario" onclick="actualizarVehiculos()" title="Actualizar lista">↻ Actualizar</button>
+          <button class="btn-primario" onclick="abrirModalVehiculo()">+ Agregar vehículo</button>
+        </div>
       </div>
       <div class="panel-body">
         <div class="tabla-wrap">
@@ -1885,12 +1888,14 @@ async function intentarLogin() {
     return;
   }
   sesion = encontrado;
+  lsSet('carhelp:sesion', sesion);
   document.getElementById('login-error').classList.remove('visible');
   iniciarApp();
 }
 
 function cerrarSesion() {
   sesion = null;
+  localStorage.removeItem('carhelp:sesion');
   document.getElementById('vista-app').style.display = 'none';
   document.getElementById('vista-login').style.display = 'flex';
   document.getElementById('login-usuario').value = '';
@@ -3575,6 +3580,18 @@ async function liquidarPropietario(vehiculoId, propietarioNombre, valor) {
 function abrirModal(id) { document.getElementById(id).classList.add('visible'); }
 function cerrarModal(id) { document.getElementById(id).classList.remove('visible'); }
 
+async function actualizarVehiculos() {
+  try {
+    const data = await sbSelect('vehiculos', '&order=marca.asc');
+    vehiculos = data || [];
+    lsSet('carhelp:vehiculos', vehiculos);
+    renderVehiculos();
+    mostrarToast('Lista de vehículos actualizada', 'var(--verde-ok)');
+  } catch(e) {
+    mostrarToast('Error al actualizar: ' + e.message, 'var(--rojo-alerta)');
+  }
+}
+
 function mostrarToast(msg, color) {
   const t = document.getElementById('toast');
   document.getElementById('toast-msg').textContent = msg;
@@ -3588,6 +3605,11 @@ function mostrarToast(msg, color) {
    ════════════════════════════════════════════ */
 (async function init() {
   await cargarDatos();
+  const sesionGuardada = lsGet('carhelp:sesion');
+  if (sesionGuardada) {
+    sesion = sesionGuardada;
+    iniciarApp();
+  }
 })();
 </script>
 </body>
