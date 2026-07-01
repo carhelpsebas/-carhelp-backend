@@ -1768,7 +1768,7 @@ async function cargarDatos() {
 
   // Vehículos
   try {
-    const data = await sbSelect('vehiculos', '&activo=neq.false&order=created_at.desc');
+    const data = await sbSelect('vehiculos', '&order=created_at.desc');
     vehiculos = data.map(adaptarVehiculoDesdeSB);
     lsSet('carhelp:vehiculos', vehiculos);
   } catch(e) {
@@ -3582,7 +3582,7 @@ function cerrarModal(id) { document.getElementById(id).classList.remove('visible
 
 async function actualizarVehiculos() {
   try {
-    const data = await sbSelect('vehiculos', '&activo=neq.false&order=created_at.desc');
+    const data = await sbSelect('vehiculos', '&order=created_at.desc');
     vehiculos = (data || []).map(adaptarVehiculoDesdeSB);
     lsSet('carhelp:vehiculos', vehiculos);
     renderTablaVehiculos();
