@@ -367,6 +367,7 @@
   .estado-mantenimiento { background: rgba(91,155,213,0.15); color: var(--azul-info); }
   .estado-pendiente { background: rgba(201,168,76,0.15); color: var(--dorado); }
   .estado-confirmada { background: rgba(76,175,130,0.15); color: var(--verde-ok); }
+  .estado-entregado { background: rgba(76,175,130,0.2); color: #2ecc71; border: 1px solid rgba(46,204,113,0.3); }
   .estado-finalizada { background: rgba(255,255,255,0.08); color: var(--blanco-suave); }
 
   .acciones-fila { display: flex; gap: 6px; }
@@ -1991,7 +1992,7 @@ function renderProximas() {
         <div class="item-titulo">${r.nombre} <span class="num-reserva">${r.num_reserva}</span></div>
         <div class="item-detalle"><strong>${r.vehiculo}</strong> — Entrega: ${fmtFechaHora(r.fecha_inicio, r.hora_inicio)} · Devolución: ${fmtFechaHora(r.fecha_fin, r.hora_fin)}</div>
       </div>
-      <span class="estado-pill estado-${r.estado}">${r.estado}</span>
+      <span class="estado-pill estado-${r.estado}">${{pendiente:'Pendiente', confirmada:'Confirmada', entregado:'Entrega realizada', finalizada:'Finalizada'}[r.estado] || r.estado}</span>
     </div>
   `).join('');
 }
@@ -2642,6 +2643,7 @@ function renderReservas() {
         <select onchange="cambiarEstadoReserva('${r.num_reserva}', this.value)" style="background:var(--gris-medio); color:var(--blanco); border:1px solid var(--borde); border-radius:6px; font-size:0.72rem; padding:5px 8px;">
           <option value="pendiente" ${r.estado==='pendiente'?'selected':''}>Pendiente</option>
           <option value="confirmada" ${r.estado==='confirmada'?'selected':''}>Confirmada</option>
+          <option value="entregado" ${r.estado==='entregado'?'selected':''}>Entrega realizada</option>
           <option value="finalizada" ${r.estado==='finalizada'?'selected':''}>Finalizada</option>
         </select>
         <button class="btn-peligro" onclick="eliminarReserva('${r.num_reserva}')">Eliminar</button>
@@ -3436,6 +3438,13 @@ async function epCompletar() {
     };
     try {
       await sbInsert('entregas', entregaSB);
+      // Cambiar estado de la orden a 'entregado'
+      if (epOrder.id) {
+        await sbUpdate('ordenes', epOrder.id, { estado: 'entregado' });
+        // Actualizar en memoria local también
+        const idx = reservas.findIndex(r => r.id === epOrder.id);
+        if (idx >= 0) reservas[idx].estado = 'entregado';
+      }
     } catch(eSB) {
       console.warn('No se pudo guardar en Supabase:', eSB.message);
     }
