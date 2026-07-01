@@ -1328,7 +1328,7 @@
       <div id="v-propietario-fields" style="display:none">
         <div class="fila-2">
           <div class="campo"><label>Nombre del propietario</label><input type="text" id="v_propietario_nombre" placeholder="Nombre completo"></div>
-          <div class="campo"><label>% que se liquida al propietario</label><input type="number" id="v_propietario_pct" placeholder="60" min="0" max="100"></div>
+          <div class="campo"><label>Valor a liquidar al propietario (COP)</label><input type="text" id="v_propietario_pct" placeholder="Ej: 200000 o 200.000"></div>
         </div>
       </div>
 
@@ -2155,7 +2155,7 @@ async function guardarVehiculo() {
     estado: document.getElementById('v_estado').value,
     esSubalquiler: document.getElementById('v_es_subalquiler').checked,
     propietarioNombre: document.getElementById('v_propietario_nombre').value.trim(),
-    propietarioPorcentaje: parseFloat(document.getElementById('v_propietario_pct').value) || 0,
+    propietarioPorcentaje: parseFloat(document.getElementById('v_propietario_pct').value.replace(/\./g, '').replace(',', '.')) || 0,
     fotos: fotosLimpias,
   };
 
@@ -3541,7 +3541,7 @@ async function renderLiquidaciones() {
       <div class="item-card">
         <div class="item-info">
           <div class="item-titulo">${v.nombre} ${v.placa ? '('+v.placa+')' : ''}</div>
-          <div class="item-detalle">Propietario: <strong>${v.propietarioNombre || 'Sin definir'}</strong> · ${pctPropietario}% de liquidación</div>
+          <div class="item-detalle">Propietario: <strong>${v.propietarioNombre || 'Sin definir'}</strong> · Liquidación base: ${formatCOP(pctPropietario)}</div>
           <div class="item-detalle">Ingresos totales por renta: <strong>${formatCOP(totalIngresos)}</strong> · Corresponde al propietario: <strong>${formatCOP(debeAlPropietario)}</strong></div>
           <div class="item-detalle">Ya liquidado: <strong>${formatCOP(yaLiquidado)}</strong></div>
         </div>
