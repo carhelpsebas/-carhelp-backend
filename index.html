@@ -3582,10 +3582,11 @@ function cerrarModal(id) { document.getElementById(id).classList.remove('visible
 
 async function actualizarVehiculos() {
   try {
-    const data = await sbSelect('vehiculos', '&order=marca.asc');
-    vehiculos = data || [];
+    const data = await sbSelect('vehiculos', '&activo=neq.false&order=created_at.desc');
+    vehiculos = (data || []).map(adaptarVehiculoDesdeSB);
     lsSet('carhelp:vehiculos', vehiculos);
-    renderVehiculos();
+    renderTablaVehiculos();
+    renderVehiculosSelect();
     mostrarToast('Lista de vehículos actualizada', 'var(--verde-ok)');
   } catch(e) {
     mostrarToast('Error al actualizar: ' + e.message, 'var(--rojo-alerta)');
