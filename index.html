@@ -3326,7 +3326,7 @@ function epPrepSummary() {
   epGo('ep-step5');
 }
 
-function epCompletar() {
+async function epCompletar() {
   var btn = document.getElementById('ep-btn-completar');
   var err = document.getElementById('ep-send-error');
   err.style.display = 'none';
@@ -3334,28 +3334,101 @@ function epCompletar() {
   btn.disabled = true;
 
   try {
-    var ordenNum = epOrder.id || ('CH-LOCAL-' + Date.now());
+    var emailCliente = document.getElementById('ep-inp-email-cli').value.trim();
+    var km = document.getElementById('ep-inp-km').value;
+    var obs = document.getElementById('ep-inp-obs').value;
+    var now = new Date();
+    var ordenNum = epOrder.num_reserva || epOrder.id || ('CH-' + Date.now());
+
+    // 1. Guardar entrega en Supabase
+    var entregaSB = {
+      orden_id: epOrder.id || null,
+      agente_id: sesion?.id || null,
+      km_salida: parseInt(km) || 0,
+      combustible_salida: epFuelPct,
+      zonas_dano: Array.from(epDmg),
+      observaciones: obs,
+      cliente_email: emailCliente,
+      fotos_urls: [],
+      fecha_entrega: now.toISOString(),
+    };
+    try {
+      await sbInsert('entregas', entregaSB);
+    } catch(eSB) {
+      console.warn('No se pudo guardar en Supabase:', eSB.message);
+    }
+
+    // 2. Enviar correo al cliente si hay email
+    var correoEnviado = false;
+    if (emailCliente) {
+      btn.textContent = 'Enviando correo...';
+      var fotosHTML = epPhotos.size > 0
+        ? `<p style="color:#888;font-size:13px">📷 Se registraron ${epPhotos.size} foto(s) del vehículo en el momento de la entrega.</p>`
+        : '';
+
+      var cuerpo = `Estimado/a ${epOrder.nombre},
+
+¡Gracias por elegir Car Help Rent a Car! Es un placer acompañarte en tu viaje.
+
+A continuación encontrarás el resumen de tu entrega:
+
+🚗 Vehículo: ${epOrder.vehiculo} · Placa: ${epOrder.placa}
+📋 N° de orden: ${ordenNum}
+🛣️ Kilometraje de salida: ${km} km
+⛽ Combustible: ${epFuelPct}%
+📅 Fecha y hora de entrega: ${now.toLocaleString('es-CO')}
+${obs ? `📝 Observaciones: ${obs}` : ''}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RECOMENDACIONES PARA TU VIAJE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Respeta las normas de tránsito y los límites de velocidad.
+✅ El vehículo debe ser devuelto con el mismo nivel de combustible.
+✅ En caso de accidente o incidente, notifica de inmediato al +57 310 743 6082.
+✅ Está prohibido fumar dentro del vehículo.
+✅ No está permitido transportar mascotas sin autorización previa.
+✅ Para más información visita nuestra web: carhelp.com.co
+
+¡Que tengas un excelente viaje! Estamos a tu disposición para cualquier consulta.
+
+Con aprecio,
+El equipo de Car Help S.A.S
+📞 310 743 6082 · reservascarhelp@gmail.com`;
+
+      try {
+        const resCorreo = await fetch(MAIL_API + '/api/enviar-correo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            para: emailCliente,
+            asunto: `✅ Entrega confirmada · ${epOrder.vehiculo} · Orden ${ordenNum} · Car Help`,
+            cuerpo,
+          })
+        });
+        if (resCorreo.ok) correoEnviado = true;
+      } catch(eCorreo) {
+        console.warn('Error enviando correo:', eCorreo.message);
+      }
+    }
+
+    // 3. Guardar respaldo local
     var entregaLocal = {
-      id: ordenNum,
-      orden: epOrder,
-      km: document.getElementById('ep-inp-km').value,
-      combustible: epFuelPct,
-      danos: Array.from(epDmg),
-      observaciones: document.getElementById('ep-inp-obs').value,
-      fecha: new Date().toISOString(),
-      agente: sesion ? sesion.nombre : '-'
+      id: ordenNum, orden: epOrder, km, combustible: epFuelPct,
+      danos: Array.from(epDmg), observaciones: obs,
+      fecha: now.toISOString(), agente: sesion ? sesion.nombre : '-'
     };
     var entregas = [];
     try { entregas = JSON.parse(localStorage.getItem('carhelp:entregas') || '[]'); } catch(e2){}
     entregas.unshift(entregaLocal);
-    localStorage.setItem('carhelp:entregas', JSON.stringify(entregas.slice(0,100)));
+    localStorage.setItem('carhelp:entregas', JSON.stringify(entregas.slice(0, 100)));
 
-    var now = new Date();
+    // 4. Mostrar pantalla de éxito
     document.getElementById('ep-done-ref').textContent = ordenNum;
-    document.getElementById('ep-done-hora').textContent = now.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
-    document.getElementById('ep-done-email').textContent = document.getElementById('ep-inp-email-cli').value || '-';
-    mostrarToast('Entrega registrada: ' + ordenNum);
+    document.getElementById('ep-done-hora').textContent = now.toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'});
+    document.getElementById('ep-done-email').textContent = correoEnviado ? `✅ Enviado a ${emailCliente}` : (emailCliente ? '⚠️ No se pudo enviar' : 'Sin correo');
+    mostrarToast('✅ Entrega registrada: ' + ordenNum);
     epGo('ep-done');
+
   } catch(e) {
     err.textContent = 'Error: ' + e.message;
     err.style.display = 'block';
