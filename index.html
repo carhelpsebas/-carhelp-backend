@@ -531,6 +531,25 @@
   .eorden-item:last-child{border-bottom:none}
   .eorden-avatar{width:36px;height:36px;border-radius:50%;background:rgba(201,168,76,.12);border:0.5px solid rgba(201,168,76,.3);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
 
+  /* ── COTIZACIONES ── */
+  .cot-tab {
+    padding: 8px 18px; border-radius: 8px; border: 1px solid var(--borde);
+    background: var(--carbon); color: var(--blanco-suave); cursor: pointer;
+    font-size: 0.82rem; font-weight: 600; transition: all 0.2s;
+  }
+  .cot-tab.activo { background: var(--dorado); color: #111; border-color: var(--dorado); }
+  .cot-tab:hover:not(.activo) { border-color: var(--dorado); color: var(--blanco); }
+  .cot-preview { font-family: Arial, sans-serif; font-size: 14px; color: #1a1a1a; background: #fff; border-radius: 10px; padding: 24px; }
+  .cot-preview-header { background: #0A0A0A; padding: 16px 20px; border-radius: 8px 8px 0 0; text-align: center; margin: -24px -24px 20px; }
+  .cot-preview-logo { color: #C9A84C; font-family: Georgia, serif; font-size: 20px; font-weight: bold; letter-spacing: 2px; }
+  .cot-preview-sub { color: #888; font-size: 10px; letter-spacing: 2px; margin-top: 2px; }
+  .cot-preview h3 { font-size: 15px; color: #0A0A0A; border-bottom: 2px solid #C9A84C; padding-bottom: 6px; margin: 16px 0 10px; }
+  .cot-preview table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .cot-preview td { padding: 5px 8px; border-bottom: 1px solid #f0f0f0; }
+  .cot-preview td:first-child { color: #666; width: 45%; }
+  .cot-preview td:last-child { font-weight: 600; color: #1a1a1a; }
+  .cot-preview .total-row td { background: #f9f5ec; font-size: 15px; color: #C9A84C; border-top: 2px solid #C9A84C; }
+  .cot-preview-footer { margin-top: 20px; padding-top: 14px; border-top: 1px solid #eee; font-size: 11px; color: #888; text-align: center; }
 </style>
 </head>
 <body>
@@ -573,11 +592,12 @@
   </header>
 
   <div class="nav-tabs" id="nav-tabs">
-    <button class="nav-tab activo" onclick="cambiarVista('inicio', this)">🏠 Inicio</button>
+    <button class="nav-tab" onclick="cambiarVista('inicio', this)">🏠 Inicio</button>
     <button class="nav-tab" onclick="cambiarVista('reservas', this)">📋 Reservas</button>
     <button class="nav-tab" onclick="cambiarVista('vehiculos', this)">🚗 Vehículos</button>
     <button class="nav-tab" onclick="cambiarVista('turismo', this)">🌄 Turismo VIP</button>
     <button class="nav-tab" onclick="cambiarVista('seguridad', this)">🛡️ Seguridad</button>
+    <button class="nav-tab" onclick="cambiarVista('cotizaciones', this)">📄 Cotizaciones</button>
     <button class="nav-tab" onclick="cambiarVista('solicitudes', this)">📥 Solicitudes</button>
     <button class="nav-tab" onclick="abrirEntregas()">📦 Entregas</button>
     <button class="nav-tab admin-only" onclick="cambiarVista('contabilidad', this)">💰 Contabilidad</button>
@@ -1065,6 +1085,158 @@
       <div class="panel-body">
         <div class="lista-cards" id="lista-seguridad">
           <div class="estado-vacio"><div class="icono-grande">🛡️</div><p>Aún no hay solicitudes registradas.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ VISTA: COTIZACIONES ═══ -->
+  <div class="vista" id="vista-cotizaciones">
+    <div class="home-header">
+      <div class="home-header-eyebrow">Módulo de cotizaciones</div>
+      <div class="home-header-titulo">Cotizaciones <span>Car Help</span></div>
+      <div class="home-header-sub">Genera cotizaciones de renta, seguridad/transporte y turismo VIP</div>
+    </div>
+
+    <!-- Tabs tipo cotización -->
+    <div style="display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap">
+      <button class="cot-tab activo" onclick="cambiarTipoCotizacion('renta', this)">🚗 Renta de vehículo</button>
+      <button class="cot-tab" onclick="cambiarTipoCotizacion('seguridad', this)">🛡️ Seguridad y transporte</button>
+      <button class="cot-tab" onclick="cambiarTipoCotizacion('turismo', this)">🌄 Turismo VIP</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start">
+
+      <!-- FORMULARIO -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-titulo-wrap">
+            <div class="panel-icono">✏️</div>
+            <div><div class="panel-titulo" id="cot-form-titulo">Cotización de renta</div></div>
+          </div>
+        </div>
+        <div class="panel-body">
+
+          <!-- Datos del cliente -->
+          <div class="seccion-label">Datos del cliente</div>
+          <div class="campo" style="position:relative">
+            <label>Nombre completo</label>
+            <input type="text" id="cot-nombre" placeholder="Nombre del cliente" autocomplete="off" oninput="buscarClienteAutocomplete(this.value, 'cot')">
+            <div id="cot-nombre_sugerencias" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--gris-oscuro);border:1px solid var(--dorado);border-radius:8px;z-index:999;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.4)"></div>
+          </div>
+          <div class="campo"><label>Correo electrónico</label><input type="email" id="cot-email" placeholder="correo@ejemplo.com"></div>
+          <div class="campo"><label>Teléfono / WhatsApp</label><input type="text" id="cot-telefono" placeholder="310 000 0000"></div>
+
+          <!-- Campos de renta -->
+          <div id="cot-campos-renta">
+            <div class="seccion-label">Detalles del servicio</div>
+            <div class="campo"><label>Vehículo</label>
+              <select id="cot-vehiculo">
+                <option value="">Seleccionar vehículo...</option>
+              </select>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="campo"><label>Fecha de entrega</label><input type="date" id="cot-fecha-inicio"></div>
+              <div class="campo"><label>Fecha de devolución</label><input type="date" id="cot-fecha-fin"></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="campo"><label>Hora entrega</label><input type="time" id="cot-hora-inicio" value="12:00"></div>
+              <div class="campo"><label>Hora devolución</label><input type="time" id="cot-hora-fin" value="12:00"></div>
+            </div>
+            <div class="campo"><label>Lugar de entrega</label><input type="text" id="cot-lugar-entrega" placeholder="Ej: Aeropuerto, hotel, dirección"></div>
+            <div class="campo"><label>Tarifa por 24h (COP)</label><input type="text" id="cot-tarifa" placeholder="Ej: 320000" oninput="calcularCotizacion()"></div>
+            <div class="campo"><label>Depósito / garantía (COP)</label><input type="text" id="cot-deposito" placeholder="Ej: 500000" oninput="calcularCotizacion()"></div>
+          </div>
+
+          <!-- Campos de seguridad -->
+          <div id="cot-campos-seguridad" style="display:none">
+            <div class="seccion-label">Detalles del servicio</div>
+            <div class="campo"><label>Tipo de servicio</label>
+              <select id="cot-tipo-seguridad">
+                <option value="escolta">Escolta de seguridad</option>
+                <option value="transporte-blindado">Transporte en vehículo blindado</option>
+                <option value="traslado-aeropuerto">Traslado aeropuerto seguro</option>
+                <option value="personalizado">Servicio personalizado</option>
+              </select>
+            </div>
+            <div class="campo"><label>Origen</label><input type="text" id="cot-seg-origen" placeholder="Ciudad / punto de origen"></div>
+            <div class="campo"><label>Destino</label><input type="text" id="cot-seg-destino" placeholder="Ciudad / punto de destino"></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="campo"><label>Fecha del servicio</label><input type="date" id="cot-seg-fecha"></div>
+              <div class="campo"><label>Hora</label><input type="time" id="cot-seg-hora" value="08:00"></div>
+            </div>
+            <div class="campo"><label>Número de personas</label><input type="number" id="cot-seg-personas" value="1" min="1"></div>
+            <div class="campo"><label>Valor del servicio (COP)</label><input type="text" id="cot-seg-valor" placeholder="Ej: 800000" oninput="calcularCotizacion()"></div>
+          </div>
+
+          <!-- Campos de turismo -->
+          <div id="cot-campos-turismo" style="display:none">
+            <div class="seccion-label">Detalles del servicio</div>
+            <div class="campo"><label>Destino / Tour</label>
+              <select id="cot-tour-destino">
+                <option value="">Seleccionar destino...</option>
+                <option value="eje-cafetero">Eje Cafetero</option>
+                <option value="medellin">Medellín</option>
+                <option value="cartagena">Cartagena</option>
+                <option value="bogota">Bogotá</option>
+                <option value="personalizado">Destino personalizado</option>
+              </select>
+            </div>
+            <div class="campo"><label>Descripción del tour / itinerario</label><textarea id="cot-tour-desc" rows="3" placeholder="Describe el itinerario o actividades incluidas..."></textarea></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="campo"><label>Fecha inicio</label><input type="date" id="cot-tour-inicio"></div>
+              <div class="campo"><label>Fecha fin</label><input type="date" id="cot-tour-fin"></div>
+            </div>
+            <div class="campo"><label>Número de personas</label><input type="number" id="cot-tour-personas" value="2" min="1" oninput="calcularCotizacion()"></div>
+            <div class="campo"><label>Precio por persona (COP)</label><input type="text" id="cot-tour-precio" placeholder="Ej: 450000" oninput="calcularCotizacion()"></div>
+            <div class="campo"><label>Incluye</label><input type="text" id="cot-tour-incluye" placeholder="Ej: Transporte, guía, almuerzo"></div>
+          </div>
+
+          <!-- Notas adicionales -->
+          <div class="campo"><label>Notas adicionales</label><textarea id="cot-notas" rows="2" placeholder="Condiciones especiales, términos, etc."></textarea></div>
+
+          <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap">
+            <button class="btn-primario" onclick="generarCotizacion()" style="flex:2">📄 Generar cotización</button>
+            <button class="btn-secundario" onclick="limpiarCotizacion()">✕ Limpiar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- VISTA PREVIA -->
+      <div class="panel" id="cot-preview-panel" style="position:sticky;top:20px">
+        <div class="panel-header">
+          <div class="panel-titulo-wrap">
+            <div class="panel-icono">👁️</div>
+            <div><div class="panel-titulo">Vista previa</div></div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn-secundario" onclick="enviarCotizacionPorCorreo()" id="cot-btn-enviar" style="font-size:0.75rem;padding:6px 12px" disabled>📧 Enviar</button>
+            <button class="btn-secundario" onclick="copiarCotizacion()" id="cot-btn-copiar" style="font-size:0.75rem;padding:6px 12px" disabled>📋 Copiar</button>
+          </div>
+        </div>
+        <div class="panel-body" id="cot-preview-body">
+          <div style="text-align:center;padding:40px 20px;color:var(--blanco-suave)">
+            <div style="font-size:2rem;margin-bottom:12px">📄</div>
+            <div style="font-size:0.85rem">Completa el formulario y haz clic en<br><strong>"Generar cotización"</strong></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lista de cotizaciones guardadas -->
+    <div class="panel" style="margin-top:24px">
+      <div class="panel-header">
+        <div class="panel-titulo-wrap">
+          <div class="panel-icono">🗂️</div>
+          <div>
+            <div class="panel-titulo">Cotizaciones recientes</div>
+            <div class="panel-sub">Historial de cotizaciones generadas</div>
+          </div>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="lista-cards" id="cot-lista">
+          <div class="estado-vacio"><div class="icono-grande">📄</div><p>No hay cotizaciones generadas aún.</p></div>
         </div>
       </div>
     </div>
@@ -1969,6 +2141,8 @@ function renderTodo() {
   renderReservasTour();
   renderSeguridad();
   renderUsuarios();
+  poblarVehiculosCotizacion();
+  renderCotizaciones();
 }
 
 function formatCOP(n) {
@@ -3886,6 +4060,325 @@ function mostrarToast(msg, color) {
 /* ════════════════════════════════════════════
    INIT
    ════════════════════════════════════════════ */
+/* ════════════════════════════════════════════
+   MÓDULO DE COTIZACIONES
+   ════════════════════════════════════════════ */
+let cotTipo = 'renta';
+let cotizaciones = JSON.parse(localStorage.getItem('carhelp:cotizaciones') || '[]');
+let cotTextoActual = '';
+
+function cambiarTipoCotizacion(tipo, el) {
+  cotTipo = tipo;
+  document.querySelectorAll('.cot-tab').forEach(t => t.classList.remove('activo'));
+  if (el) el.classList.add('activo');
+  document.getElementById('cot-campos-renta').style.display = tipo === 'renta' ? 'block' : 'none';
+  document.getElementById('cot-campos-seguridad').style.display = tipo === 'seguridad' ? 'block' : 'none';
+  document.getElementById('cot-campos-turismo').style.display = tipo === 'turismo' ? 'block' : 'none';
+  const titulos = { renta: 'Cotización de renta', seguridad: 'Cotización de seguridad y transporte', turismo: 'Cotización de turismo VIP' };
+  document.getElementById('cot-form-titulo').textContent = titulos[tipo];
+  limpiarCotizacion();
+}
+
+function cotValor(id) {
+  const el = document.getElementById(id);
+  if (!el) return '';
+  return el.value || '';
+}
+
+function cotParseCOP(str) {
+  return parseFloat(String(str).replace(/\./g, '').replace(',', '.')) || 0;
+}
+
+function calcularCotizacion() {
+  // Solo recalcula si ya hay vista previa generada
+  const preview = document.getElementById('cot-preview-body');
+  if (!preview.querySelector('.cot-preview')) return;
+  generarCotizacion(true);
+}
+
+function cotDias(inicio, fin) {
+  if (!inicio || !fin) return 0;
+  const d1 = new Date(inicio + 'T12:00:00');
+  const d2 = new Date(fin + 'T12:00:00');
+  const diff = Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24));
+  return diff > 0 ? diff : 0;
+}
+
+function generarCotizacion(silencioso = false) {
+  const nombre = cotValor('cot-nombre') || 'Cliente';
+  const email = cotValor('cot-email');
+  const telefono = cotValor('cot-telefono');
+  const notas = cotValor('cot-notas');
+  const fechaHoy = new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
+  const numCot = 'COT-' + Date.now().toString().slice(-6);
+
+  let detalle = '';
+  let total = 0;
+  let subtitulo = '';
+
+  if (cotTipo === 'renta') {
+    const vehSel = document.getElementById('cot-vehiculo');
+    const vehNombre = vehSel?.options[vehSel?.selectedIndex]?.text || 'Vehículo a confirmar';
+    const fechaInicio = cotValor('cot-fecha-inicio');
+    const fechaFin = cotValor('cot-fecha-fin');
+    const horaInicio = cotValor('cot-hora-inicio');
+    const horaFin = cotValor('cot-hora-fin');
+    const lugar = cotValor('cot-lugar-entrega');
+    const tarifa = cotParseCOP(cotValor('cot-tarifa'));
+    const deposito = cotParseCOP(cotValor('cot-deposito'));
+    const dias = cotDias(fechaInicio, fechaFin);
+    const subtotal = tarifa * dias;
+    total = subtotal + deposito;
+    subtitulo = 'Renta de vehículo';
+
+    detalle = `
+      <h3>Vehículo</h3>
+      <table><tr><td>Vehículo</td><td>${vehNombre}</td></tr></table>
+      <h3>Fechas y lugar</h3>
+      <table>
+        <tr><td>Entrega</td><td>${fechaInicio ? new Date(fechaInicio + 'T12:00').toLocaleDateString('es-CO') : '—'} a las ${horaInicio}</td></tr>
+        <tr><td>Devolución</td><td>${fechaFin ? new Date(fechaFin + 'T12:00').toLocaleDateString('es-CO') : '—'} a las ${horaFin}</td></tr>
+        <tr><td>Lugar de entrega</td><td>${lugar || '—'}</td></tr>
+        <tr><td>Número de días</td><td>${dias} día${dias !== 1 ? 's' : ''}</td></tr>
+      </table>
+      <h3>Valores</h3>
+      <table>
+        <tr><td>Tarifa por 24h</td><td>${formatCOP(tarifa)}</td></tr>
+        <tr><td>Subtotal (${dias} días)</td><td>${formatCOP(subtotal)}</td></tr>
+        <tr><td>Depósito / garantía</td><td>${formatCOP(deposito)}</td></tr>
+        <tr class="total-row"><td><strong>TOTAL ESTIMADO</strong></td><td><strong>${formatCOP(total)}</strong></td></tr>
+      </table>`;
+
+  } else if (cotTipo === 'seguridad') {
+    const tipoSeg = document.getElementById('cot-tipo-seguridad');
+    const tipoNombre = tipoSeg?.options[tipoSeg?.selectedIndex]?.text || 'Servicio de seguridad';
+    const origen = cotValor('cot-seg-origen');
+    const destino = cotValor('cot-seg-destino');
+    const fecha = cotValor('cot-seg-fecha');
+    const hora = cotValor('cot-seg-hora');
+    const personas = cotValor('cot-seg-personas') || '1';
+    const valor = cotParseCOP(cotValor('cot-seg-valor'));
+    total = valor;
+    subtitulo = 'Seguridad y transporte';
+
+    detalle = `
+      <h3>Servicio</h3>
+      <table>
+        <tr><td>Tipo de servicio</td><td>${tipoNombre}</td></tr>
+        <tr><td>Origen</td><td>${origen || '—'}</td></tr>
+        <tr><td>Destino</td><td>${destino || '—'}</td></tr>
+        <tr><td>Fecha y hora</td><td>${fecha ? new Date(fecha + 'T12:00').toLocaleDateString('es-CO') : '—'} - ${hora}</td></tr>
+        <tr><td>Número de personas</td><td>${personas}</td></tr>
+      </table>
+      <h3>Valores</h3>
+      <table>
+        <tr class="total-row"><td><strong>VALOR DEL SERVICIO</strong></td><td><strong>${formatCOP(valor)}</strong></td></tr>
+      </table>`;
+
+  } else if (cotTipo === 'turismo') {
+    const destSel = document.getElementById('cot-tour-destino');
+    const destino = destSel?.options[destSel?.selectedIndex]?.text || 'Destino a confirmar';
+    const desc = cotValor('cot-tour-desc');
+    const fechaIni = cotValor('cot-tour-inicio');
+    const fechaFin2 = cotValor('cot-tour-fin');
+    const personas = parseInt(cotValor('cot-tour-personas')) || 1;
+    const precioPP = cotParseCOP(cotValor('cot-tour-precio'));
+    const incluye = cotValor('cot-tour-incluye');
+    total = precioPP * personas;
+    subtitulo = 'Turismo VIP';
+    const dias = cotDias(fechaIni, fechaFin2);
+
+    detalle = `
+      <h3>Tour / Destino</h3>
+      <table>
+        <tr><td>Destino</td><td>${destino}</td></tr>
+        <tr><td>Fecha inicio</td><td>${fechaIni ? new Date(fechaIni + 'T12:00').toLocaleDateString('es-CO') : '—'}</td></tr>
+        <tr><td>Fecha fin</td><td>${fechaFin2 ? new Date(fechaFin2 + 'T12:00').toLocaleDateString('es-CO') : '—'}</td></tr>
+        <tr><td>Duración</td><td>${dias} día${dias !== 1 ? 's' : ''}</td></tr>
+        <tr><td>Número de personas</td><td>${personas}</td></tr>
+        ${incluye ? `<tr><td>Incluye</td><td>${incluye}</td></tr>` : ''}
+        ${desc ? `<tr><td>Itinerario</td><td>${desc}</td></tr>` : ''}
+      </table>
+      <h3>Valores</h3>
+      <table>
+        <tr><td>Precio por persona</td><td>${formatCOP(precioPP)}</td></tr>
+        <tr><td>Personas</td><td>${personas}</td></tr>
+        <tr class="total-row"><td><strong>TOTAL ESTIMADO</strong></td><td><strong>${formatCOP(total)}</strong></td></tr>
+      </table>`;
+  }
+
+  const notasHTML = notas ? `<h3>Notas adicionales</h3><p style="font-size:13px;color:#555;margin:0">${notas}</p>` : '';
+
+  const html = `<div class="cot-preview">
+    <div class="cot-preview-header">
+      <div class="cot-preview-logo">CAR HELP</div>
+      <div class="cot-preview-sub">RENT A CAR · SEGURIDAD · TURISMO VIP</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-size:18px;font-weight:bold;color:#0A0A0A">Cotización ${subtitulo}</div>
+        <div style="font-size:12px;color:#888;margin-top:2px">${numCot} · ${fechaHoy}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:13px;font-weight:600">${nombre}</div>
+        ${email ? `<div style="font-size:11px;color:#888">${email}</div>` : ''}
+        ${telefono ? `<div style="font-size:11px;color:#888">${telefono}</div>` : ''}
+      </div>
+    </div>
+    ${detalle}
+    ${notasHTML}
+    <div style="margin-top:16px;padding:10px;background:#f9f5ec;border-radius:6px;font-size:12px;color:#666">
+      ⏰ Esta cotización tiene validez de <strong>5 días hábiles</strong> a partir de la fecha de emisión.<br>
+      Los precios pueden variar según disponibilidad y condiciones del servicio.
+    </div>
+    <div class="cot-preview-footer">
+      Car Help S.A.S · NIT 901.697.903-5 · Pereira, Colombia<br>
+      📞 310 743 6082 · reservascarhelp@gmail.com · carhelp.com.co
+    </div>
+  </div>`;
+
+  document.getElementById('cot-preview-body').innerHTML = html;
+  document.getElementById('cot-btn-enviar').disabled = false;
+  document.getElementById('cot-btn-copiar').disabled = false;
+
+  // Generar texto plano para el correo
+  cotTextoActual = `COTIZACIÓN CAR HELP - ${subtitulo.toUpperCase()}\n${numCot} · ${fechaHoy}\n\nCliente: ${nombre}${email ? '\nCorreo: ' + email : ''}${telefono ? '\nTeléfono: ' + telefono : ''}\n\nTOTAL ESTIMADO: ${formatCOP(total)}\n\n${notas ? 'Notas: ' + notas + '\n\n' : ''}Esta cotización tiene validez de 5 días hábiles.\n\nCar Help S.A.S · 310 743 6082 · reservascarhelp@gmail.com`;
+
+  if (!silencioso) {
+    // Guardar en historial
+    cotizaciones.unshift({ id: numCot, tipo: cotTipo, nombre, total, fecha: new Date().toISOString(), subtitulo });
+    cotizaciones = cotizaciones.slice(0, 50);
+    localStorage.setItem('carhelp:cotizaciones', JSON.stringify(cotizaciones));
+    renderCotizaciones();
+    mostrarToast('✅ Cotización generada: ' + numCot);
+  }
+}
+
+function renderCotizaciones() {
+  const cont = document.getElementById('cot-lista');
+  if (!cont) return;
+  if (!cotizaciones.length) {
+    cont.innerHTML = '<div class="estado-vacio"><div class="icono-grande">📄</div><p>No hay cotizaciones generadas aún.</p></div>';
+    return;
+  }
+  cont.innerHTML = cotizaciones.map(c => `
+    <div class="item-card">
+      <div class="item-info">
+        <div class="item-titulo">${c.nombre} <span class="num-reserva">${c.id}</span></div>
+        <div class="item-detalle"><strong>${c.subtitulo}</strong> · ${new Date(c.fecha).toLocaleDateString('es-CO')} · <strong>${formatCOP(c.total)}</strong></div>
+      </div>
+      <span class="estado-pill" style="background:rgba(201,168,76,0.15);color:var(--dorado)">${c.tipo}</span>
+    </div>`).join('');
+}
+
+async function enviarCotizacionPorCorreo() {
+  const email = cotValor('cot-email');
+  if (!email) { mostrarToast('⚠️ Ingresa el correo del cliente primero', '#C9A84C'); return; }
+
+  const btnEnviar = document.getElementById('cot-btn-enviar');
+  btnEnviar.textContent = 'Enviando...';
+  btnEnviar.disabled = true;
+
+  try {
+    const preview = document.getElementById('cot-preview-body');
+    const htmlCotizacion = preview.innerHTML;
+    const res = await fetch(MAIL_API + '/api/enviar-correo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        para: email,
+        asunto: `Cotización Car Help · ${cotValor('cot-nombre') || 'Cliente'}`,
+        cuerpo: cotTextoActual,
+      })
+    });
+    const data = await res.json();
+    if (data.ok) mostrarToast('✅ Cotización enviada a ' + email);
+    else mostrarToast('⚠️ Error enviando: ' + (data.error || 'desconocido'), 'var(--rojo-alerta)');
+  } catch(e) {
+    mostrarToast('⚠️ Error de conexión: ' + e.message, 'var(--rojo-alerta)');
+  } finally {
+    btnEnviar.textContent = '📧 Enviar';
+    btnEnviar.disabled = false;
+  }
+}
+
+function copiarCotizacion() {
+  navigator.clipboard.writeText(cotTextoActual).then(() => {
+    mostrarToast('✅ Cotización copiada al portapapeles');
+  }).catch(() => {
+    mostrarToast('⚠️ No se pudo copiar', '#C9A84C');
+  });
+}
+
+function limpiarCotizacion() {
+  ['cot-nombre','cot-email','cot-telefono','cot-notas',
+   'cot-fecha-inicio','cot-fecha-fin','cot-hora-inicio','cot-hora-fin',
+   'cot-lugar-entrega','cot-tarifa','cot-deposito',
+   'cot-seg-origen','cot-seg-destino','cot-seg-fecha','cot-seg-valor',
+   'cot-tour-desc','cot-tour-inicio','cot-tour-fin','cot-tour-precio'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('cot-preview-body').innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--blanco-suave)"><div style="font-size:2rem;margin-bottom:12px">📄</div><div style="font-size:0.85rem">Completa el formulario y haz clic en<br><strong>"Generar cotización"</strong></div></div>';
+  document.getElementById('cot-btn-enviar').disabled = true;
+  document.getElementById('cot-btn-copiar').disabled = true;
+  cotTextoActual = '';
+}
+
+function buscarClienteAutocomplete(q, prefijo = 'r') {
+  const cajaId = prefijo === 'cot' ? 'cot-nombre_sugerencias' : 'r_nombre_sugerencias';
+  const caja = document.getElementById(cajaId);
+  if (!caja) return;
+  if (!q || q.length < 3) { caja.style.display = 'none'; return; }
+  clearTimeout(window._autocompleteTimer);
+  window._autocompleteTimer = setTimeout(async () => {
+    try {
+      const data = await sbSelect('clientes', `&nombre=ilike.*${encodeURIComponent(q)}*&limit=6`);
+      if (!data || data.length === 0) { caja.style.display = 'none'; return; }
+      caja.innerHTML = data.map(c => `
+        <div onclick="seleccionarClienteAutocomplete(${JSON.stringify(c).replace(/"/g,'&quot;')}, '${prefijo}')"
+          style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--borde);font-size:0.85rem"
+          onmouseover="this.style.background='var(--gris-medio)'" onmouseout="this.style.background=''">
+          <div style="font-weight:600;color:var(--blanco)">${c.nombre}</div>
+          <div style="color:var(--blanco-suave);font-size:0.75rem">${c.num_doc || ''} · ${c.celular || ''}</div>
+        </div>`).join('');
+      caja.style.display = 'block';
+    } catch(e) { caja.style.display = 'none'; }
+  }, 300);
+}
+
+function seleccionarClienteAutocomplete(c, prefijo = 'r') {
+  if (prefijo === 'cot') {
+    document.getElementById('cot-nombre').value = c.nombre || '';
+    document.getElementById('cot-email').value = c.email || '';
+    document.getElementById('cot-telefono').value = c.celular || '';
+    document.getElementById('cot-nombre_sugerencias').style.display = 'none';
+  } else {
+    document.getElementById('r_nombre').value = c.nombre || '';
+    if (document.getElementById('r_tipo_doc')) document.getElementById('r_tipo_doc').value = c.tipo_doc || '';
+    if (document.getElementById('r_num_doc')) document.getElementById('r_num_doc').value = c.num_doc || '';
+    if (document.getElementById('r_celular')) document.getElementById('r_celular').value = c.celular || '';
+    if (document.getElementById('r_email')) document.getElementById('r_email').value = c.email || '';
+    document.getElementById('r_nombre_sugerencias').style.display = 'none';
+  }
+}
+
+function poblarVehiculosCotizacion() {
+  const sel = document.getElementById('cot-vehiculo');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Seleccionar vehículo...</option>';
+  vehiculos.forEach(v => {
+    const op = document.createElement('option');
+    op.value = v.id;
+    op.textContent = v.nombre + (v.placa ? ' · ' + v.placa : '');
+    sel.appendChild(op);
+  });
+  sel.onchange = function() {
+    const veh = vehiculos.find(v => v.id === this.value);
+    if (veh && veh.tarifa) document.getElementById('cot-tarifa').value = veh.tarifa;
+  };
+}
+
 (async function init() {
   // Restaurar sesión ANTES de cargar datos para que no haya delay en la pantalla
   const sesionGuardada = lsGet('carhelp:sesion');
