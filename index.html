@@ -2025,9 +2025,20 @@ async function cargarDatos() {
   try {
     const data = await sbSelect('reservas_tour', '&order=created_at.desc');
     reservasTour = data.map(r => ({
-      num_reserva: r.num_reserva, nombre: r.cliente_nombre, email: r.cliente_email,
-      celular: r.cliente_celular, personas: r.personas, tour: r.tour_id,
-      fecha: r.fecha, hora: r.hora, vehiculo_asignado: r.vehiculo_asignado, estado: r.estado
+      id: r.id,
+      num_reserva: r.numero || r.num_reserva,
+      nombre: r.nombre_cliente || r.cliente_nombre,
+      email: r.email || r.cliente_email,
+      celular: r.celular || r.cliente_celular,
+      personas: r.personas,
+      tour_id: r.tour_id,
+      tour_nombre: r.tour_nombre,
+      vehiculo: r.vehiculo_asignado,
+      fecha: r.fecha,
+      hora: r.hora,
+      precio_persona: r.precio_persona,
+      total: r.total,
+      estado: r.estado,
     }));
     lsSet('carhelp:reservas_tour', reservasTour);
   } catch(e) { reservasTour = lsGet('carhelp:reservas_tour') || []; }
@@ -2036,10 +2047,21 @@ async function cargarDatos() {
   try {
     const data = await sbSelect('solicitudes_seguridad', '&order=created_at.desc');
     solicitudesSeguridad = data.map(s => ({
-      num_reserva: s.num_reserva, nombre: s.cliente_nombre, email: s.cliente_email,
-      celular: s.cliente_celular, escolta: s.escolta, arma: s.arma,
-      origen: s.origen, destino: s.destino, fecha: s.fecha, hora: s.hora,
-      vehiculo: s.vehiculo, tarifa: s.tarifa, notas: s.notas
+      id: s.id,
+      num_reserva: s.numero || s.num_reserva,
+      nombre: s.nombre_cliente || s.cliente_nombre,
+      email: s.email || s.cliente_email,
+      celular: s.celular || s.cliente_celular,
+      escolta: s.escolta,
+      arma: s.arma,
+      origen: s.origen,
+      destino: s.destino,
+      fecha: s.fecha,
+      hora: s.hora,
+      vehiculo: s.vehiculo,
+      tarifa: s.tarifa,
+      notas: s.notas,
+      estado: s.estado,
     }));
     lsSet('carhelp:seguridad', solicitudesSeguridad);
   } catch(e) { solicitudesSeguridad = lsGet('carhelp:seguridad') || []; }
@@ -2644,6 +2666,20 @@ async function generarReserva() {
       notas: notas
     });
     nuevaReserva.id = ordenSB[0]?.id;
+
+    // Generar movimiento contable automático
+    const fechaIngreso = valores.fecha_inicio || new Date().toISOString().split('T')[0];
+    await sbInsert('movimientos_contables', {
+      fecha: fechaIngreso,
+      tipo: 'ingreso',
+      categoria: 'renta',
+      descripcion: `Renta: ${veh ? veh.nombre : '—'} · ${valores.nombre} · ${periodo.periodosFacturables} día(s)`,
+      valor: periodo.total,
+      num_referencia: numReserva,
+      vehiculo_id: valores.vehiculo_id || null,
+      orden_id: ordenSB[0]?.id || null,
+    });
+
     mostrarToast('✅ Reserva creada y guardada en Supabase: ' + numReserva);
   } catch(e) {
     console.error('Error guardando reserva en Supabase:', e);
@@ -2977,33 +3013,39 @@ async function guardarTour() {
   const vehId = document.getElementById('tour_vehiculo').value;
   const veh = vehiculos.find(v => v.id === vehId);
   const datos = {
-    id: id || ('tour_' + Date.now()),
     nombre,
     descripcion: document.getElementById('tour_desc').value.trim(),
-    vehiculo_id: vehId,
+    vehiculo_id: vehId || null,
     vehiculo_nombre: veh ? veh.nombre : '',
     duracion: document.getElementById('tour_duracion').value.trim(),
     precio: parseFloat(document.getElementById('tour_precio').value) || 0,
+    activo: true,
   };
-  if (id) {
-    const idx = tours.findIndex(t => t.id === id);
-    tours[idx] = datos;
-  } else {
-    if (tours.length >= 3) {
-      mostrarToast('⚠️ Ya tienes 3 tours configurados. Edita o elimina uno existente.', '#C9A84C');
-      return;
+  try {
+    if (id) {
+      await sbUpdate('tours', id, datos);
+      const idx = tours.findIndex(t => t.id === id);
+      if (idx >= 0) tours[idx] = { ...datos, id };
+    } else {
+      if (tours.length >= 3) { mostrarToast('⚠️ Ya tienes 3 tours configurados.', '#C9A84C'); return; }
+      const creado = await sbInsert('tours', datos);
+      tours.push({ ...datos, id: creado[0]?.id || ('tour_' + Date.now()) });
     }
-    tours.push(datos);
+    mostrarToast('✅ Tour guardado en Supabase');
+  } catch(e) {
+    mostrarToast('⚠️ Error guardando tour: ' + e.message, 'var(--rojo-alerta)');
   }
-  await guardar('carhelp:tours', tours);
+  lsSet('carhelp:tours', tours);
   cerrarModal('modal-tour');
   renderTours(); renderToursSelect(); renderStats();
-  mostrarToast('✅ Tour guardado');
 }
 
 async function eliminarTour(id) {
+  try {
+    await sbDelete('tours', id);
+  } catch(e) { console.warn('Error eliminando tour de Supabase:', e.message); }
   tours = tours.filter(t => t.id !== id);
-  await guardar('carhelp:tours', tours);
+  lsSet('carhelp:tours', tours);
   renderTours(); renderToursSelect(); renderStats();
   mostrarToast('🗑️ Tour eliminado');
 }
@@ -3039,7 +3081,39 @@ async function generarReservaTour() {
     fecha, hora, precio_persona: tour.precio, total, creada: new Date().toISOString(),
   };
   reservasTour.unshift(nueva);
-  await guardar('carhelp:reservas_tour', reservasTour);
+
+  // Guardar en Supabase
+  try {
+    const creado = await sbInsert('reservas_tour', {
+      numero: numReserva,
+      nombre_cliente: nombre,
+      email: email,
+      celular: celular,
+      tour_id: tourId || null,
+      tour_nombre: tour.nombre,
+      fecha: fecha,
+      hora: hora,
+      personas: parseInt(personas),
+      precio_persona: tour.precio || 0,
+      total: total,
+      estado: 'pendiente',
+    });
+    nueva.id = creado[0]?.id;
+    // Generar movimiento contable automático
+    await sbInsert('movimientos_contables', {
+      fecha: fecha || new Date().toISOString().split('T')[0],
+      tipo: 'ingreso',
+      categoria: 'turismo',
+      descripcion: `Tour VIP: ${tour.nombre} · ${nombre} · ${personas} persona(s)`,
+      valor: total,
+      num_referencia: numReserva,
+    });
+    mostrarToast('✅ Tour reservado en Supabase: ' + numReserva);
+  } catch(e) {
+    console.warn('Error guardando en Supabase:', e.message);
+    mostrarToast('⚠️ Reserva guardada localmente: ' + numReserva, '#BA7517');
+  }
+  lsSet('carhelp:reservas_tour', reservasTour);
 
   const asunto = `🌄 Confirmación Tour VIP ${numReserva} — Car Help`;
   const cuerpo = `Estimado/a ${nombre},
@@ -3105,8 +3179,12 @@ function renderReservasTour() {
 }
 
 async function eliminarReservaTour(num) {
+  const r = reservasTour.find(x => x.num_reserva === num);
+  try {
+    if (r?.id) await sbDelete('reservas_tour', r.id);
+  } catch(e) { console.warn('Error eliminando de Supabase:', e.message); }
   reservasTour = reservasTour.filter(r => r.num_reserva !== num);
-  await guardar('carhelp:reservas_tour', reservasTour);
+  lsSet('carhelp:reservas_tour', reservasTour);
   renderReservasTour();
   mostrarToast('🗑️ Eliminado');
 }
@@ -3144,7 +3222,43 @@ async function generarSeguridad() {
     escolta, arma, vehiculo, tarifa, notas, creada: new Date().toISOString(),
   };
   solicitudesSeguridad.unshift(nueva);
-  await guardar('carhelp:seguridad', solicitudesSeguridad);
+
+  // Guardar en Supabase
+  try {
+    const creado = await sbInsert('solicitudes_seguridad', {
+      numero: numReserva,
+      nombre_cliente: nombre,
+      email: email,
+      celular: celular,
+      origen: origen,
+      destino: destino,
+      fecha: fecha,
+      hora: hora,
+      escolta: escolta,
+      arma: arma,
+      vehiculo: vehiculo,
+      tarifa: tarifa,
+      notas: notas,
+      estado: 'pendiente',
+    });
+    nueva.id = creado[0]?.id;
+    // Generar movimiento contable automático si hay tarifa
+    if (tarifa > 0) {
+      await sbInsert('movimientos_contables', {
+        fecha: fecha || new Date().toISOString().split('T')[0],
+        tipo: 'ingreso',
+        categoria: 'seguridad',
+        descripcion: `Seguridad: ${origen} → ${destino} · ${nombre} · ${escoltaTxt}`,
+        valor: tarifa,
+        num_referencia: numReserva,
+      });
+    }
+    mostrarToast('✅ Servicio de seguridad guardado: ' + numReserva);
+  } catch(e) {
+    console.warn('Error guardando en Supabase:', e.message);
+    mostrarToast('⚠️ Guardado localmente: ' + numReserva, '#BA7517');
+  }
+  lsSet('carhelp:seguridad', solicitudesSeguridad);
 
   const asunto = `🛡️ Confirmación servicio de seguridad ${numReserva} — Car Help`;
   const cuerpo = `Estimado/a ${nombre},
@@ -3207,8 +3321,12 @@ function renderSeguridad() {
 }
 
 async function eliminarSeguridad(num) {
+  const s = solicitudesSeguridad.find(x => x.num_reserva === num);
+  try {
+    if (s?.id) await sbDelete('solicitudes_seguridad', s.id);
+  } catch(e) { console.warn('Error eliminando de Supabase:', e.message); }
   solicitudesSeguridad = solicitudesSeguridad.filter(s => s.num_reserva !== num);
-  await guardar('carhelp:seguridad', solicitudesSeguridad);
+  lsSet('carhelp:seguridad', solicitudesSeguridad);
   renderSeguridad();
   mostrarToast('🗑️ Eliminado');
 }
