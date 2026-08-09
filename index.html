@@ -2888,11 +2888,25 @@ function renderReservas() {
 
 async function cambiarEstadoReserva(num, estado) {
   const r = reservas.find(x => x.num_reserva === num);
-  if (r) { r.estado = estado; await guardar('carhelp:reservas', reservas); renderStats(); renderEnCurso(); renderProximas(); renderReservas(); }
+  if (!r) return;
+  r.estado = estado;
+  // Guardar en Supabase
+  try {
+    await sbUpdate('ordenes', r.id, { estado });
+    mostrarToast('✅ Estado actualizado: ' + ({pendiente:'Pendiente', confirmada:'Confirmada', entregado:'Entrega realizada', finalizada:'Finalizada'}[estado] || estado));
+  } catch(e) {
+    mostrarToast('⚠️ Error guardando en Supabase: ' + e.message, 'var(--rojo-alerta)');
+  }
+  await guardar('carhelp:reservas', reservas);
+  renderStats(); renderEnCurso(); renderProximas(); renderReservas();
 }
 
 async function eliminarReserva(num) {
+  const r = reservas.find(x => x.num_reserva === num);
   reservas = reservas.filter(r => r.num_reserva !== num);
+  try {
+    if (r?.id) await sbDelete('ordenes', r.id);
+  } catch(e) { console.warn('Error eliminando de Supabase:', e.message); }
   await guardar('carhelp:reservas', reservas);
   renderReservas(); renderStats(); renderProximas();
   mostrarToast('🗑️ Reserva eliminada');
