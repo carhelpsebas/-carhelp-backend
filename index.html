@@ -2981,7 +2981,6 @@ async function generarReserva() {
     const ordenSB = await sbInsert('ordenes', {
       numero: numReserva,
       cliente_id: clienteId,
-      nombre_cliente: valores.nombre,
       vehiculo_id: valores.vehiculo_id,
       fecha_salida: `${valores.fecha_inicio}T${valores.hora_inicio}:00`,
       fecha_retorno: `${valores.fecha_fin}T${valores.hora_fin}:00`,
@@ -5487,13 +5486,13 @@ async function cliCargarHistorial(clienteId, nombre, numDoc) {
   const cont = document.getElementById('cli-historial-contenido');
   cont.innerHTML = '<div style="color:var(--blanco-suave);font-size:0.8rem;padding:8px">Cargando historial...</div>';
   try {
-    // Buscar en ordenes por cliente_id (confiable) o por nombre (respaldo para registros viejos)
+    // ordenes no tiene columna nombre_cliente: se busca únicamente por cliente_id
     const filtroOrdenes = clienteId
-      ? `&or=(cliente_id.eq.${encodeURIComponent(clienteId)},nombre_cliente.ilike.*${encodeURIComponent(nombre)}*)`
-      : `&nombre_cliente=ilike.*${encodeURIComponent(nombre)}*`;
+      ? `&cliente_id=eq.${encodeURIComponent(clienteId)}`
+      : null;
 
     const [rentas, tours, seguridad] = await Promise.all([
-      sbSelect('ordenes', `${filtroOrdenes}&order=created_at.desc&limit=20`).catch(() => []),
+      filtroOrdenes ? sbSelect('ordenes', `${filtroOrdenes}&order=created_at.desc&limit=20`).catch(() => []) : Promise.resolve([]),
       sbSelect('reservas_tour', `&nombre_cliente=ilike.*${encodeURIComponent(nombre)}*&order=created_at.desc&limit=10`).catch(() => []),
       sbSelect('solicitudes_seguridad', `&nombre_cliente=ilike.*${encodeURIComponent(nombre)}*&order=created_at.desc&limit=10`).catch(() => []),
     ]);
@@ -5509,15 +5508,22 @@ async function cliCargarHistorial(clienteId, nombre, numDoc) {
 
     if (rentas?.length) {
       html += `<div style="font-size:0.72rem;font-weight:700;color:var(--dorado);letter-spacing:0.1em;margin:8px 0 6px">🚗 RENTAS (${rentas.length})</div>`;
-      html += rentas.map(r => `
+      html += rentas.map(r => {
+        const local = (typeof reservas !== 'undefined' ? reservas.find(x => x.id === r.id) : null) || {};
+        const veh = (typeof vehiculos !== 'undefined' ? vehiculos.find(v => v.id === r.vehiculo_id) : null);
+        const vehNombre = local.vehiculo || veh?.nombre || '—';
+        const fecha = r.fecha_salida ? new Date(r.fecha_salida).toLocaleDateString('es-CO') : (local.fecha_inicio ? new Date(local.fecha_inicio+'T12:00').toLocaleDateString('es-CO') : '—');
+        const total = local.total || 0;
+        return `
         <div style="background:var(--gris-oscuro);border-radius:8px;padding:10px 12px;margin-bottom:6px;font-size:0.8rem">
           <div style="display:flex;justify-content:space-between">
             <span style="color:var(--dorado);font-weight:600">${r.numero||'—'}</span>
             <span style="color:${estadoColor[r.estado]||'#fff'};font-size:0.72rem">${r.estado||'—'}</span>
           </div>
-          <div style="color:var(--blanco-suave);margin-top:3px">${r.vehiculo_label||'—'} · ${r.fecha_inicio ? new Date(r.fecha_inicio+'T12:00').toLocaleDateString('es-CO') : '—'}</div>
-          ${r.total ? `<div style="color:var(--blanco);font-weight:600;margin-top:2px">${formatCOP(r.total)}</div>` : ''}
-        </div>`).join('');
+          <div style="color:var(--blanco-suave);margin-top:3px">${vehNombre} · ${fecha}</div>
+          ${total ? `<div style="color:var(--blanco);font-weight:600;margin-top:2px">${formatCOP(total)}</div>` : ''}
+        </div>`;
+      }).join('');
     }
 
     if (tours?.length) {
