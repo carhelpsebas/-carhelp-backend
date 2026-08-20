@@ -2981,6 +2981,7 @@ async function generarReserva() {
     const ordenSB = await sbInsert('ordenes', {
       numero: numReserva,
       cliente_id: clienteId,
+      nombre_cliente: valores.nombre,
       vehiculo_id: valores.vehiculo_id,
       fecha_salida: `${valores.fecha_inicio}T${valores.hora_inicio}:00`,
       fecha_retorno: `${valores.fecha_fin}T${valores.hora_fin}:00`,
@@ -5486,9 +5487,13 @@ async function cliCargarHistorial(clienteId, nombre, numDoc) {
   const cont = document.getElementById('cli-historial-contenido');
   cont.innerHTML = '<div style="color:var(--blanco-suave);font-size:0.8rem;padding:8px">Cargando historial...</div>';
   try {
-    // Buscar por nombre o documento en ordenes
+    // Buscar en ordenes por cliente_id (confiable) o por nombre (respaldo para registros viejos)
+    const filtroOrdenes = clienteId
+      ? `&or=(cliente_id.eq.${encodeURIComponent(clienteId)},nombre_cliente.ilike.*${encodeURIComponent(nombre)}*)`
+      : `&nombre_cliente=ilike.*${encodeURIComponent(nombre)}*`;
+
     const [rentas, tours, seguridad] = await Promise.all([
-      sbSelect('ordenes', `&nombre_cliente=ilike.*${encodeURIComponent(nombre)}*&order=created_at.desc&limit=20`).catch(() => []),
+      sbSelect('ordenes', `${filtroOrdenes}&order=created_at.desc&limit=20`).catch(() => []),
       sbSelect('reservas_tour', `&nombre_cliente=ilike.*${encodeURIComponent(nombre)}*&order=created_at.desc&limit=10`).catch(() => []),
       sbSelect('solicitudes_seguridad', `&nombre_cliente=ilike.*${encodeURIComponent(nombre)}*&order=created_at.desc&limit=10`).catch(() => []),
     ]);
