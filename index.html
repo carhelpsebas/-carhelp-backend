@@ -5293,7 +5293,23 @@ let cliDocSlotActivo = null;
 async function cargarClientes() {
   try {
     const data = await sbSelect('clientes', '&order=nombre.asc');
-    clientesData = data || [];
+    clientesData = (data || []).map(c => ({
+      id: c.id,
+      nombre: c.nombre || '',
+      tipo_doc: c.tipo_doc || 'CC',
+      num_doc: c.num_doc || c.documento || '',
+      celular: c.celular || c.telefono || '',
+      email: c.email || '',
+      ciudad: c.ciudad || '',
+      direccion: c.direccion || '',
+      licencia_num: c.licencia_num || c.licencia_numero || '',
+      licencia_cat: c.licencia_cat || c.licencia_categoria || '',
+      licencia_vence: c.licencia_vence || '',
+      fecha_nac: c.fecha_nac || '',
+      clasificacion: c.clasificacion || 'normal',
+      notas: c.notas || '',
+      docs_urls: c.docs_urls || {},
+    }));
     lsSet('carhelp:clientes', clientesData);
   } catch(e) {
     clientesData = lsGet('carhelp:clientes') || [];
@@ -5524,6 +5540,7 @@ async function guardarCliente() {
     nombre,
     tipo_doc: document.getElementById('cli-tipo-doc').value,
     num_doc: document.getElementById('cli-num-doc').value.trim(),
+    documento: document.getElementById('cli-num-doc').value.trim(), // compatibilidad con columna existente
     celular: document.getElementById('cli-celular').value.trim(),
     email: document.getElementById('cli-email-campo').value.trim(),
     ciudad: document.getElementById('cli-ciudad').value.trim(),
