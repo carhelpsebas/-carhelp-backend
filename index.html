@@ -600,6 +600,7 @@
     <button class="nav-tab" onclick="cambiarVista('cotizaciones', this)">📄 Cotizaciones</button>
     <button class="nav-tab" onclick="cambiarVista('solicitudes', this)">📥 Solicitudes</button>
     <button class="nav-tab" onclick="abrirEntregas()">📦 Entregas</button>
+    <button class="nav-tab" onclick="abrirDevolucion()">🔄 Devoluciones</button>
     <button class="nav-tab admin-only" onclick="cambiarVista('contabilidad', this)">💰 Contabilidad</button>
     <button class="nav-tab admin-only" onclick="cambiarVista('usuarios', this)">👤 Usuarios</button>
   </div>
@@ -1823,6 +1824,143 @@
 </div>
 
 <div class="toast" id="toast">✅ <span id="toast-msg">Listo</span></div>
+
+<!-- ═══ OVERLAY: DEVOLUCIONES ═══ -->
+<div class="entrega-overlay" id="devolucion-overlay">
+
+  <!-- PASO 0: Selección de orden -->
+  <div id="dv-ordenes" class="epanel eactive">
+    <div class="entrega-topbar">
+      <button class="entrega-back" onclick="cerrarDevolucion()">&#10005;</button>
+      <div>
+        <div class="entrega-title">MÓDULO DE DEVOLUCIONES</div>
+        <div class="entrega-sub" id="dv-agente-label">Registro de retorno de vehículo</div>
+      </div>
+    </div>
+    <div style="padding:20px;max-width:560px;margin:0 auto;width:100%">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div style="font-size:15px;font-weight:600;color:#f0f0f0">Rentas en curso</div>
+        <span id="dv-count" style="font-size:11px;font-weight:600;background:rgba(201,168,76,.15);color:#C9A84C;padding:3px 10px;border-radius:4px">-</span>
+      </div>
+      <div id="dv-lista-ordenes" style="background:#141414;border:1px solid #2e2e2e;border-radius:12px;padding:10px 14px">
+        <div style="padding:20px;text-align:center;color:#555;font-size:13px">Cargando...</div>
+      </div>
+      <button onclick="dvCargarOrdenes()" class="btn-secundario" style="width:100%;margin-top:10px;font-size:12px">↻ Actualizar</button>
+    </div>
+  </div>
+
+  <!-- PASO 1: Fotos de retorno -->
+  <div id="dv-step1" class="epanel">
+    <div class="entrega-topbar">
+      <button class="entrega-back" onclick="dvGo('dv-ordenes')">&#8249;</button>
+      <div><div class="entrega-title">Paso 1 de 3 — Fotos de retorno</div><div class="entrega-sub" id="dv-step1-sub">-</div></div>
+    </div>
+    <div class="estepbar"><div class="estepdot done"></div><div class="estepdot active"></div><div class="estepdot"></div><div class="estepdot"></div></div>
+    <div style="padding:20px;max-width:560px;margin:0 auto;width:100%">
+      <p style="font-size:14px;font-weight:600;color:#f0f0f0;margin-bottom:4px">Registro fotográfico del vehículo</p>
+      <p style="font-size:12px;color:#666;margin-bottom:14px">Toca cada ángulo para capturar la foto de retorno</p>
+      <div id="dv-fotos-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px">
+        <div class="ephoto-slot" id="dvph-front" onclick="dvFoto('dvph-front','Frontal')" style="height:120px;background:#1a1a1a;border:1.5px dashed #333;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative">
+          <span style="font-size:22px">📷</span><span style="font-size:11px;color:#666;margin-top:4px">Frontal</span>
+        </div>
+        <div class="ephoto-slot" id="dvph-back" onclick="dvFoto('dvph-back','Trasera')" style="height:120px;background:#1a1a1a;border:1.5px dashed #333;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative">
+          <span style="font-size:22px">📷</span><span style="font-size:11px;color:#666;margin-top:4px">Trasera</span>
+        </div>
+        <div class="ephoto-slot" id="dvph-left" onclick="dvFoto('dvph-left','Lateral izq.')" style="height:120px;background:#1a1a1a;border:1.5px dashed #333;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative">
+          <span style="font-size:22px">📷</span><span style="font-size:11px;color:#666;margin-top:4px">Lateral izq.</span>
+        </div>
+        <div class="ephoto-slot" id="dvph-right" onclick="dvFoto('dvph-right','Lateral der.')" style="height:120px;background:#1a1a1a;border:1.5px dashed #333;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative">
+          <span style="font-size:22px">📷</span><span style="font-size:11px;color:#666;margin-top:4px">Lateral der.</span>
+        </div>
+        <div class="ephoto-slot" id="dvph-int" onclick="dvFoto('dvph-int','Interior')" style="height:120px;background:#1a1a1a;border:1.5px dashed #333;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative">
+          <span style="font-size:22px">📷</span><span style="font-size:11px;color:#666;margin-top:4px">Interior</span>
+        </div>
+        <div class="ephoto-slot" id="dvph-trunk" onclick="dvFoto('dvph-trunk','Maletero')" style="height:120px;background:#1a1a1a;border:1.5px dashed #333;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative">
+          <span style="font-size:22px">📷</span><span style="font-size:11px;color:#666;margin-top:4px">Maletero</span>
+        </div>
+      </div>
+      <input type="file" id="dv-foto-input" accept="image/*" style="display:none" onchange="dvCargarFoto(event)">
+      <button class="btn-primario full" onclick="dvGo('dv-step2')">Continuar →</button>
+    </div>
+  </div>
+
+  <!-- PASO 2: Inspección y daños -->
+  <div id="dv-step2" class="epanel">
+    <div class="entrega-topbar">
+      <button class="entrega-back" onclick="dvGo('dv-step1')">&#8249;</button>
+      <div><div class="entrega-title">Paso 2 de 3 — Inspección</div><div class="entrega-sub" id="dv-step2-sub">-</div></div>
+    </div>
+    <div class="estepbar"><div class="estepdot done"></div><div class="estepdot done"></div><div class="estepdot active"></div><div class="estepdot"></div></div>
+    <div style="padding:20px;max-width:560px;margin:0 auto;width:100%">
+
+      <!-- Km y combustible -->
+      <p style="font-size:14px;font-weight:600;color:#f0f0f0;margin-bottom:12px">Estado de retorno</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+        <div class="campo"><label>Km de retorno</label><input type="number" id="dv-km" placeholder="Ej: 45230"></div>
+        <div class="campo"><label>Combustible %</label><input type="number" id="dv-fuel" placeholder="0-100" min="0" max="100" oninput="dvCalcLiquidacion()"></div>
+      </div>
+
+      <!-- Novedades/daños -->
+      <p style="font-size:13px;font-weight:600;color:#f0f0f0;margin-bottom:8px">Novedades y daños</p>
+      <div id="dv-danos-lista" style="margin-bottom:12px"></div>
+      <button class="btn-secundario" onclick="dvAgregarDano()" style="width:100%;margin-bottom:20px">+ Agregar novedad / daño</button>
+
+      <!-- Observaciones -->
+      <div class="campo"><label>Observaciones generales</label><textarea id="dv-obs" rows="3" placeholder="Estado general del vehículo al retorno..."></textarea></div>
+
+      <button class="btn-primario full" onclick="dvGo('dv-step3'); dvCalcLiquidacion()">Continuar →</button>
+    </div>
+  </div>
+
+  <!-- PASO 3: Resumen y cierre -->
+  <div id="dv-step3" class="epanel">
+    <div class="entrega-topbar">
+      <button class="entrega-back" onclick="dvGo('dv-step2')">&#8249;</button>
+      <div><div class="entrega-title">Paso 3 de 3 — Liquidación</div><div class="entrega-sub" id="dv-step3-sub">-</div></div>
+    </div>
+    <div class="estepbar"><div class="estepdot done"></div><div class="estepdot done"></div><div class="estepdot done"></div><div class="estepdot active"></div></div>
+    <div style="padding:20px;max-width:560px;margin:0 auto;width:100%">
+      <p style="font-size:14px;font-weight:600;color:#f0f0f0;margin-bottom:16px">Resumen de liquidación</p>
+
+      <div style="background:#141414;border:1px solid #2e2e2e;border-radius:12px;padding:16px;margin-bottom:16px">
+        <div class="esum-row"><span class="esum-key">Depósito cobrado</span><span class="esum-val" id="dv-liq-deposito" style="color:#C9A84C">—</span></div>
+        <div class="esum-row"><span class="esum-key">Diferencia combustible</span><span class="esum-val" id="dv-liq-combustible" style="color:var(--rojo-alerta)">—</span></div>
+        <div class="esum-row"><span class="esum-key">Costo de daños</span><span class="esum-val" id="dv-liq-danos" style="color:var(--rojo-alerta)">—</span></div>
+        <div style="border-top:1px solid #333;margin:10px 0"></div>
+        <div class="esum-row"><span class="esum-key" style="font-weight:700">Saldo a devolver al cliente</span><span class="esum-val" id="dv-liq-saldo" style="font-size:18px;font-weight:700;color:#4CAF82">—</span></div>
+      </div>
+
+      <div class="campo"><label>Correo del cliente</label><input type="email" id="dv-email" placeholder="correo@cliente.com"></div>
+
+      <div id="dv-send-error" style="display:none;color:var(--rojo-alerta);font-size:12px;margin-bottom:10px"></div>
+      <button class="btn-primario full" id="dv-btn-completar" onclick="dvCompletar()">✅ Completar devolución</button>
+      <button class="btn-secundario full" style="margin-top:8px" onclick="dvGo('dv-step2')">← Revisar</button>
+    </div>
+  </div>
+
+  <!-- DONE -->
+  <div id="dv-done" class="epanel">
+    <div class="entrega-topbar">
+      <button class="entrega-back" onclick="cerrarDevolucion()">&#10005;</button>
+      <div><div class="entrega-title">DEVOLUCIÓN COMPLETADA</div></div>
+    </div>
+    <div style="padding:30px 20px;max-width:560px;margin:0 auto;width:100%;text-align:center">
+      <div style="font-size:56px;margin-bottom:16px">✅</div>
+      <div>
+        <p style="font-size:17px;font-weight:600;color:#f0f0f0">¡Devolución registrada!</p>
+        <p style="font-size:12px;color:#666;margin-top:6px">La orden se cerró y se notificó al cliente</p>
+      </div>
+      <div style="background:#141414;border:1px solid #2e2e2e;border-radius:10px;padding:14px;width:100%;text-align:left;margin:20px 0">
+        <div class="esum-row"><span class="esum-key">N° orden</span><span class="esum-val" id="dv-done-ref" style="color:#C9A84C">-</span></div>
+        <div class="esum-row"><span class="esum-key">Saldo devuelto</span><span class="esum-val" id="dv-done-saldo" style="color:#4CAF82">-</span></div>
+        <div class="esum-row"><span class="esum-key">Correo enviado</span><span class="esum-val" id="dv-done-email" style="font-size:11px">-</span></div>
+        <div class="esum-row"><span class="esum-key">Estado</span><span class="esum-val" style="color:#4CAF82">Finalizada</span></div>
+      </div>
+      <button class="btn-primario full" onclick="cerrarDevolucion()">Volver al panel</button>
+    </div>
+  </div>
+
+</div>
 
 <script>
 /* ════════════════════════════════════════════
@@ -4509,6 +4647,366 @@ function poblarVehiculosCotizacion() {
     const veh = vehiculos.find(v => v.id === this.value);
     if (veh && veh.tarifa) document.getElementById('cot-tarifa').value = veh.tarifa;
   };
+}
+
+/* ════════════════════════════════════════════
+   MÓDULO DE DEVOLUCIONES
+   ════════════════════════════════════════════ */
+let dvOrder = null;
+let dvArchivos = {};
+let dvDanos = [];
+let dvFuelSalida = 0;
+
+function abrirDevolucion() {
+  document.getElementById('devolucion-overlay').classList.add('visible');
+  dvGo('dv-ordenes');
+  dvCargarOrdenes();
+  if (sesion) document.getElementById('dv-agente-label').textContent = sesion.nombre + ' — ' + (sesion.rol || '');
+}
+
+function cerrarDevolucion() {
+  document.getElementById('devolucion-overlay').classList.remove('visible');
+  dvOrder = null; dvArchivos = {}; dvDanos = [];
+}
+
+function dvGo(id) {
+  document.querySelectorAll('#devolucion-overlay .epanel').forEach(p => p.classList.remove('eactive'));
+  document.getElementById(id).classList.add('eactive');
+}
+
+async function dvCargarOrdenes() {
+  const lista = document.getElementById('dv-lista-ordenes');
+  const count = document.getElementById('dv-count');
+  lista.innerHTML = '<div style="padding:20px;text-align:center;color:#555;font-size:13px">Cargando...</div>';
+  try {
+    const data = await sbSelect('ordenes', '&estado=eq.entregado&order=created_at.desc');
+    if (!data || data.length === 0) {
+      lista.innerHTML = '<div style="padding:20px;text-align:center;color:#555;font-size:13px">No hay rentas en curso para devolver.</div>';
+      count.textContent = '0 activas';
+      return;
+    }
+    count.textContent = data.length + ' activa' + (data.length > 1 ? 's' : '');
+    lista.innerHTML = data.map((o, idx) => `
+      <div class="eorden-item" onclick="dvSeleccionar(${JSON.stringify(o).replace(/"/g,'&quot;')})">
+        <div class="eorden-avatar">🔄</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:500;color:#f0f0f0">${o.nombre_cliente || o.numero}</div>
+          <div style="font-size:11px;color:#666;margin-top:2px">${o.numero} · Retorno: ${o.fecha_retorno ? new Date(o.fecha_retorno).toLocaleDateString('es-CO') : '—'}</div>
+        </div>
+        <span style="font-size:10px;background:rgba(46,204,113,.15);color:#2ecc71;padding:2px 8px;border-radius:4px;font-weight:600">En curso</span>
+      </div>`).join('');
+  } catch(e) {
+    // Fallback a reservas en memoria
+    const enCurso = reservas.filter(r => r.estado === 'entregado');
+    count.textContent = enCurso.length + ' activa' + (enCurso.length !== 1 ? 's' : '');
+    if (enCurso.length === 0) {
+      lista.innerHTML = '<div style="padding:20px;text-align:center;color:#555;font-size:13px">No hay rentas en curso.</div>';
+      return;
+    }
+    lista.innerHTML = enCurso.map(r => `
+      <div class="eorden-item" onclick="dvSeleccionarLocal(${JSON.stringify(r).replace(/"/g,'&quot;')})">
+        <div class="eorden-avatar">🔄</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:500;color:#f0f0f0">${r.nombre}</div>
+          <div style="font-size:11px;color:#666;margin-top:2px">${r.num_reserva} · ${r.vehiculo}</div>
+        </div>
+        <span style="font-size:10px;background:rgba(46,204,113,.15);color:#2ecc71;padding:2px 8px;border-radius:4px;font-weight:600">En curso</span>
+      </div>`).join('');
+  }
+}
+
+function dvSeleccionar(orden) {
+  // Desde Supabase
+  const r = reservas.find(x => x.id === orden.id) || {};
+  dvOrder = {
+    id: orden.id,
+    num_reserva: orden.numero || r.num_reserva,
+    nombre: orden.nombre_cliente || r.nombre,
+    email: orden.email_cliente || r.email || '',
+    vehiculo: r.vehiculo || '',
+    vehiculo_id: orden.vehiculo_id || r.vehiculo_id,
+    deposito: parseFloat(orden.deposito || r.deposito || 0),
+    tarifa: parseFloat(orden.tarifa_diaria || r.tarifa || 0),
+    combustible_salida: r.combustible_salida || 100,
+  };
+  dvIniciar();
+}
+
+function dvSeleccionarLocal(r) {
+  dvOrder = {
+    id: r.id,
+    num_reserva: r.num_reserva,
+    nombre: r.nombre,
+    email: r.email || '',
+    vehiculo: r.vehiculo,
+    vehiculo_id: r.vehiculo_id,
+    deposito: parseFloat(r.deposito || 0),
+    tarifa: parseFloat(r.tarifa || 0),
+    combustible_salida: r.combustible_salida || 100,
+  };
+  dvIniciar();
+}
+
+function dvIniciar() {
+  dvArchivos = {}; dvDanos = [];
+  document.getElementById('dv-step1-sub').textContent = dvOrder.vehiculo + ' · ' + dvOrder.nombre;
+  document.getElementById('dv-step2-sub').textContent = dvOrder.vehiculo;
+  document.getElementById('dv-step3-sub').textContent = dvOrder.num_reserva;
+  document.getElementById('dv-email').value = dvOrder.email || '';
+  document.getElementById('dv-km').value = '';
+  document.getElementById('dv-fuel').value = '';
+  document.getElementById('dv-obs').value = '';
+  dvDanos = [];
+  dvRenderDanos();
+  // Resetear fotos
+  ['dvph-front','dvph-back','dvph-left','dvph-right','dvph-int','dvph-trunk'].forEach(id => {
+    const el = document.getElementById(id);
+    const label = el.querySelector('span:last-child')?.textContent || id;
+    el.innerHTML = `<span style="font-size:22px">📷</span><span style="font-size:11px;color:#666;margin-top:4px">${label}</span>`;
+    el.classList.remove('done');
+  });
+  dvGo('dv-step1');
+}
+
+// Captura de fotos
+let dvFotoSlotActivo = null;
+function dvFoto(slotId, label) {
+  dvFotoSlotActivo = { slotId, label };
+  const input = document.getElementById('dv-foto-input');
+  input.value = '';
+  input.click();
+}
+
+function dvCargarFoto(event) {
+  const file = event.target.files[0];
+  if (!file || !dvFotoSlotActivo) return;
+  const { slotId, label } = dvFotoSlotActivo;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    dvArchivos[slotId] = { file, dataUrl: e.target.result, label };
+    const el = document.getElementById(slotId);
+    el.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:9px;position:absolute;inset:0"><span style="position:absolute;top:4px;right:6px;background:rgba(0,0,0,0.7);color:#C9A84C;font-size:10px;font-weight:700;padding:2px 5px;border-radius:4px">${label}</span>`;
+    el.classList.add('done');
+  };
+  reader.readAsDataURL(file);
+}
+
+// Daños
+function dvAgregarDano() {
+  dvDanos.push({ desc: '', costo: 0, quienPaga: 'cliente' });
+  dvRenderDanos();
+}
+
+function dvRenderDanos() {
+  const cont = document.getElementById('dv-danos-lista');
+  if (dvDanos.length === 0) {
+    cont.innerHTML = '<div style="text-align:center;color:#555;font-size:12px;padding:10px">Sin novedades registradas</div>';
+    return;
+  }
+  cont.innerHTML = dvDanos.map((d, i) => `
+    <div style="background:#1a1a1a;border:1px solid #333;border-radius:10px;padding:12px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:12px;font-weight:600;color:#C9A84C">Novedad #${i+1}</span>
+        <button onclick="dvEliminarDano(${i})" style="background:none;border:none;color:var(--rojo-alerta);cursor:pointer;font-size:16px">✕</button>
+      </div>
+      <div class="campo" style="margin-bottom:8px"><label>Descripción</label>
+        <input type="text" value="${d.desc}" onchange="dvDanos[${i}].desc=this.value;dvCalcLiquidacion()" placeholder="Ej: Rayón puerta derecha, llanta pinchada...">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="campo"><label>Costo estimado (COP)</label>
+          <input type="text" value="${d.costo||''}" onchange="dvDanos[${i}].costo=parseFloat(this.value.replace(/\\./g,''))||0;dvCalcLiquidacion()" placeholder="Ej: 150000">
+        </div>
+        <div class="campo"><label>¿Quién paga?</label>
+          <select onchange="dvDanos[${i}].quienPaga=this.value">
+            <option value="cliente" ${d.quienPaga==='cliente'?'selected':''}>Cliente</option>
+            <option value="seguro" ${d.quienPaga==='seguro'?'selected':''}>Seguro</option>
+            <option value="car_help" ${d.quienPaga==='car_help'?'selected':''}>Car Help</option>
+          </select>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function dvEliminarDano(i) {
+  dvDanos.splice(i, 1);
+  dvRenderDanos();
+  dvCalcLiquidacion();
+}
+
+function dvCalcLiquidacion() {
+  if (!dvOrder) return;
+  const deposito = dvOrder.deposito || 0;
+  const fuelSalida = dvOrder.combustible_salida || 100;
+  const fuelRetorno = parseInt(document.getElementById('dv-fuel')?.value) || fuelSalida;
+  const diffFuel = Math.max(0, fuelSalida - fuelRetorno);
+  // Costo por diferencia de combustible: cada 10% = 1/10 de la tarifa diaria
+  const costoCombustible = diffFuel > 0 ? Math.round((diffFuel / 100) * dvOrder.tarifa * 0.8) : 0;
+  const costoDanos = dvDanos.filter(d => d.quienPaga === 'cliente').reduce((s, d) => s + (d.costo||0), 0);
+  const totalDescuentos = costoCombustible + costoDanos;
+  const saldo = Math.max(0, deposito - totalDescuentos);
+
+  const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  setEl('dv-liq-deposito', formatCOP(deposito));
+  setEl('dv-liq-combustible', diffFuel > 0 ? `- ${formatCOP(costoCombustible)} (${diffFuel}% menos)` : '$ 0 COP');
+  setEl('dv-liq-danos', costoDanos > 0 ? `- ${formatCOP(costoDanos)}` : '$ 0 COP');
+  setEl('dv-liq-saldo', formatCOP(saldo));
+  const saldoEl = document.getElementById('dv-liq-saldo');
+  if (saldoEl) saldoEl.style.color = saldo > 0 ? '#4CAF82' : 'var(--rojo-alerta)';
+  return { deposito, costoCombustible, costoDanos, totalDescuentos, saldo, diffFuel };
+}
+
+async function dvSubirFotoStorage(slotId, ordenNum) {
+  const archivo = dvArchivos[slotId];
+  if (!archivo?.file) return null;
+  try {
+    const ext = archivo.file.name.split('.').pop() || 'jpg';
+    const path = `retorno-${ordenNum}/${slotId}.${ext}`;
+    const res = await fetch(`${SB_URL}/storage/v1/object/entregas-fotos/${path}`, {
+      method: 'POST',
+      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': archivo.file.type || 'image/jpeg', 'x-upsert': 'true' },
+      body: archivo.file
+    });
+    if (!res.ok) return null;
+    return { url: `${SB_URL}/storage/v1/object/public/entregas-fotos/${path}`, label: archivo.label };
+  } catch(e) { return null; }
+}
+
+async function dvCompletar() {
+  const btn = document.getElementById('dv-btn-completar');
+  const err = document.getElementById('dv-send-error');
+  err.style.display = 'none';
+  btn.textContent = 'Procesando...';
+  btn.disabled = true;
+
+  try {
+    const emailCliente = document.getElementById('dv-email').value.trim();
+    const km = document.getElementById('dv-km').value;
+    const obs = document.getElementById('dv-obs').value;
+    const liq = dvCalcLiquidacion();
+    const now = new Date();
+    const ordenNum = dvOrder.num_reserva;
+
+    // 1. Subir fotos
+    btn.textContent = 'Subiendo fotos...';
+    const slotsRetorno = ['dvph-front','dvph-back','dvph-left','dvph-right','dvph-int','dvph-trunk'];
+    const fotosSubidas = (await Promise.all(slotsRetorno.map(s => dvSubirFotoStorage(s, ordenNum)))).filter(Boolean);
+
+    // 2. Guardar devolución en Supabase
+    btn.textContent = 'Guardando...';
+    await sbInsert('devoluciones', {
+      orden_id: dvOrder.id || null,
+      km_retorno: parseInt(km) || 0,
+      combustible_retorno: parseInt(document.getElementById('dv-fuel').value) || 0,
+      danos: dvDanos,
+      observaciones: obs,
+      deposito: liq.deposito,
+      costo_combustible: liq.costoCombustible,
+      costo_danos: liq.costoDanos,
+      saldo_devuelto: liq.saldo,
+      fotos_retorno: fotosSubidas.map(f => f.url),
+      fecha_retorno: now.toISOString(),
+      agente_id: sesion?.id || null,
+    }).catch(e => console.warn('Error guardando devolución:', e.message));
+
+    // 3. Cambiar estado de la orden a finalizada
+    if (dvOrder.id) {
+      await sbUpdate('ordenes', dvOrder.id, { estado: 'finalizada' });
+      const idx = reservas.findIndex(r => r.id === dvOrder.id);
+      if (idx >= 0) reservas[idx].estado = 'finalizada';
+    }
+
+    // 4. Registrar movimientos contables
+    if (liq.deposito > 0) {
+      // Devolución del depósito
+      await sbInsert('movimientos_contables', {
+        fecha: now.toISOString().split('T')[0],
+        tipo: 'egreso',
+        categoria: 'deposito',
+        descripcion: `Devolución depósito · ${dvOrder.nombre} · ${ordenNum}`,
+        valor: liq.saldo,
+        num_referencia: ordenNum,
+        vehiculo_id: dvOrder.vehiculo_id || null,
+        orden_id: dvOrder.id || null,
+      }).catch(() => {});
+
+      if (liq.costoDanos > 0) {
+        await sbInsert('movimientos_contables', {
+          fecha: now.toISOString().split('T')[0],
+          tipo: 'ingreso',
+          categoria: 'danos',
+          descripcion: `Cobro por daños · ${dvOrder.nombre} · ${ordenNum}`,
+          valor: liq.costoDanos,
+          num_referencia: ordenNum,
+        }).catch(() => {});
+      }
+    }
+
+    // 5. Enviar correo al cliente
+    btn.textContent = 'Enviando correo...';
+    let correoEnviado = false;
+    if (emailCliente) {
+      const fotosTexto = fotosSubidas.length > 0
+        ? `\n\n📷 Registro fotográfico disponible en el sistema Car Help.`  : '';
+      const danosTxt = dvDanos.length > 0
+        ? `\n\nNOVEDADES REGISTRADAS:\n${dvDanos.map(d => `• ${d.desc}: ${formatCOP(d.costo)} (${d.quienPaga === 'cliente' ? 'A cargo del cliente' : d.quienPaga === 'seguro' ? 'Reportado al seguro' : 'A cargo de Car Help'})`).join('\n')}` : '';
+
+      const cuerpo = `Estimado/a ${dvOrder.nombre},
+
+Confirmamos la devolución exitosa del vehículo. Gracias por confiar en Car Help.
+
+RESUMEN DE DEVOLUCIÓN
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚗 Vehículo: ${dvOrder.vehiculo}
+📋 N° de orden: ${ordenNum}
+📅 Fecha y hora de retorno: ${now.toLocaleString('es-CO')}
+${km ? `🛣️ Kilometraje de retorno: ${km} km` : ''}
+${obs ? `📝 Observaciones: ${obs}` : ''}${danosTxt}
+
+LIQUIDACIÓN FINAL
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+Depósito cobrado: ${formatCOP(liq.deposito)}
+Descuento combustible: ${liq.costoCombustible > 0 ? `- ${formatCOP(liq.costoCombustible)}` : '$ 0 COP'}
+Descuento por daños: ${liq.costoDanos > 0 ? `- ${formatCOP(liq.costoDanos)}` : '$ 0 COP'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+SALDO DEVUELTO AL CLIENTE: ${formatCOP(liq.saldo)}
+${fotosTexto}
+
+¡Esperamos verte pronto! Recuerda que puedes reservar nuevamente en carhelp.com.co
+
+Con aprecio,
+El equipo de Car Help S.A.S
+📞 310 743 6082 · reservascarhelp@gmail.com`;
+
+      try {
+        const res = await fetch(MAIL_API + '/api/enviar-correo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            para: emailCliente,
+            asunto: `✅ Devolución confirmada · ${dvOrder.vehiculo} · ${ordenNum} · Car Help`,
+            cuerpo,
+            fotosUrls: fotosSubidas,
+          })
+        });
+        if (res.ok) correoEnviado = true;
+      } catch(e) { console.warn('Error enviando correo:', e); }
+    }
+
+    // 6. Mostrar pantalla de éxito
+    document.getElementById('dv-done-ref').textContent = ordenNum;
+    document.getElementById('dv-done-saldo').textContent = formatCOP(liq.saldo);
+    document.getElementById('dv-done-email').textContent = correoEnviado ? `✅ Enviado a ${emailCliente}` : (emailCliente ? '⚠️ No se pudo enviar' : 'Sin correo');
+    mostrarToast('✅ Devolución registrada: ' + ordenNum);
+    renderEnCurso(); renderReservas(); renderStats();
+    dvGo('dv-done');
+
+  } catch(e) {
+    err.textContent = 'Error: ' + e.message;
+    err.style.display = 'block';
+  } finally {
+    btn.textContent = '✅ Completar devolución';
+    btn.disabled = false;
+  }
 }
 
 (async function init() {
