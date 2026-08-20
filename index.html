@@ -598,6 +598,7 @@
     <button class="nav-tab" onclick="cambiarVista('turismo', this)">🌄 Turismo VIP</button>
     <button class="nav-tab" onclick="cambiarVista('seguridad', this)">🛡️ Seguridad</button>
     <button class="nav-tab" onclick="cambiarVista('cotizaciones', this)">📄 Cotizaciones</button>
+    <button class="nav-tab" onclick="cambiarVista('clientes', this)">👥 Clientes</button>
     <button class="nav-tab" onclick="cambiarVista('solicitudes', this)">📥 Solicitudes</button>
     <button class="nav-tab" onclick="abrirEntregas()">📦 Entregas</button>
     <button class="nav-tab" onclick="abrirDevolucion()">🔄 Devoluciones</button>
@@ -903,6 +904,32 @@
             </thead>
             <tbody id="tabla-vehiculos"></tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel historial por vehículo -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-titulo-wrap">
+          <div class="panel-icono">📋</div>
+          <div>
+            <div class="panel-titulo">Historial por vehículo</div>
+            <div class="panel-sub">Consulta quién tuvo cada vehículo y en qué fechas</div>
+          </div>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+          <select id="hist-vehiculo-sel" style="flex:2;background:var(--gris-oscuro);color:var(--blanco);border:1px solid var(--borde);border-radius:8px;padding:8px 12px;font-size:0.85rem">
+            <option value="">Seleccionar vehículo...</option>
+          </select>
+          <input type="date" id="hist-desde" style="background:var(--gris-oscuro);color:var(--blanco);border:1px solid var(--borde);border-radius:8px;padding:8px 12px;font-size:0.85rem">
+          <input type="date" id="hist-hasta" style="background:var(--gris-oscuro);color:var(--blanco);border:1px solid var(--borde);border-radius:8px;padding:8px 12px;font-size:0.85rem">
+          <button class="btn-primario" onclick="buscarHistorialVehiculo()" style="padding:8px 18px">🔍 Buscar</button>
+        </div>
+        <div id="hist-resultados">
+          <div style="text-align:center;color:var(--blanco-suave);padding:30px;font-size:0.85rem">Selecciona un vehículo para ver su historial</div>
         </div>
       </div>
     </div>
@@ -1243,7 +1270,155 @@
     </div>
   </div>
 
-  <!-- ═══ VISTA: SOLICITUDES (formulario cliente) ═══ -->
+  <!-- ═══ VISTA: CLIENTES ═══ -->
+  <div class="vista" id="vista-clientes">
+    <div class="home-header">
+      <div class="home-header-eyebrow">Módulo de clientes</div>
+      <div class="home-header-titulo">Gestión de <span>Clientes</span></div>
+      <div class="home-header-sub">Perfiles, historial de servicios y documentos</div>
+    </div>
+
+    <!-- Buscador + botón nuevo -->
+    <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+      <div style="flex:1;position:relative;min-width:200px">
+        <input type="text" id="cli-buscador" placeholder="🔍 Buscar por nombre, documento o teléfono..." oninput="filtrarClientes(this.value)"
+          style="width:100%;background:var(--carbon);border:1px solid var(--borde);border-radius:10px;padding:10px 16px;color:var(--blanco);font-size:0.9rem">
+      </div>
+      <button class="btn-primario" onclick="abrirModalCliente(null)">+ Nuevo cliente</button>
+    </div>
+
+    <!-- Estadísticas rápidas -->
+    <div class="stats-grid" style="margin-bottom:20px" id="cli-stats">
+      <div class="stat-card"><div class="stat-label">Total clientes</div><div class="stat-value" id="cli-stat-total">0</div></div>
+      <div class="stat-card"><div class="stat-label">Clientes VIP</div><div class="stat-value" id="cli-stat-vip" style="color:#C9A84C">0</div></div>
+      <div class="stat-card"><div class="stat-label">Clientes frecuentes</div><div class="stat-value" id="cli-stat-frecuentes">0</div></div>
+    </div>
+
+    <!-- Lista de clientes -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-titulo-wrap">
+          <div class="panel-icono">👥</div>
+          <div><div class="panel-titulo">Directorio de clientes</div><div class="panel-sub" id="cli-count-label">Cargando...</div></div>
+        </div>
+      </div>
+      <div class="panel-body" id="cli-lista">
+        <div class="estado-vacio"><div class="icono-grande">👥</div><p>No hay clientes registrados.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL PERFIL CLIENTE -->
+  <div class="modal-overlay" id="modal-cliente">
+    <div class="modal" style="max-width:680px;max-height:90vh;overflow-y:auto">
+      <div class="modal-header">
+        <div class="modal-titulo" id="modal-cliente-titulo">Nuevo cliente</div>
+        <button class="modal-close" onclick="cerrarModal('modal-cliente')">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="cli-id">
+
+        <!-- Clasificación -->
+        <div class="seccion-label">Clasificación</div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+          <button class="cot-tab activo" id="cli-cls-normal" onclick="setClasificacion('normal')">⚪ Normal</button>
+          <button class="cot-tab" id="cli-cls-frecuente" onclick="setClasificacion('frecuente')">🔵 Frecuente</button>
+          <button class="cot-tab" id="cli-cls-vip" onclick="setClasificacion('vip')">⭐ VIP</button>
+        </div>
+        <input type="hidden" id="cli-clasificacion" value="normal">
+
+        <!-- Datos personales -->
+        <div class="seccion-label">Datos personales</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="campo" style="grid-column:1/-1"><label>Nombre completo *</label><input type="text" id="cli-nombre" placeholder="Nombre completo"></div>
+          <div class="campo">
+            <label>Tipo de documento</label>
+            <select id="cli-tipo-doc">
+              <option value="CC">Cédula de ciudadanía</option>
+              <option value="CE">Cédula extranjería</option>
+              <option value="PA">Pasaporte</option>
+              <option value="NIT">NIT</option>
+            </select>
+          </div>
+          <div class="campo"><label>Número de documento</label><input type="text" id="cli-num-doc" placeholder="Ej: 1234567890"></div>
+          <div class="campo"><label>Celular / WhatsApp</label><input type="text" id="cli-celular" placeholder="310 000 0000"></div>
+          <div class="campo"><label>Correo electrónico</label><input type="email" id="cli-email-campo" placeholder="correo@ejemplo.com"></div>
+          <div class="campo"><label>Ciudad</label><input type="text" id="cli-ciudad" placeholder="Ej: Pereira"></div>
+          <div class="campo"><label>Fecha de nacimiento</label><input type="date" id="cli-fecha-nac"></div>
+          <div class="campo" style="grid-column:1/-1"><label>Dirección</label><input type="text" id="cli-direccion-campo" placeholder="Dirección completa"></div>
+        </div>
+
+        <!-- Licencia de conducción -->
+        <div class="seccion-label" style="margin-top:16px">Licencia de conducción</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+          <div class="campo"><label>Número de licencia</label><input type="text" id="cli-lic-num" placeholder="Ej: 12345678"></div>
+          <div class="campo">
+            <label>Categoría</label>
+            <select id="cli-lic-cat">
+              <option value="">Sin licencia</option>
+              <option value="A1">A1 - Moto hasta 125cc</option>
+              <option value="A2">A2 - Moto más de 125cc</option>
+              <option value="B1">B1 - Auto/camioneta</option>
+              <option value="B2">B2 - Vehículo de carga</option>
+              <option value="B3">B3 - Bus</option>
+              <option value="C1">C1 - Camión</option>
+              <option value="C2">C2 - Camión articulado</option>
+            </select>
+          </div>
+          <div class="campo"><label>Vence</label><input type="date" id="cli-lic-vence"></div>
+        </div>
+
+        <!-- Fotos de documentos -->
+        <div class="seccion-label">Fotos de documentos</div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px">
+          <div>
+            <div style="font-size:0.72rem;color:var(--blanco-suave);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">Cédula — Frente</div>
+            <div id="cli-doc-cc-front" onclick="cliCapturarDoc('cli-doc-cc-front','cc_frente')"
+              style="height:90px;background:var(--gris-oscuro);border:1.5px dashed var(--borde);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;overflow:hidden">
+              <span style="font-size:20px">📷</span><span style="font-size:10px;color:var(--blanco-suave);margin-top:4px">Toca para capturar</span>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:0.72rem;color:var(--blanco-suave);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">Cédula — Reverso</div>
+            <div id="cli-doc-cc-back" onclick="cliCapturarDoc('cli-doc-cc-back','cc_reverso')"
+              style="height:90px;background:var(--gris-oscuro);border:1.5px dashed var(--borde);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;overflow:hidden">
+              <span style="font-size:20px">📷</span><span style="font-size:10px;color:var(--blanco-suave);margin-top:4px">Toca para capturar</span>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:0.72rem;color:var(--blanco-suave);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">Licencia — Frente</div>
+            <div id="cli-doc-lic-front" onclick="cliCapturarDoc('cli-doc-lic-front','lic_frente')"
+              style="height:90px;background:var(--gris-oscuro);border:1.5px dashed var(--borde);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;overflow:hidden">
+              <span style="font-size:20px">📷</span><span style="font-size:10px;color:var(--blanco-suave);margin-top:4px">Toca para capturar</span>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:0.72rem;color:var(--blanco-suave);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">Licencia — Reverso</div>
+            <div id="cli-doc-lic-back" onclick="cliCapturarDoc('cli-doc-lic-back','lic_reverso')"
+              style="height:90px;background:var(--gris-oscuro);border:1.5px dashed var(--borde);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;overflow:hidden">
+              <span style="font-size:20px">📷</span><span style="font-size:10px;color:var(--blanco-suave);margin-top:4px">Toca para capturar</span>
+            </div>
+          </div>
+        </div>
+        <input type="file" id="cli-doc-input" accept="image/*,application/pdf" style="display:none" onchange="cliCargarDoc(event)">
+
+        <!-- Notas internas -->
+        <div class="campo"><label>Notas internas</label><textarea id="cli-notas" rows="2" placeholder="Observaciones, preferencias, alertas..."></textarea></div>
+
+        <!-- Historial (solo en edición) -->
+        <div id="cli-historial-panel" style="display:none">
+          <div class="seccion-label" style="margin-top:16px">Historial de servicios</div>
+          <div id="cli-historial-contenido" style="max-height:300px;overflow-y:auto"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secundario" onclick="cerrarModal('modal-cliente')">Cancelar</button>
+        <button class="btn-primario" onclick="guardarCliente()">💾 Guardar cliente</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ VISTA: SOLICITUDES ═══ -->
   <div class="vista" id="vista-solicitudes">
     <div class="panel">
       <div class="panel-header">
@@ -2303,6 +2478,7 @@ function renderTodo() {
   renderUsuarios();
   poblarVehiculosCotizacion();
   renderCotizaciones();
+  renderClientes();
 }
 
 function formatCOP(n) {
@@ -4635,18 +4811,109 @@ function seleccionarClienteAutocomplete(c, prefijo = 'r') {
 
 function poblarVehiculosCotizacion() {
   const sel = document.getElementById('cot-vehiculo');
-  if (!sel) return;
-  sel.innerHTML = '<option value="">Seleccionar vehículo...</option>';
-  vehiculos.forEach(v => {
-    const op = document.createElement('option');
-    op.value = v.id;
-    op.textContent = v.nombre + (v.placa ? ' · ' + v.placa : '');
-    sel.appendChild(op);
-  });
-  sel.onchange = function() {
-    const veh = vehiculos.find(v => v.id === this.value);
-    if (veh && veh.tarifa) document.getElementById('cot-tarifa').value = veh.tarifa;
-  };
+  const histSel = document.getElementById('hist-vehiculo-sel');
+  if (sel) {
+    sel.innerHTML = '<option value="">Seleccionar vehículo...</option>';
+    vehiculos.forEach(v => {
+      const op = document.createElement('option');
+      op.value = v.id;
+      op.textContent = v.nombre + (v.placa ? ' · ' + v.placa : '');
+      sel.appendChild(op);
+    });
+    sel.onchange = function() {
+      const veh = vehiculos.find(v => v.id === this.value);
+      if (veh && veh.tarifa) document.getElementById('cot-tarifa').value = veh.tarifa;
+    };
+  }
+  if (histSel) {
+    histSel.innerHTML = '<option value="">Seleccionar vehículo...</option>';
+    vehiculos.forEach(v => {
+      const op = document.createElement('option');
+      op.value = v.id;
+      op.textContent = v.nombre + (v.placa ? ' · ' + v.placa : '');
+      histSel.appendChild(op);
+    });
+  }
+}
+
+async function buscarHistorialVehiculo() {
+  const vehId = document.getElementById('hist-vehiculo-sel').value;
+  const desde = document.getElementById('hist-desde').value;
+  const hasta = document.getElementById('hist-hasta').value;
+  const cont = document.getElementById('hist-resultados');
+
+  if (!vehId) { mostrarToast('⚠️ Selecciona un vehículo', '#C9A84C'); return; }
+
+  cont.innerHTML = '<div style="text-align:center;padding:20px;color:var(--blanco-suave)">Buscando...</div>';
+
+  try {
+    let query = `&vehiculo_id=eq.${vehId}&order=created_at.desc`;
+    if (desde) query += `&fecha_inicio=gte.${desde}`;
+    if (hasta) query += `&fecha_inicio=lte.${hasta}`;
+
+    const data = await sbSelect('ordenes', query);
+    const veh = vehiculos.find(v => v.id === vehId);
+
+    if (!data || data.length === 0) {
+      cont.innerHTML = `<div style="text-align:center;padding:30px;color:var(--blanco-suave)">No hay reservas registradas para ${veh?.nombre || 'este vehículo'}${desde || hasta ? ' en ese período' : ''}.</div>`;
+      return;
+    }
+
+    const estadoLabels = { pendiente:'Pendiente', confirmada:'Confirmada', entregado:'En curso', finalizada:'Finalizada' };
+    const estadoColores = { pendiente:'var(--dorado)', confirmada:'var(--verde-ok)', entregado:'#2ecc71', finalizada:'var(--blanco-suave)' };
+
+    cont.innerHTML = `
+      <div style="margin-bottom:12px;font-size:0.8rem;color:var(--blanco-suave)">
+        <strong style="color:var(--dorado)">${veh?.nombre || '—'}</strong> · ${data.length} registro(s) encontrado(s)
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:0.82rem">
+          <thead>
+            <tr style="border-bottom:1px solid var(--borde);color:var(--blanco-suave)">
+              <th style="padding:8px;text-align:left">N° Orden</th>
+              <th style="padding:8px;text-align:left">Cliente</th>
+              <th style="padding:8px;text-align:left">Entrega</th>
+              <th style="padding:8px;text-align:left">Devolución</th>
+              <th style="padding:8px;text-align:right">Total</th>
+              <th style="padding:8px;text-align:center">Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.map(o => {
+              const r = reservas.find(x => x.id === o.id) || {};
+              const nombre = o.nombre_cliente || r.nombre || '—';
+              const fechaI = o.fecha_inicio ? new Date(o.fecha_inicio + 'T12:00').toLocaleDateString('es-CO') : (r.fecha_inicio || '—');
+              const fechaF = o.fecha_retorno ? new Date(o.fecha_retorno + 'T12:00').toLocaleDateString('es-CO') : (r.fecha_fin || '—');
+              const total = o.total || r.total || 0;
+              const estado = o.estado || r.estado || 'pendiente';
+              return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);transition:background 0.15s" onmouseover="this.style.background='var(--gris-oscuro)'" onmouseout="this.style.background=''">
+                <td style="padding:10px 8px;color:var(--dorado);font-weight:600">${o.numero || r.num_reserva || '—'}</td>
+                <td style="padding:10px 8px;font-weight:500">${nombre}</td>
+                <td style="padding:10px 8px;color:var(--blanco-suave)">${fechaI}</td>
+                <td style="padding:10px 8px;color:var(--blanco-suave)">${fechaF}</td>
+                <td style="padding:10px 8px;text-align:right;font-weight:600">${total ? formatCOP(total) : '—'}</td>
+                <td style="padding:10px 8px;text-align:center"><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:rgba(255,255,255,0.08);color:${estadoColores[estado]||'#fff'}">${estadoLabels[estado]||estado}</span></td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  } catch(e) {
+    // Fallback a datos locales
+    const reservasVeh = reservas.filter(r => r.vehiculo_id === vehId || r.vehiculo === vehiculos.find(v=>v.id===vehId)?.nombre);
+    if (reservasVeh.length === 0) {
+      cont.innerHTML = '<div style="text-align:center;padding:30px;color:var(--blanco-suave)">No se encontraron registros.</div>';
+      return;
+    }
+    cont.innerHTML = reservasVeh.map(r => `
+      <div class="item-card">
+        <div class="item-info">
+          <div class="item-titulo">${r.nombre} <span class="num-reserva">${r.num_reserva}</span></div>
+          <div class="item-detalle">${r.fecha_inicio || '—'} → ${r.fecha_fin || '—'} · ${r.total ? formatCOP(r.total) : '—'}</div>
+        </div>
+        <span class="estado-pill estado-${r.estado}">${r.estado}</span>
+      </div>`).join('');
+  }
 }
 
 /* ════════════════════════════════════════════
@@ -4686,15 +4953,22 @@ async function dvCargarOrdenes() {
       return;
     }
     count.textContent = data.length + ' activa' + (data.length > 1 ? 's' : '');
-    lista.innerHTML = data.map((o, idx) => `
+    lista.innerHTML = data.map((o) => {
+      // Buscar nombre en memoria local para complementar
+      const rLocal = reservas.find(r => r.id === o.id || r.num_reserva === o.numero);
+      const nombreCliente = o.nombre_cliente || rLocal?.nombre || o.numero;
+      const vehiculoNombre = rLocal?.vehiculo || o.vehiculo_label || '—';
+      const fechaRetorno = o.fecha_retorno ? new Date(o.fecha_retorno).toLocaleDateString('es-CO') : (rLocal?.fecha_fin ? new Date(rLocal.fecha_fin + 'T12:00').toLocaleDateString('es-CO') : '—');
+      return `
       <div class="eorden-item" onclick="dvSeleccionar(${JSON.stringify(o).replace(/"/g,'&quot;')})">
-        <div class="eorden-avatar">🔄</div>
+        <div class="eorden-avatar" style="background:rgba(46,204,113,.15);color:#2ecc71;font-size:18px">🔄</div>
         <div style="flex:1">
-          <div style="font-size:13px;font-weight:500;color:#f0f0f0">${o.nombre_cliente || o.numero}</div>
-          <div style="font-size:11px;color:#666;margin-top:2px">${o.numero} · Retorno: ${o.fecha_retorno ? new Date(o.fecha_retorno).toLocaleDateString('es-CO') : '—'}</div>
+          <div style="font-size:13px;font-weight:600;color:#f0f0f0">${nombreCliente}</div>
+          <div style="font-size:11px;color:#666;margin-top:2px">${o.numero} · ${vehiculoNombre} · Retorno: ${fechaRetorno}</div>
         </div>
         <span style="font-size:10px;background:rgba(46,204,113,.15);color:#2ecc71;padding:2px 8px;border-radius:4px;font-weight:600">En curso</span>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   } catch(e) {
     // Fallback a reservas en memoria
     const enCurso = reservas.filter(r => r.estado === 'entregado');
@@ -5009,6 +5283,319 @@ El equipo de Car Help S.A.S
   }
 }
 
+/* ════════════════════════════════════════════
+   MÓDULO DE CLIENTES
+   ════════════════════════════════════════════ */
+let clientesData = [];
+let cliDocArchivos = {};
+let cliDocSlotActivo = null;
+
+async function cargarClientes() {
+  try {
+    const data = await sbSelect('clientes', '&order=nombre.asc');
+    clientesData = data || [];
+    lsSet('carhelp:clientes', clientesData);
+  } catch(e) {
+    clientesData = lsGet('carhelp:clientes') || [];
+  }
+  renderClientes();
+}
+
+function renderClientes(lista = clientesData) {
+  const cont = document.getElementById('cli-lista');
+  const countEl = document.getElementById('cli-count-label');
+  const totalEl = document.getElementById('cli-stat-total');
+  const vipEl = document.getElementById('cli-stat-vip');
+  const frecEl = document.getElementById('cli-stat-frecuentes');
+  if (!cont) return;
+
+  if (totalEl) totalEl.textContent = clientesData.length;
+  if (vipEl) vipEl.textContent = clientesData.filter(c => c.clasificacion === 'vip').length;
+  if (frecEl) frecEl.textContent = clientesData.filter(c => c.clasificacion === 'frecuente').length;
+  if (countEl) countEl.textContent = lista.length + ' cliente' + (lista.length !== 1 ? 's' : '');
+
+  if (!lista.length) {
+    cont.innerHTML = '<div class="estado-vacio"><div class="icono-grande">👥</div><p>No hay clientes registrados.</p></div>';
+    return;
+  }
+
+  const clsBadge = { vip: '<span style="font-size:10px;background:rgba(201,168,76,.2);color:#C9A84C;padding:2px 7px;border-radius:4px;font-weight:700">⭐ VIP</span>', frecuente: '<span style="font-size:10px;background:rgba(91,155,213,.2);color:#5B9BD5;padding:2px 7px;border-radius:4px;font-weight:700">🔵 Frecuente</span>', normal: '' };
+
+  cont.innerHTML = lista.map(c => `
+    <div class="item-card" onclick="abrirModalCliente('${c.id}')" style="cursor:pointer">
+      <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--dorado),var(--carbon));display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#111;flex-shrink:0">
+        ${(c.nombre||'?').charAt(0).toUpperCase()}
+      </div>
+      <div class="item-info" style="flex:1">
+        <div class="item-titulo">${c.nombre} ${clsBadge[c.clasificacion||'normal']||''}</div>
+        <div class="item-detalle">${c.tipo_doc||'CC'} ${c.num_doc||'—'} · 📱 ${c.celular||'—'} · ✉️ ${c.email||'—'}</div>
+        ${c.ciudad ? `<div class="item-detalle" style="margin-top:2px">📍 ${c.ciudad}</div>` : ''}
+      </div>
+      <button class="btn-secundario" onclick="event.stopPropagation();abrirModalCliente('${c.id}')" style="font-size:0.72rem;padding:5px 10px">Ver perfil</button>
+    </div>`).join('');
+}
+
+function filtrarClientes(q) {
+  if (!q) { renderClientes(); return; }
+  const ql = q.toLowerCase();
+  const filtrados = clientesData.filter(c =>
+    (c.nombre||'').toLowerCase().includes(ql) ||
+    (c.num_doc||'').includes(ql) ||
+    (c.celular||'').includes(ql) ||
+    (c.email||'').toLowerCase().includes(ql)
+  );
+  renderClientes(filtrados);
+}
+
+function setClasificacion(cls) {
+  document.getElementById('cli-clasificacion').value = cls;
+  ['normal','frecuente','vip'].forEach(c => {
+    const btn = document.getElementById('cli-cls-' + c);
+    if (btn) btn.classList.toggle('activo', c === cls);
+  });
+}
+
+function cliCapturarDoc(slotId, campo) {
+  cliDocSlotActivo = { slotId, campo };
+  const input = document.getElementById('cli-doc-input');
+  input.value = '';
+  input.click();
+}
+
+function cliCargarDoc(event) {
+  const file = event.target.files[0];
+  if (!file || !cliDocSlotActivo) return;
+  const { slotId, campo } = cliDocSlotActivo;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    cliDocArchivos[campo] = { file, dataUrl: e.target.result };
+    const el = document.getElementById(slotId);
+    if (el) {
+      if (file.type === 'application/pdf') {
+        el.innerHTML = `<span style="font-size:24px">📄</span><span style="font-size:10px;color:var(--verde-ok);margin-top:4px">PDF cargado ✓</span>`;
+      } else {
+        el.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;border-radius:9px"><span style="position:absolute;bottom:4px;right:6px;background:rgba(0,0,0,0.7);color:#4CAF82;font-size:10px;font-weight:700;padding:2px 5px;border-radius:4px">✓</span>`;
+      }
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function cliSubirDocStorage(campo, clienteId) {
+  const arch = cliDocArchivos[campo];
+  if (!arch?.file) return null;
+  try {
+    const ext = arch.file.type === 'application/pdf' ? 'pdf' : 'jpg';
+    const path = `clientes/${clienteId}/${campo}.${ext}`;
+    const res = await fetch(`${SB_URL}/storage/v1/object/entregas-fotos/${path}`, {
+      method: 'POST',
+      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Content-Type': arch.file.type || 'image/jpeg', 'x-upsert': 'true' },
+      body: arch.file
+    });
+    if (!res.ok) return null;
+    return `${SB_URL}/storage/v1/object/public/entregas-fotos/${path}`;
+  } catch(e) { return null; }
+}
+
+async function abrirModalCliente(id) {
+  cliDocArchivos = {};
+  document.getElementById('cli-historial-panel').style.display = 'none';
+
+  // Resetear fotos
+  ['cli-doc-cc-front','cli-doc-cc-back','cli-doc-lic-front','cli-doc-lic-back'].forEach(slotId => {
+    const el = document.getElementById(slotId);
+    if (el) el.innerHTML = '<span style="font-size:20px">📷</span><span style="font-size:10px;color:var(--blanco-suave);margin-top:4px">Toca para capturar</span>';
+  });
+
+  if (!id) {
+    // Nuevo cliente
+    document.getElementById('modal-cliente-titulo').textContent = 'Nuevo cliente';
+    document.getElementById('cli-id').value = '';
+    ['cli-nombre','cli-num-doc','cli-celular','cli-email-campo','cli-ciudad','cli-direccion-campo','cli-lic-num','cli-notas'].forEach(f => {
+      const el = document.getElementById(f); if (el) el.value = '';
+    });
+    document.getElementById('cli-tipo-doc').value = 'CC';
+    document.getElementById('cli-lic-cat').value = '';
+    document.getElementById('cli-fecha-nac').value = '';
+    document.getElementById('cli-lic-vence').value = '';
+    setClasificacion('normal');
+  } else {
+    // Editar cliente existente
+    const c = clientesData.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById('modal-cliente-titulo').textContent = 'Perfil: ' + c.nombre;
+    document.getElementById('cli-id').value = c.id;
+    document.getElementById('cli-nombre').value = c.nombre || '';
+    document.getElementById('cli-tipo-doc').value = c.tipo_doc || 'CC';
+    document.getElementById('cli-num-doc').value = c.num_doc || '';
+    document.getElementById('cli-celular').value = c.celular || '';
+    document.getElementById('cli-email-campo').value = c.email || '';
+    document.getElementById('cli-ciudad').value = c.ciudad || '';
+    document.getElementById('cli-direccion-campo').value = c.direccion || '';
+    document.getElementById('cli-lic-num').value = c.licencia_num || '';
+    document.getElementById('cli-lic-cat').value = c.licencia_cat || '';
+    document.getElementById('cli-fecha-nac').value = c.fecha_nac || '';
+    document.getElementById('cli-lic-vence').value = c.licencia_vence || '';
+    document.getElementById('cli-notas').value = c.notas || '';
+    setClasificacion(c.clasificacion || 'normal');
+
+    // Mostrar fotos existentes si tienen URL guardada
+    const docs = c.docs_urls || {};
+    ['cc_frente','cc_reverso','lic_frente','lic_reverso'].forEach((campo, i) => {
+      const slotIds = ['cli-doc-cc-front','cli-doc-cc-back','cli-doc-lic-front','cli-doc-lic-back'];
+      if (docs[campo]) {
+        const el = document.getElementById(slotIds[i]);
+        if (el) el.innerHTML = `<img src="${docs[campo]}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;border-radius:9px"><span style="position:absolute;bottom:4px;right:6px;background:rgba(0,0,0,0.7);color:#4CAF82;font-size:10px;font-weight:700;padding:2px 5px;border-radius:4px">✓</span>`;
+      }
+    });
+
+    // Cargar historial
+    await cliCargarHistorial(id, c.nombre, c.num_doc);
+    document.getElementById('cli-historial-panel').style.display = 'block';
+  }
+  abrirModal('modal-cliente');
+}
+
+async function cliCargarHistorial(clienteId, nombre, numDoc) {
+  const cont = document.getElementById('cli-historial-contenido');
+  cont.innerHTML = '<div style="color:var(--blanco-suave);font-size:0.8rem;padding:8px">Cargando historial...</div>';
+  try {
+    // Buscar por nombre o documento en ordenes
+    const [rentas, tours, seguridad] = await Promise.all([
+      sbSelect('ordenes', `&nombre_cliente=ilike.*${encodeURIComponent(nombre)}*&order=created_at.desc&limit=20`).catch(() => []),
+      sbSelect('reservas_tour', `&nombre_cliente=ilike.*${encodeURIComponent(nombre)}*&order=created_at.desc&limit=10`).catch(() => []),
+      sbSelect('solicitudes_seguridad', `&nombre_cliente=ilike.*${encodeURIComponent(nombre)}*&order=created_at.desc&limit=10`).catch(() => []),
+    ]);
+
+    const total = (rentas?.length||0) + (tours?.length||0) + (seguridad?.length||0);
+    if (total === 0) {
+      cont.innerHTML = '<div style="color:var(--blanco-suave);font-size:0.8rem;padding:8px;text-align:center">Sin servicios registrados aún.</div>';
+      return;
+    }
+
+    const estadoColor = { pendiente:'var(--dorado)', confirmada:'var(--verde-ok)', entregado:'#2ecc71', finalizada:'var(--blanco-suave)' };
+    let html = '';
+
+    if (rentas?.length) {
+      html += `<div style="font-size:0.72rem;font-weight:700;color:var(--dorado);letter-spacing:0.1em;margin:8px 0 6px">🚗 RENTAS (${rentas.length})</div>`;
+      html += rentas.map(r => `
+        <div style="background:var(--gris-oscuro);border-radius:8px;padding:10px 12px;margin-bottom:6px;font-size:0.8rem">
+          <div style="display:flex;justify-content:space-between">
+            <span style="color:var(--dorado);font-weight:600">${r.numero||'—'}</span>
+            <span style="color:${estadoColor[r.estado]||'#fff'};font-size:0.72rem">${r.estado||'—'}</span>
+          </div>
+          <div style="color:var(--blanco-suave);margin-top:3px">${r.vehiculo_label||'—'} · ${r.fecha_inicio ? new Date(r.fecha_inicio+'T12:00').toLocaleDateString('es-CO') : '—'}</div>
+          ${r.total ? `<div style="color:var(--blanco);font-weight:600;margin-top:2px">${formatCOP(r.total)}</div>` : ''}
+        </div>`).join('');
+    }
+
+    if (tours?.length) {
+      html += `<div style="font-size:0.72rem;font-weight:700;color:var(--dorado);letter-spacing:0.1em;margin:8px 0 6px">🌄 TOURS VIP (${tours.length})</div>`;
+      html += tours.map(t => `
+        <div style="background:var(--gris-oscuro);border-radius:8px;padding:10px 12px;margin-bottom:6px;font-size:0.8rem">
+          <div style="color:var(--dorado);font-weight:600">${t.numero||'—'} · ${t.tour_nombre||'—'}</div>
+          <div style="color:var(--blanco-suave);margin-top:3px">${t.fecha ? new Date(t.fecha+'T12:00').toLocaleDateString('es-CO') : '—'} · ${t.personas||1} persona(s)</div>
+          ${t.total ? `<div style="color:var(--blanco);font-weight:600;margin-top:2px">${formatCOP(t.total)}</div>` : ''}
+        </div>`).join('');
+    }
+
+    if (seguridad?.length) {
+      html += `<div style="font-size:0.72rem;font-weight:700;color:var(--dorado);letter-spacing:0.1em;margin:8px 0 6px">🛡️ SEGURIDAD (${seguridad.length})</div>`;
+      html += seguridad.map(s => `
+        <div style="background:var(--gris-oscuro);border-radius:8px;padding:10px 12px;margin-bottom:6px;font-size:0.8rem">
+          <div style="color:var(--dorado);font-weight:600">${s.numero||'—'}</div>
+          <div style="color:var(--blanco-suave);margin-top:3px">${s.origen||'—'} → ${s.destino||'—'} · ${s.fecha ? new Date(s.fecha+'T12:00').toLocaleDateString('es-CO') : '—'}</div>
+          ${s.tarifa ? `<div style="color:var(--blanco);font-weight:600;margin-top:2px">${formatCOP(s.tarifa)}</div>` : ''}
+        </div>`).join('');
+    }
+
+    cont.innerHTML = html;
+  } catch(e) {
+    cont.innerHTML = '<div style="color:var(--blanco-suave);font-size:0.8rem;padding:8px">Error cargando historial.</div>';
+  }
+}
+
+async function guardarCliente() {
+  const nombre = document.getElementById('cli-nombre').value.trim();
+  if (!nombre) { mostrarToast('⚠️ El nombre es obligatorio', '#C9A84C'); return; }
+
+  const id = document.getElementById('cli-id').value;
+  const datos = {
+    nombre,
+    tipo_doc: document.getElementById('cli-tipo-doc').value,
+    num_doc: document.getElementById('cli-num-doc').value.trim(),
+    celular: document.getElementById('cli-celular').value.trim(),
+    email: document.getElementById('cli-email-campo').value.trim(),
+    ciudad: document.getElementById('cli-ciudad').value.trim(),
+    direccion: document.getElementById('cli-direccion-campo').value.trim(),
+    licencia_num: document.getElementById('cli-lic-num').value.trim(),
+    licencia_cat: document.getElementById('cli-lic-cat').value,
+    licencia_vence: document.getElementById('cli-lic-vence').value || null,
+    fecha_nac: document.getElementById('cli-fecha-nac').value || null,
+    clasificacion: document.getElementById('cli-clasificacion').value,
+    notas: document.getElementById('cli-notas').value.trim(),
+  };
+
+  try {
+    let clienteId = id;
+    if (id) {
+      await sbUpdate('clientes', id, datos);
+      const idx = clientesData.findIndex(c => c.id === id);
+      if (idx >= 0) clientesData[idx] = { ...clientesData[idx], ...datos };
+    } else {
+      const creado = await sbInsert('clientes', datos);
+      clienteId = creado[0]?.id;
+      clientesData.unshift({ ...datos, id: clienteId });
+    }
+
+    // Subir documentos al storage
+    if (clienteId) {
+      const docsUrls = (clientesData.find(c => c.id === clienteId)?.docs_urls) || {};
+      for (const campo of ['cc_frente','cc_reverso','lic_frente','lic_reverso']) {
+        if (cliDocArchivos[campo]) {
+          const url = await cliSubirDocStorage(campo, clienteId);
+          if (url) docsUrls[campo] = url;
+        }
+      }
+      if (Object.keys(docsUrls).length > 0) {
+        await sbUpdate('clientes', clienteId, { docs_urls: docsUrls });
+        const idx = clientesData.findIndex(c => c.id === clienteId);
+        if (idx >= 0) clientesData[idx].docs_urls = docsUrls;
+      }
+    }
+
+    lsSet('carhelp:clientes', clientesData);
+    mostrarToast('✅ Cliente guardado correctamente');
+    cerrarModal('modal-cliente');
+    renderClientes();
+  } catch(e) {
+    mostrarToast('⚠️ Error: ' + e.message, 'var(--rojo-alerta)');
+  }
+}
+
+// Autocomplete mejorado — llena TODOS los campos
+function seleccionarClienteAutocomplete(c, prefijo = 'r') {
+  if (prefijo === 'cot') {
+    document.getElementById('cot-nombre').value = c.nombre || '';
+    document.getElementById('cot-email').value = c.email || '';
+    document.getElementById('cot-telefono').value = c.celular || '';
+    document.getElementById('cot-nombre_sugerencias').style.display = 'none';
+  } else {
+    // Reservas — llenar TODOS los campos disponibles
+    const set = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+    set('r_nombre', c.nombre);
+    set('r_tipo_doc', c.tipo_doc);
+    set('r_num_doc', c.num_doc);
+    set('r_celular', c.celular);
+    set('r_email', c.email);
+    set('r_direccion', c.direccion);
+    set('r_licencia_num', c.licencia_num);
+    set('r_licencia_cat', c.licencia_cat);
+    set('r_licencia_vence', c.licencia_vence);
+    document.getElementById('r_nombre_sugerencias').style.display = 'none';
+  }
+}
+
 (async function init() {
   // Restaurar sesión ANTES de cargar datos para que no haya delay en la pantalla
   const sesionGuardada = lsGet('carhelp:sesion');
@@ -5019,7 +5606,11 @@ El equipo de Car Help S.A.S
   // Cargar datos en segundo plano
   try {
     await cargarDatos();
-    if (sesion) renderTodo(); // Refrescar la UI con datos nuevos si ya hay sesión
+    if (sesion) {
+      renderTodo();
+      actualizarRentasEnCurso();
+      cargarClientes();
+    }
   } catch(e) {
     console.error('Error cargando datos:', e);
   }
