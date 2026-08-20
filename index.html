@@ -2203,7 +2203,17 @@ function lsGet(clave) {
 }
 function lsSet(clave, datos) {
   try { localStorage.setItem(clave, JSON.stringify(datos)); }
-  catch(e) { console.error('Error guardando local', clave, e); }
+  catch(e) {
+    // Si el localStorage está lleno, limpiar cachés grandes y reintentar
+    try {
+      ['carhelp:vehiculos','carhelp:reservas','carhelp:clientes','carhelp:reservas_tour','carhelp:seguridad','carhelp:tours'].forEach(k => {
+        try { localStorage.removeItem(k); } catch(e2) {}
+      });
+      localStorage.setItem(clave, JSON.stringify(datos));
+    } catch(e3) {
+      console.warn('localStorage lleno, operando sin caché local:', clave);
+    }
+  }
 }
 
 // Adaptadores: convierten formato Supabase <-> formato que usa el panel
@@ -5613,7 +5623,33 @@ function seleccionarClienteAutocomplete(c, prefijo = 'r') {
   }
 }
 
+async function actualizarRentasEnCurso() {
+  try {
+    const data = await sbSelect('ordenes', '&estado=eq.entregado&order=created_at.desc');
+    if (data && data.length > 0) {
+      data.forEach(o => {
+        const idx = reservas.findIndex(r => r.id === o.id);
+        if (idx >= 0) reservas[idx].estado = 'entregado';
+      });
+    }
+    renderEnCurso();
+  } catch(e) {
+    console.warn('Error actualizando rentas en curso:', e.message);
+  }
+}
+
 (async function init() {
+  // Limpiar caché local si está muy lleno
+  try {
+    const testKey = '__test__';
+    localStorage.setItem(testKey, '1');
+    localStorage.removeItem(testKey);
+  } catch(e) {
+    // localStorage lleno — limpiar todo excepto la sesión
+    const sesionBackup = localStorage.getItem('carhelp:sesion');
+    localStorage.clear();
+    if (sesionBackup) localStorage.setItem('carhelp:sesion', sesionBackup);
+  }
   // Restaurar sesión ANTES de cargar datos para que no haya delay en la pantalla
   const sesionGuardada = lsGet('carhelp:sesion');
   if (sesionGuardada) {
