@@ -26,6 +26,14 @@
     --verde-ok: #4CAF82;
     --azul-info: #5B9BD5;
     --font-display: 'Playfair Display', serif;
+
+    /* Dorado metalizado — inspirado en el logo de Car Help */
+    --metal-1: #5e4813;
+    --metal-2: #caa43d;
+    --metal-3: #f6e7b3;
+    --metal-4: #b8860b;
+    --gradiente-dorado: linear-gradient(135deg, var(--metal-1) 0%, var(--metal-2) 24%, var(--metal-3) 48%, var(--metal-2) 72%, var(--metal-1) 100%);
+    --sombra-metalica: 0 3px 10px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -1px 2px rgba(0,0,0,0.3);
   }
 
   body {
@@ -128,7 +136,8 @@
   @media (max-width: 640px) { .fila-2, .fila-3 { grid-template-columns: 1fr; } }
 
   .btn-primario {
-    background: var(--dorado);
+    background: var(--gradiente-dorado);
+    box-shadow: var(--sombra-metalica);
     color: var(--negro);
     font-family: 'Syne', sans-serif;
     font-weight: 700;
@@ -136,15 +145,15 @@
     letter-spacing: 0.05em;
     padding: 13px 22px;
     border: none;
-    border-radius: 8px;
+    border-radius: 999px;
     cursor: pointer;
-    transition: background 0.2s, transform 0.1s;
+    transition: filter 0.2s, transform 0.1s;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
   }
-  .btn-primario:hover { background: var(--dorado-suave); }
+  .btn-primario:hover { filter: brightness(1.1); }
   .btn-primario:active { transform: scale(0.98); }
   .btn-primario:disabled { opacity: 0.4; cursor: not-allowed; }
   .btn-primario.full { width: 100%; }
@@ -241,28 +250,30 @@
   /* TABS NAV */
   .nav-tabs {
     display: flex;
-    gap: 4px;
-    padding: 12px 24px 0;
+    gap: 8px;
+    padding: 14px 24px;
     overflow-x: auto;
     background: var(--carbon);
     border-bottom: 1px solid var(--borde);
   }
   .nav-tab {
     font-family: 'Syne', sans-serif;
-    font-size: 0.78rem;
+    font-size: 0.76rem;
     font-weight: 700;
-    letter-spacing: 0.04em;
-    color: var(--blanco-suave);
-    background: transparent;
+    letter-spacing: 0.03em;
+    color: var(--negro);
+    background: var(--gradiente-dorado);
+    box-shadow: var(--sombra-metalica);
     border: none;
-    padding: 12px 18px;
+    border-radius: 999px;
+    padding: 9px 18px;
     cursor: pointer;
-    border-bottom: 2px solid transparent;
     white-space: nowrap;
-    transition: color 0.2s, border-color 0.2s;
+    filter: brightness(0.7) saturate(0.85);
+    transition: filter 0.2s, transform 0.15s;
   }
-  .nav-tab.activo { color: var(--dorado); border-color: var(--dorado); }
-  .nav-tab:hover:not(.activo) { color: var(--blanco); }
+  .nav-tab:hover:not(.activo) { filter: brightness(0.88) saturate(0.95); }
+  .nav-tab.activo { filter: brightness(1.12) saturate(1.05); transform: translateY(-1px); }
 
   .vista { display: none; max-width: 1200px; margin: 0 auto; padding: 32px 22px 80px; }
   .vista.activa { display: block; }
@@ -464,7 +475,7 @@
     border-radius: 20px; border: 1px solid var(--borde); background: transparent;
     color: var(--blanco-suave); cursor: pointer; transition: all 0.2s;
   }
-  .tab-correo.activo { background: var(--dorado); border-color: var(--dorado); color: var(--negro); font-weight: 700; }
+  .tab-correo.activo { background: var(--gradiente-dorado); box-shadow: var(--sombra-metalica); border-color: transparent; color: var(--negro); font-weight: 700; }
   .correo-preview { background: var(--gris-oscuro); border: 1px solid var(--borde); border-radius: 8px; overflow: hidden; font-size: 0.82rem; }
   .correo-header { padding: 12px 16px; border-bottom: 1px solid var(--borde); display: flex; flex-direction: column; gap: 4px; }
   .correo-meta { font-size: 0.72rem; color: var(--blanco-suave); display: flex; gap: 6px; flex-wrap: wrap; }
@@ -569,7 +580,7 @@
     background: var(--carbon); color: var(--blanco-suave); cursor: pointer;
     font-size: 0.82rem; font-weight: 600; transition: all 0.2s;
   }
-  .cot-tab.activo { background: var(--dorado); color: #111; border-color: var(--dorado); }
+  .cot-tab.activo { background: var(--gradiente-dorado); box-shadow: var(--sombra-metalica); color: #111; border-color: transparent; }
   .cot-tab:hover:not(.activo) { border-color: var(--dorado); color: var(--blanco); }
   .cot-preview { font-family: Arial, sans-serif; font-size: 14px; color: #1a1a1a; background: #fff; border-radius: 10px; padding: 24px; }
   .cot-preview-header { background: #0A0A0A; padding: 16px 20px; border-radius: 8px 8px 0 0; text-align: center; margin: -24px -24px 20px; }
@@ -624,18 +635,18 @@
   </header>
 
   <div class="nav-tabs" id="nav-tabs">
-    <button class="nav-tab" onclick="cambiarVista('inicio', this)">🏠 Inicio</button>
-    <button class="nav-tab" onclick="cambiarVista('reservas', this)">📋 Reservas</button>
-    <button class="nav-tab" onclick="cambiarVista('vehiculos', this)">🚗 Vehículos</button>
-    <button class="nav-tab" onclick="cambiarVista('turismo', this)">🌄 Turismo VIP</button>
-    <button class="nav-tab" onclick="cambiarVista('seguridad', this)">🛡️ Seguridad</button>
-    <button class="nav-tab" onclick="cambiarVista('cotizaciones', this)">📄 Cotizaciones</button>
-    <button class="nav-tab" onclick="cambiarVista('clientes', this)">👥 Clientes</button>
-    <button class="nav-tab" onclick="cambiarVista('solicitudes', this)">📥 Solicitudes</button>
-    <button class="nav-tab" onclick="abrirEntregas()">📦 Entregas</button>
-    <button class="nav-tab" onclick="abrirDevolucion()">🔄 Devoluciones</button>
-    <button class="nav-tab admin-only" onclick="cambiarVista('contabilidad', this)">💰 Contabilidad</button>
-    <button class="nav-tab admin-only" onclick="cambiarVista('usuarios', this)">👤 Usuarios</button>
+    <button class="nav-tab" onclick="cambiarVista('inicio', this)">Inicio</button>
+    <button class="nav-tab" onclick="cambiarVista('reservas', this)">Reservas</button>
+    <button class="nav-tab" onclick="cambiarVista('vehiculos', this)">Vehículos</button>
+    <button class="nav-tab" onclick="cambiarVista('turismo', this)">Turismo VIP</button>
+    <button class="nav-tab" onclick="cambiarVista('seguridad', this)">Seguridad</button>
+    <button class="nav-tab" onclick="cambiarVista('cotizaciones', this)">Cotizaciones</button>
+    <button class="nav-tab" onclick="cambiarVista('clientes', this)">Clientes</button>
+    <button class="nav-tab" onclick="cambiarVista('solicitudes', this)">Solicitudes</button>
+    <button class="nav-tab" onclick="abrirEntregas()">Entregas</button>
+    <button class="nav-tab" onclick="abrirDevolucion()">Devoluciones</button>
+    <button class="nav-tab admin-only" onclick="cambiarVista('contabilidad', this)">Contabilidad</button>
+    <button class="nav-tab admin-only" onclick="cambiarVista('usuarios', this)">Usuarios</button>
   </div>
 
   <!-- ═══ VISTA: INICIO ═══ -->
@@ -885,7 +896,7 @@
           </div>
           <div class="correo-cuerpo" id="rc-cuerpo"></div>
           <div class="acciones-correo">
-            <button class="btn-abrir-gmail" style="background:#C9A84C;color:#111" onclick="enviarCorreoAutomatico('rc')">⚡ Enviar automático</button>
+            <button class="btn-abrir-gmail" style="background:var(--gradiente-dorado);box-shadow:var(--sombra-metalica);color:#111" onclick="enviarCorreoAutomatico('rc')">⚡ Enviar automático</button>
             <a id="rc-link-gmail" href="#" target="_blank" class="btn-abrir-gmail">📤 Abrir en Gmail</a>
             <button class="btn-copiar" onclick="copiarCorreoReserva()">📋 Copiar texto</button>
             <span id="rc-envio-status" style="font-size:11px;color:#888;align-self:center"></span>
@@ -1045,7 +1056,7 @@
           </div>
           <div class="correo-cuerpo" id="tc-cuerpo"></div>
           <div class="acciones-correo">
-            <button class="btn-abrir-gmail" style="background:#C9A84C;color:#111" onclick="enviarCorreoAutomatico('tc')">⚡ Enviar automático</button>
+            <button class="btn-abrir-gmail" style="background:var(--gradiente-dorado);box-shadow:var(--sombra-metalica);color:#111" onclick="enviarCorreoAutomatico('tc')">⚡ Enviar automático</button>
             <a id="tc-link-gmail" href="#" target="_blank" class="btn-abrir-gmail">📤 Abrir en Gmail</a>
             <button class="btn-copiar" onclick="copiarCorreoTour()">📋 Copiar texto</button>
             <span id="tc-envio-status" style="font-size:11px;color:#888;align-self:center"></span>
@@ -1135,7 +1146,7 @@
           </div>
           <div class="correo-cuerpo" id="sc-cuerpo"></div>
           <div class="acciones-correo">
-            <button class="btn-abrir-gmail" style="background:#C9A84C;color:#111" onclick="enviarCorreoAutomatico('sc')">⚡ Enviar automático</button>
+            <button class="btn-abrir-gmail" style="background:var(--gradiente-dorado);box-shadow:var(--sombra-metalica);color:#111" onclick="enviarCorreoAutomatico('sc')">⚡ Enviar automático</button>
             <a id="sc-link-gmail" href="#" target="_blank" class="btn-abrir-gmail">📤 Abrir en Gmail</a>
             <button class="btn-copiar" onclick="copiarCorreoSeguridad()">📋 Copiar texto</button>
             <span id="sc-envio-status" style="font-size:11px;color:#888;align-self:center"></span>
