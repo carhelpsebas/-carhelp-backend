@@ -807,6 +807,17 @@
           </div>
         </div>
 
+        <div class="fila-2">
+          <div class="campo">
+            <label>Abono / anticipo recibido (COP)</label>
+            <input type="number" id="r_abono" placeholder="0" oninput="calcularPeriodo()">
+          </div>
+          <div class="campo">
+            <label>Saldo pendiente al momento de la entrega (COP)</label>
+            <input type="text" id="r_saldo" placeholder="—" readonly style="background:#111; color: var(--blanco); font-weight:700;">
+          </div>
+        </div>
+
         <hr class="divider">
         <div class="seccion-label">Notas internas</div>
 
@@ -1820,6 +1831,67 @@
   </div>
 </div>
 
+<!-- ═══════════════════ MODAL EXTENDER RENTA ═══════════════════ -->
+<div class="modal-overlay" id="modal-extender">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-titulo">📅 Extender renta <span id="ext-num-reserva" style="color:var(--dorado)"></span></div>
+      <button class="modal-cerrar" onclick="cerrarModal('modal-extender')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="info-banner" id="ext-info-actual"></div>
+      <div class="fila-2">
+        <div class="campo">
+          <label>Nueva fecha de devolución <span class="req">*</span></label>
+          <input type="date" id="ext_fecha_fin" onchange="calcularExtension()">
+        </div>
+        <div class="campo">
+          <label>Nueva hora de devolución <span class="req">*</span></label>
+          <input type="time" id="ext_hora_fin" onchange="calcularExtension()">
+        </div>
+      </div>
+      <div class="info-banner" id="ext-resultado">Selecciona la nueva fecha y hora de devolución.</div>
+      <div class="campo">
+        <label>Notas (opcional)</label>
+        <textarea id="ext_notas" placeholder="Ej. Cliente solicitó 2 días más por cambio de vuelo"></textarea>
+      </div>
+      <div class="campo" style="display:flex;align-items:center;gap:8px;flex-direction:row">
+        <input type="checkbox" id="ext_enviar_correo" checked style="width:auto">
+        <label style="margin:0">Enviar correo automático al cliente con el resumen actualizado</label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secundario" onclick="cerrarModal('modal-extender')">Cancelar</button>
+      <button class="btn-primario" onclick="confirmarExtensionRenta()">Confirmar extensión</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ MODAL CAMBIAR VEHÍCULO ═══════════════════ -->
+<div class="modal-overlay" id="modal-cambiar-vehiculo">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-titulo">🔄 Cambiar vehículo <span id="cv-num-reserva" style="color:var(--dorado)"></span></div>
+      <button class="modal-cerrar" onclick="cerrarModal('modal-cambiar-vehiculo')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="info-banner" id="cv-info-actual"></div>
+      <div class="campo">
+        <label>Nuevo vehículo <span class="req">*</span></label>
+        <select id="cv_vehiculo_id"></select>
+      </div>
+      <div class="campo">
+        <label>Motivo del cambio (opcional)</label>
+        <textarea id="cv_notas" placeholder="Ej. Vehículo original en mantenimiento"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secundario" onclick="cerrarModal('modal-cambiar-vehiculo')">Cancelar</button>
+      <button class="btn-primario" onclick="confirmarCambioVehiculo()">Confirmar cambio</button>
+    </div>
+  </div>
+</div>
+
 
 <!-- MODAL ENTREGAS -->
 <div class="entrega-overlay" id="entrega-overlay">
@@ -2302,6 +2374,8 @@ async function cargarDatos() {
         }
       } catch(e2) {}
       const veh = vehiculos.find(v => v.id === o.vehiculo_id) || {};
+      const periodoCalc = calcularPeriodosFacturables(o.fecha_salida, o.fecha_retorno);
+      const totalCalc = periodoCalc.periodosFacturables * (o.tarifa_diaria || 0) + (o.deposito || 0);
       return {
         id: o.id,
         num_reserva: o.numero,
@@ -2322,7 +2396,10 @@ async function cargarDatos() {
         lugar_devolucion: '',
         tarifa: o.tarifa_diaria || 0,
         deposito: o.deposito || 0,
-        total: (o.tarifa_diaria || 0) + (o.deposito || 0),
+        abono: o.abono || 0,
+        periodos: periodoCalc.periodosFacturables,
+        total: totalCalc,
+        saldoPendiente: Math.max(totalCalc - (o.abono || 0), 0),
         notas: o.notas || '',
         estado: o.estado || 'pendiente',
         creada: o.created_at
@@ -2502,6 +2579,42 @@ function fmtFecha(val) {
 }
 function fmtFechaHora(fecha, hora) {
   return `${fmtFecha(fecha)}${hora ? ' a las ' + hora : ''}`;
+}
+
+// Calcula períodos de 24h facturables entre dos fechas ISO (reutilizado en creación,
+// recarga de reservas y extensión de rentas)
+function calcularPeriodosFacturables(fechaInicioISO, fechaFinISO) {
+  const dtInicio = new Date(fechaInicioISO);
+  const dtFin = new Date(fechaFinISO);
+  const diffMs = dtFin - dtInicio;
+  if (!fechaInicioISO || !fechaFinISO || isNaN(diffMs) || diffMs <= 0) {
+    return { periodos24h: 0, horasExtra: 0, periodosFacturables: 0, cobroExtra: false };
+  }
+  const horasTotales = diffMs / 3600000;
+  const periodos24h = Math.floor(horasTotales / 24);
+  const horasExtra = Math.round((horasTotales - periodos24h * 24) * 100) / 100;
+  let periodosFacturables = periodos24h;
+  let cobroExtra = false;
+  if (horasExtra > 0) { periodosFacturables += 1; cobroExtra = true; }
+  if (periodosFacturables === 0) periodosFacturables = 1;
+  return { periodos24h, horasExtra, periodosFacturables, cobroExtra };
+}
+
+// Envía un correo directo vía Resend/Railway sin depender de la vista previa en pantalla
+async function enviarCorreoDirecto(para, asunto, cuerpo) {
+  try {
+    const res = await fetch(MAIL_API + '/api/enviar-correo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ para, asunto, cuerpo })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error al enviar');
+    return true;
+  } catch (e) {
+    console.warn('Error enviando correo automático:', e.message);
+    return false;
+  }
 }
 
 /* ════════════════════════════════════════════
@@ -2853,44 +2966,38 @@ function calcularPeriodo() {
   const hf = document.getElementById('r_hora_fin').value;
   const tarifa = parseFloat(document.getElementById('r_tarifa').value) || 0;
   const deposito = parseFloat(document.getElementById('r_deposito').value) || 0;
+  const abono = parseFloat(document.getElementById('r_abono')?.value) || 0;
   const info = document.getElementById('info-periodo');
+  const saldoEl = document.getElementById('r_saldo');
 
   if (!fi || !hi || !ff || !hf) {
     info.innerHTML = '⏱ Selecciona fecha y hora de entrega y devolución. El sistema calculará automáticamente los períodos de 24h y horas adicionales.';
     document.getElementById('r_total').value = '—';
+    if (saldoEl) saldoEl.value = '—';
     return null;
   }
 
-  const dtInicio = new Date(`${fi}T${hi}`);
-  const dtFin = new Date(`${ff}T${hf}`);
-  const diffMs = dtFin - dtInicio;
+  const { periodos24h, horasExtra, periodosFacturables, cobroExtra } =
+    calcularPeriodosFacturables(`${fi}T${hi}`, `${ff}T${hf}`);
 
-  if (diffMs <= 0) {
+  if (periodosFacturables === 0) {
     info.innerHTML = '⚠️ La fecha/hora de devolución debe ser posterior a la de entrega.';
     document.getElementById('r_total').value = '—';
+    if (saldoEl) saldoEl.value = '—';
     return null;
   }
 
-  const horasTotales = diffMs / 3600000;
-  const periodos24h = Math.floor(horasTotales / 24);
-  const horasExtra = Math.round((horasTotales - periodos24h * 24) * 100) / 100;
-
-  let periodosFacturables = periodos24h;
-  let cobroExtra = false;
-  if (horasExtra > 0) {
-    periodosFacturables += 1; // se cobra un período adicional completo si hay horas extra
-    cobroExtra = true;
-  }
-  if (periodosFacturables === 0) periodosFacturables = 1;
-
   const total = periodosFacturables * tarifa + deposito;
+  const saldoPendiente = Math.max(total - abono, 0);
   document.getElementById('r_total').value = total > 0 ? formatCOP(total) : '—';
+  if (saldoEl) saldoEl.value = total > 0 ? formatCOP(saldoPendiente) : '—';
 
   info.innerHTML = `⏱ Duración exacta: <strong>${periodos24h} período(s) de 24h</strong>` +
+
     (cobroExtra ? ` + <strong style="color:var(--rojo-alerta)">${horasExtra}h adicionales</strong> → se cobra <strong>1 período extra completo</strong> (cada renta es por 24h).` : ` (sin horas adicionales).`) +
     ` Total facturable: <strong style="color:var(--dorado)">${periodosFacturables} período(s) de 24h</strong>.`;
 
-  return { periodos24h, horasExtra, periodosFacturables, total, cobroExtra };
+  return { periodos24h, horasExtra, periodosFacturables, total, cobroExtra, abono, saldoPendiente };
 }
 
 /* ════════════════════════════════════════════
@@ -2942,12 +3049,14 @@ async function generarReserva() {
   const veh = vehiculos.find(v => v.id === valores.vehiculo_id);
   const tarifa = parseFloat(document.getElementById('r_tarifa').value) || 0;
   const deposito = parseFloat(document.getElementById('r_deposito').value) || 0;
+  const abono = parseFloat(document.getElementById('r_abono')?.value) || 0;
   const lugar_e = document.getElementById('r_lugar_entrega').value.trim() || 'Por confirmar';
   const lugar_d = document.getElementById('r_lugar_devolucion').value.trim() || 'Por confirmar';
   const notas = document.getElementById('r_notas').value.trim() || 'Sin observaciones';
   const email_interno = document.getElementById('r_email_interno').value.trim() || 'reservascarhelp@gmail.com';
 
   const numReserva = generarNumReserva('CH');
+  const saldoPendiente = Math.max(periodo.total - abono, 0);
 
   const nuevaReserva = {
     num_reserva: numReserva,
@@ -2957,7 +3066,7 @@ async function generarReserva() {
     fecha_inicio: valores.fecha_inicio, hora_inicio: valores.hora_inicio,
     fecha_fin: valores.fecha_fin, hora_fin: valores.hora_fin,
     lugar_entrega: lugar_e, lugar_devolucion: lugar_d,
-    tarifa, deposito, periodos: periodo.periodosFacturables, horasExtra: periodo.horasExtra,
+    tarifa, deposito, abono, saldoPendiente, periodos: periodo.periodosFacturables, horasExtra: periodo.horasExtra,
     cobroExtra: periodo.cobroExtra, total: periodo.total,
     notas, email_interno, estado: 'pendiente', creada: new Date().toISOString(),
   };
@@ -2986,6 +3095,7 @@ async function generarReserva() {
       fecha_retorno: `${valores.fecha_fin}T${valores.hora_fin}:00`,
       tarifa_diaria: tarifa,
       deposito: deposito,
+      abono: abono,
       estado: 'pendiente',
       notas: notas
     });
@@ -2997,7 +3107,7 @@ async function generarReserva() {
       fecha: fechaIngreso,
       tipo: 'ingreso',
       categoria: 'renta',
-      descripcion: `Renta: ${veh ? veh.nombre : '—'} · ${valores.nombre} · ${periodo.periodosFacturables} día(s)`,
+      descripcion: `Renta: ${veh ? veh.nombre : '—'} · ${valores.nombre} · ${periodo.periodosFacturables} día(s)` + (abono > 0 ? ` · Abono recibido: ${formatCOP(abono)}` : ''),
       valor: periodo.total,
       num_referencia: numReserva,
       vehiculo_id: valores.vehiculo_id || null,
@@ -3031,6 +3141,13 @@ function construirCorreosReserva(r) {
   const totalFmt = formatCOP(r.total);
   const tarifaFmt = formatCOP(r.tarifa);
   const depositoFmt = formatCOP(r.deposito);
+  const abono = r.abono || 0;
+  const saldoPendiente = r.saldoPendiente != null ? r.saldoPendiente : Math.max(r.total - abono, 0);
+  const abonoFmt = formatCOP(abono);
+  const saldoFmt = formatCOP(saldoPendiente);
+  const bloqueAbono = abono > 0
+    ? `Abono / anticipo pagado:  ${abonoFmt}\nSaldo pendiente (entrega): ${saldoFmt}\n`
+    : '';
 
   // Recordatorio: 1 día antes
   const fechaRec = (() => {
@@ -3065,7 +3182,7 @@ RESUMEN DE PAGO
 Tarifa por período (24h): ${tarifaFmt}
 Depósito de garantía:     ${depositoFmt}
 TOTAL ESTIMADO:           ${totalFmt}
-
+${bloqueAbono}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Por favor tenga a la mano al momento de la entrega:
@@ -3171,7 +3288,7 @@ ${r.periodos} período(s) × ${tarifaFmt}    ${formatCOP(r.periodos * r.tarifa)}
 Depósito de garantía (reembolsable)  ${depositoFmt}
 ──────────────────────────────────
 TOTAL                                ${totalFmt}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
+${abono > 0 ? `Abono / anticipo pagado              ${abonoFmt}\nSaldo pendiente (entrega)            ${saldoFmt}\n` : ''}━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Vigencia de esta cotización: 48 horas. El depósito es reembolsable al finalizar el servicio, sujeto a revisión del vehículo.
 
@@ -3231,15 +3348,17 @@ function renderReservas() {
       <div class="item-info">
         <div class="item-titulo">${r.nombre} <span class="num-reserva">${r.num_reserva}</span></div>
         <div class="item-detalle"><strong>${r.vehiculo}</strong> · ${r.tipo_doc} ${r.num_doc} · ${r.celular}</div>
-        <div class="item-detalle">Entrega: ${fmtFechaHora(r.fecha_inicio, r.hora_inicio)} → Devolución: ${fmtFechaHora(r.fecha_fin, r.hora_fin)} · Total: <strong>${formatCOP(r.total)}</strong></div>
+        <div class="item-detalle">Entrega: ${fmtFechaHora(r.fecha_inicio, r.hora_inicio)} → Devolución: ${fmtFechaHora(r.fecha_fin, r.hora_fin)} · Total: <strong>${formatCOP(r.total)}</strong>${r.abono ? ` · Abono: ${formatCOP(r.abono)} · Saldo: ${formatCOP(r.saldoPendiente != null ? r.saldoPendiente : Math.max(r.total - r.abono, 0))}` : ''}</div>
       </div>
-      <div style="display:flex; align-items:center; gap:8px;">
+      <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap">
         <select onchange="cambiarEstadoReserva('${r.num_reserva}', this.value)" style="background:var(--gris-medio); color:var(--blanco); border:1px solid var(--borde); border-radius:6px; font-size:0.72rem; padding:5px 8px;">
           <option value="pendiente" ${r.estado==='pendiente'?'selected':''}>Pendiente</option>
           <option value="confirmada" ${r.estado==='confirmada'?'selected':''}>Confirmada</option>
           <option value="entregado" ${r.estado==='entregado'?'selected':''}>Entrega realizada</option>
           <option value="finalizada" ${r.estado==='finalizada'?'selected':''}>Finalizada</option>
         </select>
+        <button class="btn-secundario" onclick="abrirModalExtenderRenta('${r.num_reserva}')">📅 Extender</button>
+        <button class="btn-secundario" onclick="abrirModalCambiarVehiculo('${r.num_reserva}')">🔄 Cambiar vehículo</button>
         <button class="btn-peligro" onclick="eliminarReserva('${r.num_reserva}')">Eliminar</button>
       </div>
     </div>
@@ -3270,6 +3389,185 @@ async function eliminarReserva(num) {
   await guardar('carhelp:reservas', reservas);
   renderReservas(); renderStats(); renderProximas();
   mostrarToast('🗑️ Reserva eliminada');
+}
+
+/* ════════════════════════════════════════════
+   EXTENDER RENTA (agregar días sin crear nueva reserva)
+   ════════════════════════════════════════════ */
+let extReservaActual = null;
+
+function abrirModalExtenderRenta(num) {
+  const r = reservas.find(x => x.num_reserva === num);
+  if (!r) return;
+  extReservaActual = r;
+  document.getElementById('ext-num-reserva').textContent = num;
+  document.getElementById('ext-info-actual').innerHTML =
+    `<strong>${r.nombre}</strong> · ${r.vehiculo}<br>Devolución actual: <strong>${fmtFechaHora(r.fecha_fin, r.hora_fin)}</strong> · Total actual: <strong>${formatCOP(r.total)}</strong>`;
+  document.getElementById('ext_fecha_fin').value = r.fecha_fin || '';
+  document.getElementById('ext_hora_fin').value = r.hora_fin || '';
+  document.getElementById('ext_notas').value = '';
+  document.getElementById('ext_enviar_correo').checked = true;
+  document.getElementById('ext-resultado').innerHTML = 'Selecciona la nueva fecha y hora de devolución.';
+  abrirModal('modal-extender');
+}
+
+function calcularExtension() {
+  const r = extReservaActual;
+  const info = document.getElementById('ext-resultado');
+  if (!r) return null;
+  const nff = document.getElementById('ext_fecha_fin').value;
+  const nhf = document.getElementById('ext_hora_fin').value;
+  if (!nff || !nhf) {
+    info.innerHTML = 'Selecciona la nueva fecha y hora de devolución.';
+    return null;
+  }
+  const inicioISO = `${r.fecha_inicio}T${r.hora_inicio}`;
+  const nuevoFinISO = `${nff}T${nhf}`;
+  const nuevoCalc = calcularPeriodosFacturables(inicioISO, nuevoFinISO);
+  if (nuevoCalc.periodosFacturables <= r.periodos) {
+    info.innerHTML = '⚠️ La nueva fecha de devolución debe ser posterior a la devolución actual para generar una extensión.';
+    return null;
+  }
+  const diasExtra = nuevoCalc.periodosFacturables - r.periodos;
+  const valorExtra = diasExtra * r.tarifa;
+  const nuevoTotal = r.total + valorExtra;
+  info.innerHTML = `➕ Se agregan <strong style="color:var(--dorado)">${diasExtra} día(s)</strong> adicionales · Valor adicional: <strong style="color:var(--dorado)">${formatCOP(valorExtra)}</strong><br>Nuevo total: <strong>${formatCOP(nuevoTotal)}</strong>`;
+  return { diasExtra, valorExtra, nuevoTotal, nuevoFinISO, periodosFacturablesNuevo: nuevoCalc.periodosFacturables };
+}
+
+async function confirmarExtensionRenta() {
+  const r = extReservaActual;
+  if (!r) return;
+  const calc = calcularExtension();
+  if (!calc) {
+    mostrarToast('⚠️ Verifica la nueva fecha de devolución', '#E05252');
+    return;
+  }
+  const notasExt = document.getElementById('ext_notas').value.trim();
+  const enviarCorreo = document.getElementById('ext_enviar_correo').checked;
+  const nff = document.getElementById('ext_fecha_fin').value;
+  const nhf = document.getElementById('ext_hora_fin').value;
+
+  // Actualizar en Supabase
+  try {
+    if (r.id) {
+      await sbUpdate('ordenes', r.id, {
+        fecha_retorno: calc.nuevoFinISO + ':00',
+        notas: (r.notas || '') + (notasExt ? ` · Extensión (+${calc.diasExtra} día(s)): ${notasExt}` : ` · Extensión: +${calc.diasExtra} día(s)`)
+      });
+    }
+    await sbInsert('movimientos_contables', {
+      fecha: new Date().toISOString().split('T')[0],
+      tipo: 'ingreso',
+      categoria: 'extension_renta',
+      descripcion: `Extensión renta: ${r.vehiculo} · ${r.nombre} · +${calc.diasExtra} día(s)`,
+      valor: calc.valorExtra,
+      num_referencia: r.num_reserva,
+      vehiculo_id: r.vehiculo_id || null,
+      orden_id: r.id || null,
+    });
+  } catch(e) {
+    console.error('Error guardando extensión en Supabase:', e);
+    mostrarToast('⚠️ Error guardando la extensión en Supabase: ' + e.message, 'var(--rojo-alerta)');
+    return;
+  }
+
+  // Actualizar localmente
+  r.fecha_fin = nff;
+  r.hora_fin = nhf;
+  r.periodos = calc.periodosFacturablesNuevo;
+  r.total = calc.nuevoTotal;
+  r.saldoPendiente = Math.max(r.total - (r.abono || 0), 0);
+  await guardar('carhelp:reservas', reservas);
+
+  // Enviar correo automático con el resumen actualizado
+  if (enviarCorreo && r.email) {
+    const asunto = `📅 Extensión de renta ${r.num_reserva} — Car Help`;
+    const cuerpo = `Estimado/a ${r.nombre},
+
+Le confirmamos la extensión de su renta con Car Help:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+RESERVA N.° ${r.num_reserva}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚗 Vehículo:            ${r.vehiculo}
+📅 Nueva devolución:    ${fmtFechaHora(nff, nhf)}
+➕ Días agregados:      ${calc.diasExtra} día(s)
+💰 Valor adicional:     ${formatCOP(calc.valorExtra)}
+💰 Nuevo total:         ${formatCOP(r.total)}
+${r.abono ? `💰 Abono ya pagado:     ${formatCOP(r.abono)}\n💰 Saldo pendiente:     ${formatCOP(r.saldoPendiente)}\n` : ''}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Gracias por confiar en Car Help.
+
+Equipo Car Help — Pereira, Colombia
+📱 WhatsApp: +57 310 743 6082`;
+    const enviado = await enviarCorreoDirecto(r.email, asunto, cuerpo);
+    mostrarToast(enviado ? '✅ Renta extendida y correo enviado a ' + r.email : '✅ Renta extendida (no se pudo enviar el correo automático)');
+  } else {
+    mostrarToast('✅ Renta extendida: +' + calc.diasExtra + ' día(s)');
+  }
+
+  cerrarModal('modal-extender');
+  renderReservas(); renderStats(); renderProximas(); renderEnCurso();
+}
+
+/* ════════════════════════════════════════════
+   CAMBIAR VEHÍCULO (reemplazo en una renta activa)
+   ════════════════════════════════════════════ */
+let cvReservaActual = null;
+
+function abrirModalCambiarVehiculo(num) {
+  const r = reservas.find(x => x.num_reserva === num);
+  if (!r) return;
+  cvReservaActual = r;
+  document.getElementById('cv-num-reserva').textContent = num;
+  document.getElementById('cv-info-actual').innerHTML =
+    `<strong>${r.nombre}</strong> · Vehículo actual: <strong>${r.vehiculo}</strong>`;
+  const sel = document.getElementById('cv_vehiculo_id');
+  sel.innerHTML = vehiculos.map(v =>
+    `<option value="${v.id}" ${v.id === r.vehiculo_id ? 'selected' : ''}>${v.nombre}${v.placa ? ' — ' + v.placa : ''}</option>`
+  ).join('');
+  document.getElementById('cv_notas').value = '';
+  abrirModal('modal-cambiar-vehiculo');
+}
+
+async function confirmarCambioVehiculo() {
+  const r = cvReservaActual;
+  if (!r) return;
+  const nuevoId = document.getElementById('cv_vehiculo_id').value;
+  if (!nuevoId) { mostrarToast('⚠️ Selecciona un vehículo', '#E05252'); return; }
+  const nuevoVeh = vehiculos.find(v => v.id === nuevoId);
+  if (!nuevoVeh) { mostrarToast('⚠️ Vehículo no encontrado', '#E05252'); return; }
+  const vehiculoAnterior = r.vehiculo;
+  const notasCambio = document.getElementById('cv_notas').value.trim();
+
+  if (nuevoId === r.vehiculo_id) {
+    mostrarToast('Selecciona un vehículo distinto al actual', '#BA7517');
+    return;
+  }
+
+  try {
+    if (r.id) {
+      await sbUpdate('ordenes', r.id, {
+        vehiculo_id: nuevoId,
+        notas: (r.notas || '') + ` · Cambio de vehículo: ${vehiculoAnterior} → ${nuevoVeh.nombre}` + (notasCambio ? ` (${notasCambio})` : '')
+      });
+    }
+  } catch(e) {
+    console.error('Error guardando cambio de vehículo en Supabase:', e);
+    mostrarToast('⚠️ Error guardando el cambio en Supabase: ' + e.message, 'var(--rojo-alerta)');
+    return;
+  }
+
+  r.vehiculo_id = nuevoId;
+  r.vehiculo = nuevoVeh.nombre;
+  r.placa = nuevoVeh.placa || '';
+  await guardar('carhelp:reservas', reservas);
+
+  cerrarModal('modal-cambiar-vehiculo');
+  renderReservas(); renderStats(); renderProximas(); renderEnCurso();
+  mostrarToast(`✅ Vehículo actualizado: ${vehiculoAnterior} → ${nuevoVeh.nombre}`);
 }
 
 /* ════════════════════════════════════════════
