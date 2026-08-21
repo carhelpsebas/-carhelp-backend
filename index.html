@@ -3107,9 +3107,9 @@ async function generarReserva() {
       fecha: fechaIngreso,
       tipo: 'ingreso',
       categoria: 'renta',
-      descripcion: `Renta: ${veh ? veh.nombre : '—'} · ${valores.nombre} · ${periodo.periodosFacturables} día(s)` + (abono > 0 ? ` · Abono recibido: ${formatCOP(abono)}` : ''),
+      concepto: `Renta: ${veh ? veh.nombre : '—'} · ${valores.nombre} · ${periodo.periodosFacturables} día(s)`,
       valor: periodo.total,
-      num_referencia: numReserva,
+      notas: `Reserva ${numReserva}` + (abono > 0 ? ` · Abono recibido: ${formatCOP(abono)}` : ''),
       vehiculo_id: valores.vehiculo_id || null,
       orden_id: ordenSB[0]?.id || null,
     });
@@ -3460,9 +3460,9 @@ async function confirmarExtensionRenta() {
       fecha: new Date().toISOString().split('T')[0],
       tipo: 'ingreso',
       categoria: 'extension_renta',
-      descripcion: `Extensión renta: ${r.vehiculo} · ${r.nombre} · +${calc.diasExtra} día(s)`,
+      concepto: `Extensión renta: ${r.vehiculo} · ${r.nombre} · +${calc.diasExtra} día(s)`,
       valor: calc.valorExtra,
-      num_referencia: r.num_reserva,
+      notas: `Reserva ${r.num_reserva}`,
       vehiculo_id: r.vehiculo_id || null,
       orden_id: r.id || null,
     });
@@ -3725,10 +3725,10 @@ async function generarReservaTour() {
     await sbInsert('movimientos_contables', {
       fecha: fecha || new Date().toISOString().split('T')[0],
       tipo: 'ingreso',
-      categoria: 'turismo',
-      descripcion: `Tour VIP: ${tour.nombre} · ${nombre} · ${personas} persona(s)`,
+      categoria: 'tour',
+      concepto: `Tour VIP: ${tour.nombre} · ${nombre} · ${personas} persona(s)`,
       valor: total,
-      num_referencia: numReserva,
+      notas: `Reserva ${numReserva}`,
     });
     mostrarToast('✅ Tour reservado en Supabase: ' + numReserva);
   } catch(e) {
@@ -3870,9 +3870,9 @@ async function generarSeguridad() {
         fecha: fecha || new Date().toISOString().split('T')[0],
         tipo: 'ingreso',
         categoria: 'seguridad',
-        descripcion: `Seguridad: ${origen} → ${destino} · ${nombre} · ${escoltaTxt}`,
+        concepto: `Seguridad: ${origen} → ${destino} · ${nombre} · ${escoltaTxt}`,
         valor: tarifa,
-        num_referencia: numReserva,
+        notas: `Reserva ${numReserva}`,
       });
     }
     mostrarToast('✅ Servicio de seguridad guardado: ' + numReserva);
@@ -5504,9 +5504,9 @@ async function dvCompletar() {
         fecha: now.toISOString().split('T')[0],
         tipo: 'egreso',
         categoria: 'deposito',
-        descripcion: `Devolución depósito · ${dvOrder.nombre} · ${ordenNum}`,
+        concepto: `Devolución depósito · ${dvOrder.nombre} · ${ordenNum}`,
         valor: liq.saldo,
-        num_referencia: ordenNum,
+        notas: `Reserva ${ordenNum}`,
         vehiculo_id: dvOrder.vehiculo_id || null,
         orden_id: dvOrder.id || null,
       }).catch(() => {});
@@ -5516,9 +5516,9 @@ async function dvCompletar() {
           fecha: now.toISOString().split('T')[0],
           tipo: 'ingreso',
           categoria: 'danos',
-          descripcion: `Cobro por daños · ${dvOrder.nombre} · ${ordenNum}`,
+          concepto: `Cobro por daños · ${dvOrder.nombre} · ${ordenNum}`,
           valor: liq.costoDanos,
-          num_referencia: ordenNum,
+          notas: `Reserva ${ordenNum}`,
         }).catch(() => {});
       }
     }
