@@ -691,7 +691,12 @@
 
   <!-- ═══ VISTA: RESERVAS (Rentacar) ═══ -->
   <div class="vista" id="vista-reservas">
-    <div class="panel">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+      <button class="btn-primario" id="btn-toggle-nueva-reserva" onclick="toggleNuevaReserva()">
+        <span id="icono-toggle-nueva-reserva">+</span>&nbsp; Nueva reserva
+      </button>
+    </div>
+    <div class="panel" id="panel-nueva-reserva" style="display:none">
       <div class="panel-header">
         <div class="panel-titulo-wrap">
           <div class="panel-icono">📋</div>
@@ -2957,6 +2962,20 @@ async function eliminarVehiculo(id) {
 }
 
 /* ════════════════════════════════════════════
+   MOSTRAR/OCULTAR PANEL DE NUEVA RESERVA
+   ════════════════════════════════════════════ */
+function toggleNuevaReserva() {
+  const panel = document.getElementById('panel-nueva-reserva');
+  const icono = document.getElementById('icono-toggle-nueva-reserva');
+  const boton = document.getElementById('btn-toggle-nueva-reserva');
+  const abrir = panel.style.display === 'none';
+  panel.style.display = abrir ? 'block' : 'none';
+  icono.textContent = abrir ? '×' : '+';
+  boton.lastChild.textContent = abrir ? '\u00A0 Cancelar' : '\u00A0 Nueva reserva';
+  if (abrir) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ════════════════════════════════════════════
    RESERVAS — calculo de periodos 24h
    ════════════════════════════════════════════ */
 function calcularPeriodo() {
@@ -3130,6 +3149,10 @@ async function generarReserva() {
   renderCorreoReserva(0);
   document.getElementById('badge-num-reserva').textContent = numReserva;
   document.getElementById('panel-correos-reserva').style.display = 'block';
+
+  // Ocultar el formulario para dejar visible el correo generado
+  const panelForm = document.getElementById('panel-nueva-reserva');
+  if (panelForm.style.display !== 'none') toggleNuevaReserva();
 
   renderReservas();
   renderStats();
