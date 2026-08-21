@@ -360,6 +360,38 @@
   .stat-value { font-family: var(--font-display); font-weight: 700; font-size: 1.85rem; color: var(--dorado-suave); letter-spacing: 0.01em; line-height: 1.1; }
   .stat-extra { font-size: 0.7rem; color: var(--blanco-suave); margin-top: 6px; }
 
+  /* ACCESOS DIRECTOS — ENTREGAS / DEVOLUCIONES */
+  .accion-directa-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 640px) { .accion-directa-grid { grid-template-columns: 1fr; } }
+  .accion-directa-card {
+    background: linear-gradient(155deg, var(--carbon) 0%, #101010 100%);
+    border: 1px solid var(--borde);
+    border-radius: 14px;
+    padding: 20px 22px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    cursor: pointer;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+  .accion-directa-card:hover { transform: translateY(-2px); border-color: var(--metal-2); }
+  .accion-directa-icono {
+    width: 50px; height: 50px; flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--gradiente-dorado);
+    box-shadow: var(--sombra-metalica);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem; font-weight: 700; color: var(--negro);
+    font-family: 'Syne', sans-serif;
+  }
+  .accion-directa-texto-titulo { font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; color: var(--blanco); }
+  .accion-directa-texto-sub { font-size: 0.76rem; color: var(--blanco-suave); margin-top: 2px; }
+
   /* GANTT DE DISPONIBILIDAD DE FLOTA */
   .gantt-scroll { overflow-x: auto; border: 1px solid var(--borde); border-radius: 10px; }
   .gantt-inner { min-width: 760px; }
@@ -656,6 +688,24 @@
       <div class="home-header-titulo">Bienvenido de nuevo, <span id="home-nombre-usuario">—</span></div>
       <div class="home-header-sub">Así está hoy la operación de Car Help</div>
     </div>
+
+    <div class="accion-directa-grid">
+      <div class="accion-directa-card" onclick="abrirEntregas()">
+        <div class="accion-directa-icono">↗</div>
+        <div>
+          <div class="accion-directa-texto-titulo">Entregas</div>
+          <div class="accion-directa-texto-sub">Iniciar la entrega de un vehículo</div>
+        </div>
+      </div>
+      <div class="accion-directa-card" onclick="abrirDevolucion()">
+        <div class="accion-directa-icono">↩</div>
+        <div>
+          <div class="accion-directa-texto-titulo">Devoluciones</div>
+          <div class="accion-directa-texto-sub">Registrar el regreso de un vehículo</div>
+        </div>
+      </div>
+    </div>
+
     <div class="panel">
       <div class="panel-header">
         <div class="panel-titulo-wrap">
