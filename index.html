@@ -746,6 +746,11 @@
         <div class="stat-value" id="cnt-disponibles-ahora">0</div>
         <div class="stat-extra" id="cnt-disponibles-total">de 0 totales</div>
       </div>
+      <div class="stat-card">
+        <div class="stat-label">Vencen en 24h</div>
+        <div class="stat-value" id="cnt-vencen-pronto">0</div>
+        <div class="stat-extra">rentas activas por devolver</div>
+      </div>
     </div>
 
     <div class="panel">
@@ -873,6 +878,17 @@
           <div class="campo">
             <label>Lugar de devolución</label>
             <input type="text" id="r_lugar_devolucion" placeholder="Ej. Oficina Car Help">
+          </div>
+        </div>
+
+        <div class="fila-2">
+          <div class="campo">
+            <label>Costo de entrega a domicilio (COP)</label>
+            <input type="number" id="r_costo_entrega" placeholder="0" oninput="calcularPeriodo()">
+          </div>
+          <div class="campo">
+            <label>Costo de recibido / devolución (COP)</label>
+            <input type="number" id="r_costo_recibido" placeholder="0" oninput="calcularPeriodo()">
           </div>
         </div>
 
@@ -2466,7 +2482,7 @@ async function cargarDatos() {
       } catch(e2) {}
       const veh = vehiculos.find(v => v.id === o.vehiculo_id) || {};
       const periodoCalc = calcularPeriodosFacturables(o.fecha_salida, o.fecha_retorno);
-      const totalCalc = periodoCalc.periodosFacturables * (o.tarifa_diaria || 0) + (o.deposito || 0);
+      const totalCalc = periodoCalc.periodosFacturables * (o.tarifa_diaria || 0) + (o.deposito || 0) + (o.costo_entrega || 0) + (o.costo_recibido || 0);
       return {
         id: o.id,
         num_reserva: o.numero,
@@ -2488,6 +2504,8 @@ async function cargarDatos() {
         tarifa: o.tarifa_diaria || 0,
         deposito: o.deposito || 0,
         abono: o.abono || 0,
+        costoEntrega: o.costo_entrega || 0,
+        costoRecibido: o.costo_recibido || 0,
         periodos: periodoCalc.periodosFacturables,
         total: totalCalc,
         saldoPendiente: Math.max(totalCalc - (o.abono || 0), 0),
@@ -2802,13 +2820,22 @@ function renderContadoresHoy() {
   const elD = document.getElementById('cnt-devoluciones-hoy');
   const elDisp = document.getElementById('cnt-disponibles-ahora');
   const elDispTotal = document.getElementById('cnt-disponibles-total');
-  if (!elE && !elD && !elDisp) return;
+  const elVencen = document.getElementById('cnt-vencen-pronto');
+  if (!elE && !elD && !elDisp && !elVencen) return;
 
   const hoy = soloFecha(new Date());
   const activas = reservas.filter(r => r.estado !== 'finalizada');
 
   if (elE) elE.textContent = activas.filter(r => r.fecha_inicio === hoy).length;
   if (elD) elD.textContent = activas.filter(r => r.fecha_fin === hoy).length;
+
+  if (elVencen) {
+    elVencen.textContent = reservas.filter(r => {
+      if (r.estado !== 'entregado') return false;
+      const h = horasHastaVencer(r);
+      return h != null && h >= 0 && h <= 24;
+    }).length;
+  }
 
   if (elDisp) {
     const ocupadosHoy = new Set(
@@ -3172,6 +3199,8 @@ function calcularPeriodo() {
   const tarifa = parseFloat(document.getElementById('r_tarifa').value) || 0;
   const deposito = parseFloat(document.getElementById('r_deposito').value) || 0;
   const abono = parseFloat(document.getElementById('r_abono')?.value) || 0;
+  const costoEntrega = parseFloat(document.getElementById('r_costo_entrega')?.value) || 0;
+  const costoRecibido = parseFloat(document.getElementById('r_costo_recibido')?.value) || 0;
   const info = document.getElementById('info-periodo');
   const saldoEl = document.getElementById('r_saldo');
 
@@ -3192,7 +3221,7 @@ function calcularPeriodo() {
     return null;
   }
 
-  const total = periodosFacturables * tarifa + deposito;
+  const total = periodosFacturables * tarifa + deposito + costoEntrega + costoRecibido;
   const saldoPendiente = Math.max(total - abono, 0);
   document.getElementById('r_total').value = total > 0 ? formatCOP(total) : '—';
   if (saldoEl) saldoEl.value = total > 0 ? formatCOP(saldoPendiente) : '—';
@@ -3202,7 +3231,7 @@ function calcularPeriodo() {
     (cobroExtra ? ` + <strong style="color:var(--rojo-alerta)">${horasExtra}h adicionales</strong> → se cobra <strong>1 período extra completo</strong> (cada renta es por 24h).` : ` (sin horas adicionales).`) +
     ` Total facturable: <strong style="color:var(--dorado)">${periodosFacturables} período(s) de 24h</strong>.`;
 
-  return { periodos24h, horasExtra, periodosFacturables, total, cobroExtra, abono, saldoPendiente };
+  return { periodos24h, horasExtra, periodosFacturables, total, cobroExtra, abono, saldoPendiente, costoEntrega, costoRecibido };
 }
 
 /* ════════════════════════════════════════════
@@ -3255,6 +3284,8 @@ async function generarReserva() {
   const tarifa = parseFloat(document.getElementById('r_tarifa').value) || 0;
   const deposito = parseFloat(document.getElementById('r_deposito').value) || 0;
   const abono = parseFloat(document.getElementById('r_abono')?.value) || 0;
+  const costoEntrega = parseFloat(document.getElementById('r_costo_entrega')?.value) || 0;
+  const costoRecibido = parseFloat(document.getElementById('r_costo_recibido')?.value) || 0;
   const lugar_e = document.getElementById('r_lugar_entrega').value.trim() || 'Por confirmar';
   const lugar_d = document.getElementById('r_lugar_devolucion').value.trim() || 'Por confirmar';
   const notas = document.getElementById('r_notas').value.trim() || 'Sin observaciones';
@@ -3271,7 +3302,7 @@ async function generarReserva() {
     fecha_inicio: valores.fecha_inicio, hora_inicio: valores.hora_inicio,
     fecha_fin: valores.fecha_fin, hora_fin: valores.hora_fin,
     lugar_entrega: lugar_e, lugar_devolucion: lugar_d,
-    tarifa, deposito, abono, saldoPendiente, periodos: periodo.periodosFacturables, horasExtra: periodo.horasExtra,
+    tarifa, deposito, abono, costoEntrega, costoRecibido, saldoPendiente, periodos: periodo.periodosFacturables, horasExtra: periodo.horasExtra,
     cobroExtra: periodo.cobroExtra, total: periodo.total,
     notas, email_interno, estado: 'pendiente', creada: new Date().toISOString(),
   };
@@ -3301,6 +3332,8 @@ async function generarReserva() {
       tarifa_diaria: tarifa,
       deposito: deposito,
       abono: abono,
+      costo_entrega: costoEntrega,
+      costo_recibido: costoRecibido,
       estado: 'pendiente',
       notas: notas
     });
@@ -3314,7 +3347,7 @@ async function generarReserva() {
       categoria: 'renta',
       concepto: `Renta: ${veh ? veh.nombre : '—'} · ${valores.nombre} · ${periodo.periodosFacturables} día(s)`,
       valor: periodo.total,
-      notas: `Reserva ${numReserva}` + (abono > 0 ? ` · Abono recibido: ${formatCOP(abono)}` : ''),
+      notas: `Reserva ${numReserva}` + (abono > 0 ? ` · Abono recibido: ${formatCOP(abono)}` : '') + ((costoEntrega + costoRecibido) > 0 ? ` · Incluye entrega/recibido: ${formatCOP(costoEntrega + costoRecibido)}` : ''),
       vehiculo_id: valores.vehiculo_id || null,
       orden_id: ordenSB[0]?.id || null,
     });
@@ -3357,6 +3390,12 @@ function construirCorreosReserva(r) {
   const bloqueAbono = abono > 0
     ? `Abono / anticipo pagado:  ${abonoFmt}\nSaldo pendiente (entrega): ${saldoFmt}\n`
     : '';
+  const costoEntrega = r.costoEntrega || 0;
+  const costoRecibido = r.costoRecibido || 0;
+  const bloqueEntregaRecibido = (costoEntrega > 0 || costoRecibido > 0)
+    ? (costoEntrega > 0 ? `Costo de entrega a domicilio: ${formatCOP(costoEntrega)}\n` : '') +
+      (costoRecibido > 0 ? `Costo de recibido/devolución: ${formatCOP(costoRecibido)}\n` : '')
+    : '';
 
   // Recordatorio: 1 día antes
   const fechaRec = (() => {
@@ -3390,7 +3429,7 @@ RESUMEN DE PAGO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 Tarifa por período (24h): ${tarifaFmt}
 Depósito de garantía:     ${depositoFmt}
-TOTAL ESTIMADO:           ${totalFmt}
+${bloqueEntregaRecibido}TOTAL ESTIMADO:           ${totalFmt}
 ${bloqueAbono}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -3495,7 +3534,7 @@ DETALLE DE COSTOS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${r.periodos} período(s) × ${tarifaFmt}    ${formatCOP(r.periodos * r.tarifa)}
 Depósito de garantía (reembolsable)  ${depositoFmt}
-──────────────────────────────────
+${bloqueEntregaRecibido}──────────────────────────────────
 TOTAL                                ${totalFmt}
 ${abono > 0 ? `Abono / anticipo pagado              ${abonoFmt}\nSaldo pendiente (entrega)            ${saldoFmt}\n` : ''}━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -3545,6 +3584,29 @@ function copiarCorreoReserva() {
   navigator.clipboard.writeText(c.cuerpo).then(() => mostrarToast('📋 Texto copiado al portapapeles'));
 }
 
+// Arma un link de WhatsApp (wa.me) con número normalizado a Colombia y mensaje prellenado
+function waLink(celular, mensaje) {
+  let num = (celular || '').replace(/\D/g, '');
+  if (num.length === 10 && num.startsWith('3')) num = '57' + num; // celular colombiano sin indicativo
+  return `https://wa.me/${num}?text=${encodeURIComponent(mensaje)}`;
+}
+
+// Horas restantes hasta la fecha/hora de devolución de una reserva (negativo = ya vencida)
+function horasHastaVencer(r) {
+  if (!r.fecha_fin || !r.hora_fin) return null;
+  const fin = new Date(`${r.fecha_fin}T${r.hora_fin}`);
+  return (fin - new Date()) / 3600000;
+}
+
+function badgeVencimiento(r) {
+  if (r.estado !== 'entregado') return '';
+  const horas = horasHastaVencer(r);
+  if (horas == null) return '';
+  if (horas < 0) return `<span style="background:rgba(224,82,82,0.15);color:var(--rojo-alerta);font-size:0.68rem;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap">🔴 Vencida hace ${Math.abs(Math.round(horas))}h</span>`;
+  if (horas <= 24) return `<span style="background:rgba(201,168,76,0.15);color:var(--dorado-suave);font-size:0.68rem;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap">⚠️ Vence en ${Math.round(horas)}h</span>`;
+  return '';
+}
+
 function renderReservas() {
   const cont = document.getElementById('lista-reservas');
   document.getElementById('reservas-count').textContent = `${reservas.length} reserva(s)`;
@@ -3555,9 +3617,9 @@ function renderReservas() {
   cont.innerHTML = reservas.map(r => `
     <div class="item-card">
       <div class="item-info">
-        <div class="item-titulo">${r.nombre} <span class="num-reserva">${r.num_reserva}</span></div>
+        <div class="item-titulo">${r.nombre} <span class="num-reserva">${r.num_reserva}</span> ${badgeVencimiento(r)}</div>
         <div class="item-detalle"><strong>${r.vehiculo}</strong> · ${r.tipo_doc} ${r.num_doc} · ${r.celular}</div>
-        <div class="item-detalle">Entrega: ${fmtFechaHora(r.fecha_inicio, r.hora_inicio)} → Devolución: ${fmtFechaHora(r.fecha_fin, r.hora_fin)} · Total: <strong>${formatCOP(r.total)}</strong>${r.abono ? ` · Abono: ${formatCOP(r.abono)} · Saldo: ${formatCOP(r.saldoPendiente != null ? r.saldoPendiente : Math.max(r.total - r.abono, 0))}` : ''}</div>
+        <div class="item-detalle">Entrega: ${fmtFechaHora(r.fecha_inicio, r.hora_inicio)} → Devolución: ${fmtFechaHora(r.fecha_fin, r.hora_fin)} · Total: <strong>${formatCOP(r.total)}</strong>${r.abono ? ` · Abono: ${formatCOP(r.abono)} · Saldo: ${formatCOP(r.saldoPendiente != null ? r.saldoPendiente : Math.max(r.total - r.abono, 0))}` : ''}${(r.costoEntrega || r.costoRecibido) ? ` · Entrega/recibido: ${formatCOP((r.costoEntrega||0)+(r.costoRecibido||0))}` : ''}</div>
       </div>
       <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap">
         <select onchange="cambiarEstadoReserva('${r.num_reserva}', this.value)" style="background:var(--gris-medio); color:var(--blanco); border:1px solid var(--borde); border-radius:6px; font-size:0.72rem; padding:5px 8px;">
@@ -3566,6 +3628,7 @@ function renderReservas() {
           <option value="entregado" ${r.estado==='entregado'?'selected':''}>Entrega realizada</option>
           <option value="finalizada" ${r.estado==='finalizada'?'selected':''}>Finalizada</option>
         </select>
+        ${r.estado === 'entregado' && r.celular ? `<a class="btn-secundario" style="text-decoration:none;color:#25D366;border-color:#25D366" target="_blank" href="${waLink(r.celular, `Hola ${r.nombre}, te recordamos que la devolución de tu ${r.vehiculo} (reserva ${r.num_reserva}) está programada para ${fmtFechaHora(r.fecha_fin, r.hora_fin)}. Cualquier novedad avísanos. — Car Help`)}">💬 Recordar por WhatsApp</a>` : ''}
         <button class="btn-secundario" onclick="abrirModalExtenderRenta('${r.num_reserva}')">📅 Extender</button>
         <button class="btn-secundario" onclick="abrirModalCambiarVehiculo('${r.num_reserva}')">🔄 Cambiar vehículo</button>
         <button class="btn-peligro" onclick="eliminarReserva('${r.num_reserva}')">Eliminar</button>
@@ -3662,6 +3725,7 @@ async function confirmarExtensionRenta() {
     if (r.id) {
       await sbUpdate('ordenes', r.id, {
         fecha_retorno: calc.nuevoFinISO + ':00',
+        alerta_enviada: false,
         notas: (r.notas || '') + (notasExt ? ` · Extensión (+${calc.diasExtra} día(s)): ${notasExt}` : ` · Extensión: +${calc.diasExtra} día(s)`)
       });
     }
