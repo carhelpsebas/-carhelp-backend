@@ -1672,14 +1672,23 @@
         <div class="panel-titulo-wrap">
           <div class="panel-icono">🚙</div>
           <div>
-            <div class="panel-titulo">Liquidación a propietarios — vehículos de subalquiler</div>
-            <div class="panel-sub">Ingresos por renta menos lo que corresponde a Car Help</div>
+            <div class="panel-titulo">Liquidación a propietarios y aliados</div>
+            <div class="panel-sub">Cada vehículo calcula su ciclo desde su fecha de ingreso a la flota</div>
           </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <select id="liq_modo" onchange="cambiarModoPeriodoLiq()" style="background:var(--gris-medio);color:var(--blanco);border:1px solid var(--borde);border-radius:6px;font-size:0.75rem;padding:6px 10px">
+            <option value="mensual">Mensual</option>
+            <option value="quincenal">Quincenal</option>
+          </select>
+          <button class="btn-secundario" onclick="moverPeriodoLiq(1)">← Anterior</button>
+          <span id="liq-offset-label" style="font-size:0.75rem;color:var(--blanco-suave)">Período actual</span>
+          <button class="btn-secundario" onclick="moverPeriodoLiq(-1)">Siguiente →</button>
         </div>
       </div>
       <div class="panel-body">
         <div id="ct-liquidaciones">
-          <div class="estado-vacio"><div class="icono-grande">🚙</div><p>No hay vehículos de subalquiler con movimientos.</p></div>
+          <div class="estado-vacio"><div class="icono-grande">🚙</div><p>No hay vehículos de propietarios o aliados registrados.</p></div>
         </div>
       </div>
     </div>
@@ -1803,17 +1812,29 @@
       </div>
 
       <hr class="divider">
-      <div class="seccion-label">Propiedad del vehículo</div>
+      <div class="seccion-label">Procedencia del vehículo</div>
       <div class="campo">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-          <input type="checkbox" id="v_es_subalquiler" onchange="vToggleSubalquiler()" style="width:auto">
-          Es un vehículo de subalquiler (de un propietario externo)
-        </label>
+        <label>¿De quién es este vehículo?</label>
+        <select id="v_procedencia" onchange="vToggleProcedencia()">
+          <option value="propio">Car Help (flota propia)</option>
+          <option value="propietario">Propietario con contrato de inversión</option>
+          <option value="aliado">Aliado (pago por día de uso)</option>
+        </select>
+      </div>
+      <div id="v-fecha-ingreso-wrap" style="display:none">
+        <div class="campo"><label>Fecha de ingreso a la flota</label><input type="date" id="v_fecha_ingreso"></div>
       </div>
       <div id="v-propietario-fields" style="display:none">
         <div class="fila-2">
           <div class="campo"><label>Nombre del propietario</label><input type="text" id="v_propietario_nombre" placeholder="Nombre completo"></div>
-          <div class="campo"><label>Valor a liquidar al propietario (COP)</label><input type="text" id="v_propietario_pct" placeholder="Ej: 200000 o 200.000"></div>
+          <div class="campo"><label>Correo del propietario</label><input type="email" id="v_propietario_email" placeholder="correo@ejemplo.com"></div>
+        </div>
+        <div class="campo"><label>% que corresponde al propietario</label><input type="number" id="v_propietario_pct" placeholder="Ej: 60" min="0" max="100"></div>
+      </div>
+      <div id="v-aliado-fields" style="display:none">
+        <div class="fila-2">
+          <div class="campo"><label>Nombre del aliado</label><input type="text" id="v_aliado_nombre" placeholder="Nombre completo"></div>
+          <div class="campo"><label>Correo del aliado</label><input type="email" id="v_aliado_email" placeholder="correo@ejemplo.com"></div>
         </div>
       </div>
 
@@ -1854,6 +1875,13 @@
       <div class="fila-2">
         <div class="campo"><label>Valor (COP)</label><input type="number" id="g_valor" placeholder="180000"></div>
         <div class="campo"><label>Fecha</label><input type="date" id="g_fecha"></div>
+      </div>
+      <div class="campo" id="g-asume-wrap" style="display:none">
+        <label>¿Quién asume este gasto?</label>
+        <select id="g_asume">
+          <option value="empresa">Car Help (empresa)</option>
+          <option value="propietario">Propietario del vehículo</option>
+        </select>
       </div>
     </div>
     <div class="modal-footer">
@@ -2409,9 +2437,14 @@ function adaptarVehiculoDesdeSB(v) {
     combustible_tipo: v.combustible_tipo || 'gasolina',
     tarifa: v.tarifa_24h || 0,
     estado: v.estado_operativo || 'disponible',
+    procedencia: v.procedencia || (v.es_subalquiler ? 'propietario' : 'propio'),
+    fechaIngreso: v.fecha_ingreso_flota || null,
     esSubalquiler: v.es_subalquiler || false,
     propietarioNombre: v.propietario_nombre || '',
+    propietarioEmail: v.propietario_email || '',
     propietarioPorcentaje: v.propietario_porcentaje || 0,
+    aliadoNombre: v.aliado_nombre || '',
+    aliadoEmail: v.aliado_email || '',
     fotos: v.fotos || [],
     activo: v.activo
   };
@@ -2428,9 +2461,14 @@ function adaptarVehiculoHaciaSB(v) {
     combustible_tipo: v.combustible_tipo || 'gasolina',
     tarifa_24h: parseFloat(v.tarifa) || 0,
     estado_operativo: v.estado || 'disponible',
+    procedencia: v.procedencia || 'propio',
+    fecha_ingreso_flota: v.fechaIngreso || null,
     es_subalquiler: !!v.esSubalquiler,
     propietario_nombre: v.propietarioNombre || null,
+    propietario_email: v.propietarioEmail || null,
     propietario_porcentaje: v.propietarioPorcentaje ? parseFloat(v.propietarioPorcentaje) : null,
+    aliado_nombre: v.aliadoNombre || null,
+    aliado_email: v.aliadoEmail || null,
     fotos: v.fotos || []
   };
 }
@@ -2948,7 +2986,8 @@ function renderTablaVehiculos() {
       <td>${thumb}</td>
       <td>
         <strong>${v.nombre}</strong>${v.anio ? ' · ' + v.anio : ''}
-        ${v.esSubalquiler ? '<br><span class="estado-pill" style="background:rgba(91,155,213,0.15);color:var(--azul-info)">Subalquiler</span>' : ''}
+        ${v.procedencia === 'propietario' ? '<br><span class="estado-pill" style="background:rgba(91,155,213,0.15);color:var(--azul-info)">Propietario</span>' : ''}
+        ${v.procedencia === 'aliado' ? '<br><span class="estado-pill" style="background:rgba(201,168,76,0.15);color:var(--dorado-suave)">Aliado</span>' : ''}
       </td>
       <td>${v.categoria || '—'}<br><span style="font-size:0.7rem;color:var(--blanco-suave)">${combLabel[v.combustible_tipo] || ''}</span></td>
       <td>${v.placa || '—'}</td>
@@ -2997,9 +3036,11 @@ function vRenderFotos() {
     : `<span style="font-size:28px;color:var(--blanco-suave)">+</span>`;
 }
 
-function vToggleSubalquiler() {
-  const checked = document.getElementById('v_es_subalquiler').checked;
-  document.getElementById('v-propietario-fields').style.display = checked ? 'block' : 'none';
+function vToggleProcedencia() {
+  const val = document.getElementById('v_procedencia').value;
+  document.getElementById('v-fecha-ingreso-wrap').style.display = val === 'propio' ? 'none' : 'block';
+  document.getElementById('v-propietario-fields').style.display = val === 'propietario' ? 'block' : 'none';
+  document.getElementById('v-aliado-fields').style.display = val === 'aliado' ? 'block' : 'none';
 }
 
 function abrirModalVehiculo() {
@@ -3013,10 +3054,16 @@ function abrirModalVehiculo() {
   document.getElementById('v_combustible').value = 'gasolina';
   document.getElementById('v_tarifa').value = '';
   document.getElementById('v_estado').value = 'disponible';
-  document.getElementById('v_es_subalquiler').checked = false;
+  document.getElementById('v_procedencia').value = 'propio';
+  document.getElementById('v_fecha_ingreso').value = '';
   document.getElementById('v_propietario_nombre').value = '';
+  document.getElementById('v_propietario_email').value = '';
   document.getElementById('v_propietario_pct').value = '';
+  document.getElementById('v_aliado_nombre').value = '';
+  document.getElementById('v_aliado_email').value = '';
+  document.getElementById('v-fecha-ingreso-wrap').style.display = 'none';
   document.getElementById('v-propietario-fields').style.display = 'none';
+  document.getElementById('v-aliado-fields').style.display = 'none';
   document.getElementById('v-gastos-lista').innerHTML = '<div style="font-size:0.78rem;color:var(--blanco-suave);text-align:center;padding:8px">Guarda el vehículo primero para poder registrar gastos.</div>';
   document.getElementById('v-btn-gasto').style.display = 'none';
   vFotosActuales = [null];
@@ -3037,10 +3084,17 @@ function editarVehiculo(id) {
   document.getElementById('v_combustible').value = v.combustible_tipo || 'gasolina';
   document.getElementById('v_tarifa').value = v.tarifa || '';
   document.getElementById('v_estado').value = v.estado;
-  document.getElementById('v_es_subalquiler').checked = !!v.esSubalquiler;
+  const procedencia = v.procedencia || (v.esSubalquiler ? 'propietario' : 'propio');
+  document.getElementById('v_procedencia').value = procedencia;
+  document.getElementById('v_fecha_ingreso').value = v.fechaIngreso || '';
   document.getElementById('v_propietario_nombre').value = v.propietarioNombre || '';
+  document.getElementById('v_propietario_email').value = v.propietarioEmail || '';
   document.getElementById('v_propietario_pct').value = v.propietarioPorcentaje || '';
-  document.getElementById('v-propietario-fields').style.display = v.esSubalquiler ? 'block' : 'none';
+  document.getElementById('v_aliado_nombre').value = v.aliadoNombre || '';
+  document.getElementById('v_aliado_email').value = v.aliadoEmail || '';
+  document.getElementById('v-fecha-ingreso-wrap').style.display = procedencia === 'propio' ? 'none' : 'block';
+  document.getElementById('v-propietario-fields').style.display = procedencia === 'propietario' ? 'block' : 'none';
+  document.getElementById('v-aliado-fields').style.display = procedencia === 'aliado' ? 'block' : 'none';
   vFotosActuales = [(v.fotos && v.fotos[0]) || null];
   vRenderFotos();
   document.getElementById('v-btn-gasto').style.display = 'block';
@@ -3063,9 +3117,14 @@ async function guardarVehiculo() {
     combustible_tipo: document.getElementById('v_combustible').value,
     tarifa: parseFloat(document.getElementById('v_tarifa').value.replace(/\./g, '').replace(',', '.')) || 0,
     estado: document.getElementById('v_estado').value,
-    esSubalquiler: document.getElementById('v_es_subalquiler').checked,
+    procedencia: document.getElementById('v_procedencia').value,
+    fechaIngreso: document.getElementById('v_fecha_ingreso').value || null,
+    esSubalquiler: document.getElementById('v_procedencia').value !== 'propio',
     propietarioNombre: document.getElementById('v_propietario_nombre').value.trim(),
-    propietarioPorcentaje: parseFloat(document.getElementById('v_propietario_pct').value.replace(/\./g, '').replace(',', '.')) || 0,
+    propietarioEmail: document.getElementById('v_propietario_email').value.trim(),
+    propietarioPorcentaje: parseFloat(document.getElementById('v_propietario_pct').value) || 0,
+    aliadoNombre: document.getElementById('v_aliado_nombre').value.trim(),
+    aliadoEmail: document.getElementById('v_aliado_email').value.trim(),
     fotos: fotosLimpias,
   };
 
@@ -3104,11 +3163,14 @@ async function guardarVehiculo() {
 function vAbrirGasto() {
   const id = document.getElementById('v_id').value;
   if (!id) { mostrarToast('⚠️ Guarda el vehículo primero', '#C9A84C'); return; }
+  const v = vehiculos.find(x => x.id === id);
   document.getElementById('g_vehiculo_id').value = id;
   document.getElementById('g_tipo').value = 'mantenimiento';
   document.getElementById('g_descripcion').value = '';
   document.getElementById('g_valor').value = '';
   document.getElementById('g_fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('g_asume').value = 'empresa';
+  document.getElementById('g-asume-wrap').style.display = (v && v.procedencia === 'propietario') ? 'block' : 'none';
   abrirModal('modal-gasto');
 }
 
@@ -3118,12 +3180,13 @@ async function guardarGastoVehiculo() {
   const descripcion = document.getElementById('g_descripcion').value.trim();
   const valor = parseFloat(document.getElementById('g_valor').value) || 0;
   const fecha = document.getElementById('g_fecha').value;
+  const asume = document.getElementById('g_asume').value || 'empresa';
 
   if (!valor) { mostrarToast('⚠️ Ingresa el valor del gasto', '#E05252'); return; }
 
   try {
     await sbInsert('vehiculo_gastos', {
-      vehiculo_id: vehiculoId, tipo, descripcion, valor, fecha
+      vehiculo_id: vehiculoId, tipo, descripcion, valor, fecha, asume
     });
     mostrarToast('✅ Gasto registrado');
   } catch(e) {
@@ -3150,7 +3213,7 @@ async function vRenderGastos(vehiculoId) {
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--gris-oscuro);border:1px solid var(--borde);border-radius:8px;margin-bottom:6px;font-size:0.78rem">
         <div>
           <strong>${labels[g.tipo] || g.tipo}</strong> — ${g.descripcion || 'Sin descripción'}<br>
-          <span style="color:var(--blanco-suave)">${fmtFecha(g.fecha)}</span>
+          <span style="color:var(--blanco-suave)">${fmtFecha(g.fecha)}</span>${g.asume === 'propietario' ? ' · <span style="color:var(--azul-info)">Asume propietario</span>' : ''}
         </div>
         <div style="color:var(--dorado);font-weight:700">${formatCOP(g.valor)}</div>
       </div>
@@ -4951,76 +5014,248 @@ async function eliminarMovimientoContable(id) {
   await renderLiquidaciones();
 }
 
+/* ════════════════════════════════════════════
+   LIQUIDACIONES — propietarios y aliados
+   ════════════════════════════════════════════ */
+let liqModoPeriodo = 'mensual'; // 'mensual' | 'quincenal'
+let liqOffsetCiclos = 0; // 0 = ciclo actual, 1 = ciclo anterior, etc.
+
+function cambiarModoPeriodoLiq() {
+  liqModoPeriodo = document.getElementById('liq_modo').value;
+  liqOffsetCiclos = 0;
+  renderLiquidaciones();
+}
+function moverPeriodoLiq(delta) {
+  liqOffsetCiclos = Math.max(0, liqOffsetCiclos + delta);
+  document.getElementById('liq-offset-label').textContent = liqOffsetCiclos === 0 ? 'Período actual' : `${liqOffsetCiclos} ciclo(s) atrás`;
+  renderLiquidaciones();
+}
+
+// Calcula el ciclo de liquidación de un vehículo, anclado a su fecha de ingreso a la flota
+function calcularCicloVehiculo(fechaIngresoStr, modo, offset) {
+  const largoDias = modo === 'quincenal' ? 15 : 30;
+  const hoy = new Date();
+  const ancla = fechaIngresoStr ? new Date(fechaIngresoStr + 'T00:00:00') : new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  const diasDesdeAncla = Math.max(0, Math.floor((hoy - ancla) / 86400000));
+  const cicloActualIndex = Math.floor(diasDesdeAncla / largoDias);
+  const indiceObjetivo = Math.max(0, cicloActualIndex - offset);
+  const inicio = new Date(ancla.getTime() + indiceObjetivo * largoDias * 86400000);
+  const fin = new Date(inicio.getTime() + (largoDias - 1) * 86400000);
+  return { inicio: soloFecha(inicio), fin: soloFecha(fin) };
+}
+
+// Cuenta los días de uso de un vehículo de aliado dentro de un rango (para referencia informativa)
+function diasUsoAliadoEnRango(vehiculoId, inicioStr, finStr) {
+  let dias = 0;
+  reservas.filter(r => r.vehiculo_id === vehiculoId && r.estado !== 'pendiente' && r.fecha_inicio && r.fecha_fin).forEach(r => {
+    const ini = r.fecha_inicio > inicioStr ? r.fecha_inicio : inicioStr;
+    const fin = r.fecha_fin < finStr ? r.fecha_fin : finStr;
+    if (ini <= fin) dias += diasEntre(ini, fin) + 1;
+  });
+  return dias;
+}
+
 async function renderLiquidaciones() {
   const cont = document.getElementById('ct-liquidaciones');
-  const subalquiler = vehiculos.filter(v => v.esSubalquiler);
+  const relevantes = vehiculos.filter(v => v.procedencia === 'propietario' || v.procedencia === 'aliado');
 
-  if (subalquiler.length === 0) {
-    cont.innerHTML = `<div class="estado-vacio"><div class="icono-grande">🚙</div><p>No hay vehículos marcados como subalquiler.</p></div>`;
+  if (relevantes.length === 0) {
+    cont.innerHTML = `<div class="estado-vacio"><div class="icono-grande">🚙</div><p>No hay vehículos de propietarios o aliados registrados. Configura la procedencia desde el perfil del vehículo.</p></div>`;
     document.getElementById('ct-pendiente-liquidar').textContent = '$ 0';
     return;
   }
 
   let totalPendienteGlobal = 0;
 
-  const filas = await Promise.all(subalquiler.map(async (v) => {
-    let movs = [];
-    try {
-      movs = await sbSelect('movimientos_contables', `&vehiculo_id=eq.${v.id}&categoria=eq.renta&tipo=eq.ingreso`);
-    } catch(e) { movs = []; }
+  const filas = await Promise.all(relevantes.map(async (v) => {
+    const ciclo = calcularCicloVehiculo(v.fechaIngreso, liqModoPeriodo, liqOffsetCiclos);
 
-    const totalIngresos = movs.reduce((s, m) => s + parseFloat(m.valor), 0);
-    const pctPropietario = v.propietarioPorcentaje || 0;
-    const debeAlPropietario = totalIngresos * (pctPropietario / 100);
-
-    let yaLiquidado = 0;
+    let ingresos = 0, gastosPropietario = 0, gastosEmpresa = 0;
     try {
-      const liqs = await sbSelect('movimientos_contables', `&vehiculo_id=eq.${v.id}&categoria=eq.liquidacion`);
-      yaLiquidado = liqs.reduce((s, m) => s + parseFloat(m.valor), 0);
+      const movs = await sbSelect('movimientos_contables', `&vehiculo_id=eq.${v.id}&tipo=eq.ingreso&categoria=in.(renta,extension_renta)&fecha=gte.${ciclo.inicio}&fecha=lte.${ciclo.fin}`);
+      ingresos = movs.reduce((s, m) => s + parseFloat(m.valor), 0);
+    } catch(e) {}
+    try {
+      const gastos = await sbSelect('vehiculo_gastos', `&vehiculo_id=eq.${v.id}&fecha=gte.${ciclo.inicio}&fecha=lte.${ciclo.fin}`);
+      gastos.forEach(g => { if (g.asume === 'propietario') gastosPropietario += parseFloat(g.valor); else gastosEmpresa += parseFloat(g.valor); });
     } catch(e) {}
 
-    const pendiente = debeAlPropietario - yaLiquidado;
-    totalPendienteGlobal += pendiente;
+    // ¿Ya se liquidó este ciclo exacto?
+    let yaLiquidado = null;
+    try {
+      const liqs = await sbSelect('liquidaciones', `&vehiculo_id=eq.${v.id}&periodo_inicio=eq.${ciclo.inicio}&periodo_fin=eq.${ciclo.fin}`);
+      yaLiquidado = liqs[0] || null;
+    } catch(e) {}
 
-    return `
+    const periodoLabel = `${fmtFecha(ciclo.inicio)} → ${fmtFecha(ciclo.fin)}`;
+
+    if (v.procedencia === 'propietario') {
+      const pct = v.propietarioPorcentaje || 0;
+      const monto = Math.max(ingresos * (pct / 100) - gastosPropietario, 0);
+      if (!yaLiquidado) totalPendienteGlobal += monto;
+
+      return `
       <div class="item-card">
         <div class="item-info">
-          <div class="item-titulo">${v.nombre} ${v.placa ? '('+v.placa+')' : ''}</div>
-          <div class="item-detalle">Propietario: <strong>${v.propietarioNombre || 'Sin definir'}</strong> · Liquidación base: ${formatCOP(pctPropietario)}</div>
-          <div class="item-detalle">Ingresos totales por renta: <strong>${formatCOP(totalIngresos)}</strong> · Corresponde al propietario: <strong>${formatCOP(debeAlPropietario)}</strong></div>
-          <div class="item-detalle">Ya liquidado: <strong>${formatCOP(yaLiquidado)}</strong></div>
+          <div class="item-titulo">${v.nombre} ${v.placa ? '('+v.placa+')' : ''} <span class="num-reserva">Propietario</span></div>
+          <div class="item-detalle">Propietario: <strong>${v.propietarioNombre || 'Sin definir'}</strong> · Período: <strong>${periodoLabel}</strong></div>
+          <div class="item-detalle">Ingresos del período: <strong>${formatCOP(ingresos)}</strong> · % propietario: <strong>${pct}%</strong> · Gastos que asumió: <strong>${formatCOP(gastosPropietario)}</strong></div>
+          ${gastosEmpresa > 0 ? `<div class="item-detalle">Gastos que asumió Car Help en el período: ${formatCOP(gastosEmpresa)}</div>` : ''}
         </div>
         <div style="text-align:right">
-          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:${pendiente > 0 ? 'var(--rojo-alerta)' : 'var(--verde-ok)'}">${formatCOP(pendiente)}</div>
-          <div style="font-size:0.7rem;color:var(--blanco-suave);margin-bottom:6px">pendiente</div>
-          ${pendiente > 0 ? `<button class="btn-secundario" onclick="liquidarPropietario('${v.id}', '${(v.propietarioNombre||'').replace(/'/g,"\\'")}', ${pendiente})" style="font-size:0.72rem">Registrar liquidación</button>` : ''}
+          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:${yaLiquidado ? 'var(--verde-ok)' : 'var(--dorado-suave)'}">${formatCOP(monto)}</div>
+          <div style="font-size:0.7rem;color:var(--blanco-suave);margin-bottom:6px">${yaLiquidado ? '✅ liquidado' : 'por liquidar'}</div>
+          ${!yaLiquidado ? `<button class="btn-primario" style="font-size:0.72rem;padding:8px 14px" onclick="liquidarYEnviar('${v.id}','propietario','${ciclo.inicio}','${ciclo.fin}',${monto},${ingresos},${gastosPropietario})">Generar y enviar</button>` : ''}
         </div>
+      </div>`;
+    }
+
+    // Aliado: el monto se ingresa manualmente por variar cada vez
+    const dias = diasUsoAliadoEnRango(v.id, ciclo.inicio, ciclo.fin);
+    return `
+    <div class="item-card">
+      <div class="item-info">
+        <div class="item-titulo">${v.nombre} ${v.placa ? '('+v.placa+')' : ''} <span class="num-reserva">Aliado</span></div>
+        <div class="item-detalle">Aliado: <strong>${v.aliadoNombre || 'Sin definir'}</strong> · Período: <strong>${periodoLabel}</strong></div>
+        <div class="item-detalle">Días de uso en el período: <strong>${dias}</strong></div>
+        ${yaLiquidado ? `<div class="item-detalle" style="color:var(--verde-ok)">✅ Liquidado: ${formatCOP(yaLiquidado.monto_liquidado)}</div>` : ''}
       </div>
-    `;
+      <div style="text-align:right">
+        ${!yaLiquidado ? `
+          <input type="number" id="liq-aliado-valor-${v.id}" placeholder="Valor a pagar" style="width:130px;background:var(--gris-medio);color:var(--blanco);border:1px solid var(--borde);border-radius:6px;padding:6px 8px;font-size:0.78rem;margin-bottom:6px">
+          <br>
+          <button class="btn-primario" style="font-size:0.72rem;padding:8px 14px" onclick="liquidarAliado('${v.id}','${ciclo.inicio}','${ciclo.fin}',${dias})">Generar y enviar</button>
+        ` : `<div style="font-size:0.7rem;color:var(--verde-ok)">Período cerrado</div>`}
+      </div>
+    </div>`;
   }));
 
   cont.innerHTML = `<div class="lista-cards">${filas.join('')}</div>`;
   document.getElementById('ct-pendiente-liquidar').textContent = formatCOP(totalPendienteGlobal);
 }
 
-async function liquidarPropietario(vehiculoId, propietarioNombre, valor) {
+async function liquidarYEnviar(vehiculoId, tipo, periodoInicio, periodoFin, monto, ingresos, gastos) {
+  const v = vehiculos.find(x => x.id === vehiculoId);
+  if (!v) return;
+  const correo = v.propietarioEmail;
+  const nombreDest = v.propietarioNombre || 'Propietario';
+  const periodoLabel = `${fmtFecha(periodoInicio)} al ${fmtFecha(periodoFin)}`;
+
   try {
     await sbInsert('movimientos_contables', {
       tipo: 'egreso',
       categoria: 'liquidacion',
-      concepto: `Liquidación a ${propietarioNombre || 'propietario'}`,
-      valor: valor,
+      concepto: `Liquidación a ${nombreDest} · ${v.nombre}`,
+      valor: monto,
       fecha: new Date().toISOString().split('T')[0],
-      metodo_pago: 'transferencia',
       vehiculo_id: vehiculoId,
-      notas: 'Liquidación de ingresos por subalquiler'
+      notas: `Período ${periodoLabel}`
     });
-    mostrarToast('✅ Liquidación registrada');
+    await sbInsert('liquidaciones', {
+      vehiculo_id: vehiculoId,
+      tipo,
+      periodo_inicio: periodoInicio,
+      periodo_fin: periodoFin,
+      ingresos,
+      gastos_deducidos: gastos,
+      monto_liquidado: monto,
+      correo_enviado: !!correo,
+      correo_destino: correo || null
+    });
   } catch(e) {
     console.error('Error registrando liquidación:', e);
     mostrarToast('⚠️ No se pudo registrar la liquidación', '#E05252');
     return;
   }
+
+  if (correo) {
+    const cuerpo = `Hola ${nombreDest},
+
+Aquí está el resumen de la liquidación de su vehículo ${v.nombre}${v.placa ? ' (' + v.placa + ')' : ''} con Car Help:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+PERÍODO LIQUIDADO: ${periodoLabel}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+Ingresos generados en el período:  ${formatCOP(ingresos)}
+% que le corresponde:              ${v.propietarioPorcentaje || 0}%
+Gastos/mantenimientos a su cargo:  ${formatCOP(gastos)}
+──────────────────────────────────
+VALOR A CONSIGNAR:                 ${formatCOP(monto)}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+En los próximos días le confirmaremos el pago correspondiente.
+
+Gracias por confiar su vehículo a Car Help.
+
+Equipo Car Help — Pereira, Colombia
+📱 WhatsApp: +57 310 743 6082`;
+    await enviarCorreoDirecto(correo, `Liquidación ${v.nombre} — Período ${fmtFecha(periodoInicio)} al ${fmtFecha(periodoFin)}`, cuerpo);
+  }
+
+  mostrarToast(correo ? '✅ Liquidación registrada y correo enviado' : '✅ Liquidación registrada (sin correo: falta el email del propietario)');
+  await cargarMovimientosContables();
+  await renderLiquidaciones();
+}
+
+async function liquidarAliado(vehiculoId, periodoInicio, periodoFin, dias) {
+  const v = vehiculos.find(x => x.id === vehiculoId);
+  if (!v) return;
+  const inputEl = document.getElementById(`liq-aliado-valor-${vehiculoId}`);
+  const monto = parseFloat(inputEl?.value) || 0;
+  if (!monto) { mostrarToast('⚠️ Ingresa el valor a pagar al aliado', '#E05252'); return; }
+
+  const correo = v.aliadoEmail;
+  const nombreDest = v.aliadoNombre || 'Aliado';
+  const periodoLabel = `${fmtFecha(periodoInicio)} al ${fmtFecha(periodoFin)}`;
+
+  try {
+    await sbInsert('movimientos_contables', {
+      tipo: 'egreso',
+      categoria: 'liquidacion',
+      concepto: `Liquidación a aliado ${nombreDest} · ${v.nombre}`,
+      valor: monto,
+      fecha: new Date().toISOString().split('T')[0],
+      vehiculo_id: vehiculoId,
+      notas: `Período ${periodoLabel} · ${dias} día(s) de uso`
+    });
+    await sbInsert('liquidaciones', {
+      vehiculo_id: vehiculoId,
+      tipo: 'aliado',
+      periodo_inicio: periodoInicio,
+      periodo_fin: periodoFin,
+      dias_utilizados: dias,
+      monto_liquidado: monto,
+      correo_enviado: !!correo,
+      correo_destino: correo || null
+    });
+  } catch(e) {
+    console.error('Error registrando liquidación de aliado:', e);
+    mostrarToast('⚠️ No se pudo registrar la liquidación', '#E05252');
+    return;
+  }
+
+  if (correo) {
+    const cuerpo = `Hola ${nombreDest},
+
+Aquí está la liquidación por el uso de su vehículo ${v.nombre}${v.placa ? ' (' + v.placa + ')' : ''} con Car Help:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+PERÍODO: ${periodoLabel}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+Días de uso en el período:  ${dias}
+VALOR A PAGAR:              ${formatCOP(monto)}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+En los próximos días le confirmaremos el pago correspondiente.
+
+Gracias por su alianza con Car Help.
+
+Equipo Car Help — Pereira, Colombia
+📱 WhatsApp: +57 310 743 6082`;
+    await enviarCorreoDirecto(correo, `Liquidación ${v.nombre} — Período ${fmtFecha(periodoInicio)} al ${fmtFecha(periodoFin)}`, cuerpo);
+  }
+
+  mostrarToast(correo ? '✅ Liquidación registrada y correo enviado' : '✅ Liquidación registrada (sin correo: falta el email del aliado)');
   await cargarMovimientosContables();
   await renderLiquidaciones();
 }
