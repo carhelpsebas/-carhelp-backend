@@ -662,9 +662,18 @@
           <div class="rol-tag" id="user-rol">ROL</div>
         </div>
       </div>
+      <button class="btn-icono" id="btn-notificaciones" onclick="toggleNotificaciones()" title="Notificaciones" style="position:relative">
+        🔔
+        <span id="badge-notificaciones" style="display:none;position:absolute;top:2px;right:2px;background:var(--rojo-alerta);color:#fff;font-size:0.62rem;font-weight:700;border-radius:50%;min-width:16px;height:16px;align-items:center;justify-content:center;padding:0 3px;line-height:1">0</span>
+      </button>
       <button class="btn-icono" onclick="cerrarSesion()" title="Cerrar sesión">⏻</button>
     </div>
   </header>
+
+  <div id="panel-notificaciones" style="display:none;position:fixed;top:74px;right:24px;width:340px;max-height:70vh;overflow-y:auto;background:var(--carbon);border:1px solid var(--borde);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.5);z-index:500;padding:14px">
+    <div style="font-family:'Syne',sans-serif;font-weight:700;color:var(--dorado);margin-bottom:10px;font-size:0.85rem">🔔 Notificaciones</div>
+    <div id="lista-notificaciones"></div>
+  </div>
 
   <div class="nav-tabs" id="nav-tabs">
     <button class="nav-tab" onclick="cambiarVista('inicio', this)">Inicio</button>
@@ -1406,32 +1415,54 @@
       <div class="home-header-sub">Perfiles, historial de servicios y documentos</div>
     </div>
 
-    <!-- Buscador + botón nuevo -->
-    <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">
-      <div style="flex:1;position:relative;min-width:200px">
-        <input type="text" id="cli-buscador" placeholder="🔍 Buscar por nombre, documento o teléfono..." oninput="filtrarClientes(this.value)"
-          style="width:100%;background:var(--carbon);border:1px solid var(--borde);border-radius:10px;padding:10px 16px;color:var(--blanco);font-size:0.9rem">
+    <!-- Toggle Directorio / Inversionistas -->
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button class="nav-tab activo" id="cli-toggle-directorio" onclick="cliMostrarSeccion('directorio')">Directorio</button>
+      <button class="nav-tab" id="cli-toggle-inversionistas" onclick="cliMostrarSeccion('inversionistas')">Inversionistas</button>
+    </div>
+
+    <div id="cli-seccion-directorio">
+      <!-- Buscador + botón nuevo -->
+      <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+        <div style="flex:1;position:relative;min-width:200px">
+          <input type="text" id="cli-buscador" placeholder="🔍 Buscar por nombre, documento o teléfono..." oninput="filtrarClientes(this.value)"
+            style="width:100%;background:var(--carbon);border:1px solid var(--borde);border-radius:10px;padding:10px 16px;color:var(--blanco);font-size:0.9rem">
+        </div>
+        <button class="btn-primario" onclick="abrirModalCliente(null)">+ Nuevo cliente</button>
       </div>
-      <button class="btn-primario" onclick="abrirModalCliente(null)">+ Nuevo cliente</button>
-    </div>
 
-    <!-- Estadísticas rápidas -->
-    <div class="stats-grid" style="margin-bottom:20px" id="cli-stats">
-      <div class="stat-card"><div class="stat-label">Total clientes</div><div class="stat-value" id="cli-stat-total">0</div></div>
-      <div class="stat-card"><div class="stat-label">Clientes VIP</div><div class="stat-value" id="cli-stat-vip" style="color:#C9A84C">0</div></div>
-      <div class="stat-card"><div class="stat-label">Clientes frecuentes</div><div class="stat-value" id="cli-stat-frecuentes">0</div></div>
-    </div>
+      <!-- Estadísticas rápidas -->
+      <div class="stats-grid" style="margin-bottom:20px" id="cli-stats">
+        <div class="stat-card"><div class="stat-label">Total clientes</div><div class="stat-value" id="cli-stat-total">0</div></div>
+        <div class="stat-card"><div class="stat-label">Clientes VIP</div><div class="stat-value" id="cli-stat-vip" style="color:#C9A84C">0</div></div>
+        <div class="stat-card"><div class="stat-label">Clientes frecuentes</div><div class="stat-value" id="cli-stat-frecuentes">0</div></div>
+      </div>
 
-    <!-- Lista de clientes -->
-    <div class="panel">
-      <div class="panel-header">
-        <div class="panel-titulo-wrap">
-          <div class="panel-icono">👥</div>
-          <div><div class="panel-titulo">Directorio de clientes</div><div class="panel-sub" id="cli-count-label">Cargando...</div></div>
+      <!-- Lista de clientes -->
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-titulo-wrap">
+            <div class="panel-icono">👥</div>
+            <div><div class="panel-titulo">Directorio de clientes</div><div class="panel-sub" id="cli-count-label">Cargando...</div></div>
+          </div>
+        </div>
+        <div class="panel-body" id="cli-lista">
+          <div class="estado-vacio"><div class="icono-grande">👥</div><p>No hay clientes registrados.</p></div>
         </div>
       </div>
-      <div class="panel-body" id="cli-lista">
-        <div class="estado-vacio"><div class="icono-grande">👥</div><p>No hay clientes registrados.</p></div>
+    </div>
+
+    <div id="cli-seccion-inversionistas" style="display:none">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-titulo-wrap">
+            <div class="panel-icono">💼</div>
+            <div><div class="panel-titulo">Inversionistas</div><div class="panel-sub">Propietarios con contrato de inversión</div></div>
+          </div>
+        </div>
+        <div class="panel-body" id="inv-lista">
+          <div class="estado-vacio"><div class="icono-grande">💼</div><p>Cargando...</p></div>
+        </div>
       </div>
     </div>
   </div>
@@ -2921,6 +2952,79 @@ function renderStats() {
 
   renderGanttFlota();
   renderContadoresHoy();
+  actualizarNotificaciones();
+}
+
+/* ════════════════════════════════════════════
+   CAMPANILLA DE NOTIFICACIONES
+   ════════════════════════════════════════════ */
+let notificacionesActuales = [];
+
+function toggleNotificaciones() {
+  const p = document.getElementById('panel-notificaciones');
+  const abrir = p.style.display !== 'block';
+  p.style.display = abrir ? 'block' : 'none';
+}
+
+function ejecutarAccionNotificacion(i) {
+  const n = notificacionesActuales[i];
+  if (n && n.accion) n.accion();
+  toggleNotificaciones();
+}
+
+function renderListaNotificaciones() {
+  const cont = document.getElementById('lista-notificaciones');
+  if (!cont) return;
+  if (notificacionesActuales.length === 0) {
+    cont.innerHTML = '<div style="font-size:0.8rem;color:var(--blanco-suave);text-align:center;padding:16px 0">Sin novedades por ahora ✅</div>';
+    return;
+  }
+  cont.innerHTML = notificacionesActuales.map((n, i) => `
+    <div onclick="ejecutarAccionNotificacion(${i})" style="cursor:pointer;padding:9px 10px;border-radius:8px;background:var(--gris-oscuro);border:1px solid var(--borde);margin-bottom:6px;font-size:0.78rem;color:var(--blanco)">
+      ${n.texto}
+    </div>
+  `).join('');
+}
+
+async function actualizarNotificaciones() {
+  const items = [];
+
+  // Rentas activas vencidas o por vencer
+  reservas.filter(r => r.estado === 'entregado').forEach(r => {
+    const h = horasHastaVencer(r);
+    if (h == null) return;
+    if (h < 0) {
+      items.push({ texto: `🔴 ${r.nombre} — ${r.vehiculo} vencida hace ${Math.abs(Math.round(h))}h`, accion: () => cambiarVistaPorId('reservas') });
+    } else if (h <= 24) {
+      items.push({ texto: `⚠️ ${r.nombre} — ${r.vehiculo} vence en ${Math.round(h)}h`, accion: () => cambiarVistaPorId('reservas') });
+    }
+  });
+
+  // Liquidaciones pendientes del período actual (propietarios y aliados)
+  const relevantes = vehiculos.filter(v => v.procedencia === 'propietario' || v.procedencia === 'aliado');
+  if (relevantes.length > 0) {
+    let todasLiq = [];
+    try { todasLiq = await sbSelect('liquidaciones', '&order=periodo_inicio.desc'); } catch(e) {}
+    relevantes.forEach(v => {
+      const ciclo = calcularCicloVehiculo(v.fechaIngreso, liqModoPeriodo, 0);
+      const yaLiquidado = todasLiq.find(l => l.vehiculo_id === v.id && l.periodo_inicio === ciclo.inicio && l.periodo_fin === ciclo.fin);
+      if (!yaLiquidado) {
+        items.push({ texto: `💰 Falta liquidar ${v.nombre} (${fmtFecha(ciclo.inicio)} → ${fmtFecha(ciclo.fin)})`, accion: () => cambiarVistaPorId('contabilidad') });
+      }
+    });
+  }
+
+  notificacionesActuales = items;
+  const badge = document.getElementById('badge-notificaciones');
+  if (badge) {
+    if (items.length > 0) {
+      badge.style.display = 'flex';
+      badge.textContent = items.length > 9 ? '9+' : items.length;
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+  renderListaNotificaciones();
 }
 
 // Devuelve fecha en formato YYYY-MM-DD a partir de un objeto Date, sin componente de hora
@@ -6854,6 +6958,56 @@ async function cargarClientes() {
     clientesData = lsGet('carhelp:clientes') || [];
   }
   renderClientes();
+}
+
+/* ════════════════════════════════════════════
+   INVERSIONISTAS (dentro de Clientes)
+   ════════════════════════════════════════════ */
+function cliMostrarSeccion(sec) {
+  document.getElementById('cli-seccion-directorio').style.display = sec === 'directorio' ? 'block' : 'none';
+  document.getElementById('cli-seccion-inversionistas').style.display = sec === 'inversionistas' ? 'block' : 'none';
+  document.getElementById('cli-toggle-directorio').classList.toggle('activo', sec === 'directorio');
+  document.getElementById('cli-toggle-inversionistas').classList.toggle('activo', sec === 'inversionistas');
+  if (sec === 'inversionistas') renderInversionistas();
+}
+
+async function renderInversionistas() {
+  const cont = document.getElementById('inv-lista');
+  const inversionistas = vehiculos.filter(v => v.procedencia === 'propietario');
+
+  if (inversionistas.length === 0) {
+    cont.innerHTML = `<div class="estado-vacio"><div class="icono-grande">💼</div><p>No hay inversionistas registrados. Configura la procedencia de un vehículo como "Propietario con contrato de inversión" en su perfil.</p></div>`;
+    return;
+  }
+
+  let todasLiq = [];
+  try { todasLiq = await sbSelect('liquidaciones', '&order=periodo_inicio.desc'); } catch(e) {}
+
+  cont.innerHTML = inversionistas.map(v => {
+    const ciclo = calcularCicloVehiculo(v.fechaIngreso, liqModoPeriodo, 0);
+    const yaLiquidado = todasLiq.find(l => l.vehiculo_id === v.id && l.periodo_inicio === ciclo.inicio && l.periodo_fin === ciclo.fin);
+    const esFijo = v.propietarioTipoLiq === 'fijo';
+    return `
+    <div class="item-card" style="cursor:pointer" onclick="abrirPerfilInversionista('${v.id}')">
+      <div class="item-info">
+        <div class="item-titulo">${v.propietarioNombre || 'Sin nombre'} <span class="num-reserva">${v.nombre}${v.placa ? ' ('+v.placa+')' : ''}</span></div>
+        <div class="item-detalle">${v.propietarioEmail || 'Sin correo registrado'}</div>
+        <div class="item-detalle">${esFijo ? `Valor fijo: ${formatCOP(v.propietarioValorFijo||0)}` : `% liquidación: ${v.propietarioPorcentaje||0}%`} por período</div>
+        <div style="font-size:0.7rem;color:var(--azul-info);margin-top:4px">Toca para ver historial y liquidar →</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:0.72rem;font-weight:700;color:${yaLiquidado ? 'var(--verde-ok)' : 'var(--dorado-suave)'}">${yaLiquidado ? '✅ Período liquidado' : '⚠️ Falta liquidar'}</div>
+        <div style="font-size:0.68rem;color:var(--blanco-suave);margin-top:2px">${fmtFecha(ciclo.inicio)} → ${fmtFecha(ciclo.fin)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Lleva directo al detalle de liquidación de este inversionista desde su perfil
+async function abrirPerfilInversionista(vehiculoId) {
+  cambiarVistaPorId('contabilidad');
+  await renderLiquidaciones();
+  abrirDetalleLiquidacion(vehiculoId);
 }
 
 function renderClientes(lista = clientesData) {
