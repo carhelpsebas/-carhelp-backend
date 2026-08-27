@@ -5736,6 +5736,8 @@ async function guardarDetalleLiquidacion() {
   }
 
   if (correo || true) {
+    const esFijo = v.propietarioTipoLiq === 'fijo';
+    const brutoPropietario = esFijo ? (v.propietarioValorFijo || 0) : (ingresos * (v.propietarioPorcentaje || 0) / 100);
     const bloqueAjustes = liqAjustesTrabajo.length > 0
       ? '\nCuadres / gastos de cambio en este período:\n' + liqAjustesTrabajo.map(a => `  • ${a.descripcion}: ${a.valor < 0 ? '-' : '+'}${formatCOP(Math.abs(a.valor))}${a.factura_url ? ` — Ver factura: ${a.factura_url}` : ''}`).join('\n') + '\n'
       : '';
@@ -5749,7 +5751,7 @@ ${esCorreccion ? 'Le enviamos la liquidación corregida' : 'Aquí está el resum
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 PERÍODO: ${periodoLabel}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-${v.procedencia === 'propietario' ? `Ingresos generados en el período:  ${formatCOP(ingresos)}\nGastos/mantenimientos a su cargo:  ${formatCOP(gastosPropietario)}\n` : `Días de uso en el período:  ${dias}\n`}${bloqueFacturas}${bloqueAjustes}──────────────────────────────────
+${v.procedencia === 'propietario' ? `Valor correspondiente (antes de descuentos): ${formatCOP(brutoPropietario)}\nGastos/mantenimientos descontados:           ${formatCOP(gastosPropietario)}\n` : `Días de uso en el período:  ${dias}\n`}${bloqueFacturas}${bloqueAjustes}──────────────────────────────────
 VALOR ${esCorreccion ? 'CORREGIDO' : ''} A CONSIGNAR:      ${formatCOP(montoFinal)}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -5764,7 +5766,7 @@ Equipo Car Help — Pereira, Colombia
 
     if (correo) await enviarCorreoDirecto(correo, asuntoCorreo, cuerpo);
     // Copia siempre a contabilidad interna
-    await enviarCorreoDirecto('rdacarhelp@gmail.com', `[Contabilidad] ${asuntoCorreo}`, cuerpo);
+    await enviarCorreoDirecto('rdacarhelp@gmail.com', asuntoCorreo, cuerpo);
   }
 
   mostrarToast(`✅ Liquidación ${esCorreccion ? 'corregida y reenviada' : 'guardada y enviada'}${correo ? ' (con copia a contabilidad)' : ' — sin correo al propietario/aliado por falta de email, pero se envió copia a contabilidad'}`);
