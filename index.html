@@ -135,6 +135,24 @@
   .fila-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
   @media (max-width: 640px) { .fila-2, .fila-3 { grid-template-columns: 1fr; } }
 
+  .btn-agregar-cuadre {
+    width: 100%;
+    margin-bottom: 14px;
+    background: var(--verde-ok);
+    color: #0A0A0A;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.03em;
+    border: none;
+    border-radius: 999px;
+    padding: 12px 20px;
+    cursor: pointer;
+    transition: filter 0.2s, transform 0.1s;
+  }
+  .btn-agregar-cuadre:hover { filter: brightness(1.12); }
+  .btn-agregar-cuadre:active { transform: scale(0.98); }
+
   .btn-primario {
     background: var(--gradiente-dorado);
     box-shadow: var(--sombra-metalica);
@@ -2149,16 +2167,29 @@
 
       <div class="seccion-label">Cuadres / gastos de cambio de este período</div>
       <div id="dl-ajustes-lista" style="margin-bottom:10px"></div>
+      <div class="campo">
+        <label>Descripción</label>
+        <input type="text" id="dl_ajuste_desc" placeholder="Ej. Cambio de aceite, cuadre de caja...">
+      </div>
       <div class="fila-2">
-        <div class="campo"><label>Descripción</label><input type="text" id="dl_ajuste_desc" placeholder="Ej. Cambio de aceite descontado, cuadre de caja..."></div>
-        <div class="campo"><label>Valor (usa negativo para descontar)</label><input type="number" id="dl_ajuste_valor" placeholder="Ej. -50000 o 30000"></div>
+        <div class="campo">
+          <label>Tipo de cuadre</label>
+          <select id="dl_ajuste_tipo">
+            <option value="descontar">➖ Descontar (gasto)</option>
+            <option value="sumar">➕ Sumar (a favor)</option>
+          </select>
+        </div>
+        <div class="campo">
+          <label>Valor (COP)</label>
+          <input type="number" id="dl_ajuste_valor" placeholder="Ej. 50000" min="0">
+        </div>
       </div>
       <div class="campo">
         <label>Foto de la factura / soporte (opcional)</label>
         <input type="file" id="dl_ajuste_factura_file" accept="image/*" onchange="dlPreviewFacturaAjuste(event)">
         <img id="dl_ajuste_factura_preview" style="display:none;max-width:100%;max-height:140px;border-radius:8px;margin-top:8px;border:1px solid var(--borde)">
       </div>
-      <button type="button" class="btn-secundario" onclick="agregarAjusteLiquidacion()" style="width:100%;margin-bottom:14px">+ Agregar cuadre / gasto</button>
+      <button type="button" class="btn-agregar-cuadre" onclick="agregarAjusteLiquidacion()">+ Agregar cuadre / gasto</button>
 
       <hr class="divider">
       <div class="campo">
@@ -5879,6 +5910,7 @@ async function abrirDetalleLiquidacion(vehiculoId) {
   document.getElementById('dl_monto_final').value = montoInicial || '';
   document.getElementById('dl_ajuste_desc').value = '';
   document.getElementById('dl_ajuste_valor').value = '';
+  document.getElementById('dl_ajuste_tipo').value = 'descontar';
 
   document.getElementById('dl-estado-envio').innerHTML = registro
     ? `📧 Ya se ${registro.correo_enviado ? 'envió' : 'registró'} esta liquidación${registro.correo_destino ? ' a ' + registro.correo_destino : ''}. Guardar aquí actualizará el registro y reenviará el correo con el valor corregido.`
@@ -5910,8 +5942,10 @@ function renderAjustesLiquidacion() {
 
 async function agregarAjusteLiquidacion() {
   const desc = document.getElementById('dl_ajuste_desc').value.trim();
-  const valor = parseFloat(document.getElementById('dl_ajuste_valor').value);
-  if (!desc || !valor) { mostrarToast('⚠️ Escribe la descripción y el valor del cuadre', '#E05252'); return; }
+  const valorAbs = Math.abs(parseFloat(document.getElementById('dl_ajuste_valor').value));
+  const tipo = document.getElementById('dl_ajuste_tipo').value; // 'descontar' o 'sumar'
+  if (!desc || !valorAbs) { mostrarToast('⚠️ Escribe la descripción y el valor del cuadre', '#E05252'); return; }
+  const valor = tipo === 'descontar' ? -valorAbs : valorAbs;
 
   let facturaUrl = null;
   if (dlAjusteFacturaArchivo) {
@@ -5937,6 +5971,7 @@ async function agregarAjusteLiquidacion() {
   liqAjustesTrabajo.push({ descripcion: desc, valor, fecha: new Date().toISOString().split('T')[0], factura_url: facturaUrl });
   document.getElementById('dl_ajuste_desc').value = '';
   document.getElementById('dl_ajuste_valor').value = '';
+  document.getElementById('dl_ajuste_tipo').value = 'descontar';
   document.getElementById('dl_ajuste_factura_file').value = '';
   document.getElementById('dl_ajuste_factura_preview').style.display = 'none';
   dlAjusteFacturaArchivo = null;
