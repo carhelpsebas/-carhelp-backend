@@ -2126,6 +2126,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn-secundario" onclick="cerrarModal('modal-detalle-liquidacion')">Cerrar</button>
+      <button class="btn-secundario" id="dl-btn-reenviar-igual" style="display:none" onclick="reenviarUltimoCorreoLiquidacion()">📧 Reenviar el mismo correo</button>
       <button class="btn-primario" id="dl-btn-guardar" onclick="guardarDetalleLiquidacion()">Guardar y enviar</button>
     </div>
   </div>
@@ -5608,6 +5609,7 @@ function abrirDetalleLiquidacion(vehiculoId) {
     : `Esta liquidación aún no se ha generado ni enviado. Los cuadres que agregues aquí se incluirán al generarla.`;
 
   document.getElementById('dl-btn-guardar').textContent = registro ? 'Guardar y reenviar corregida' : 'Guardar y enviar';
+  document.getElementById('dl-btn-reenviar-igual').style.display = registro ? 'inline-flex' : 'none';
 
   renderAjustesLiquidacion();
   abrirModal('modal-detalle-liquidacion');
@@ -5676,6 +5678,52 @@ function quitarAjusteLiquidacion(idx) {
   renderAjustesLiquidacion();
   const actual = parseFloat(document.getElementById('dl_monto_final').value) || 0;
   document.getElementById('dl_monto_final').value = Math.max(actual - ajuste.valor, 0);
+}
+
+async function reenviarUltimoCorreoLiquidacion() {
+  const vehiculoId = liqVehiculoModalActual;
+  const ctx = liqDatosPeriodo[vehiculoId];
+  if (!ctx || !ctx.registro) return;
+  const { vehiculo: v, ciclo, ingresos, gastosPropietario, dias, registro, gastosListaPropietario } = ctx;
+
+  const correo = v.procedencia === 'propietario' ? v.propietarioEmail : v.aliadoEmail;
+  const nombreDest = v.procedencia === 'propietario' ? (v.propietarioNombre || 'Propietario') : (v.aliadoNombre || 'Aliado');
+  const periodoLabel = `${fmtFecha(ciclo.inicio)} al ${fmtFecha(ciclo.fin)}`;
+  const montoFinal = parseFloat(registro.monto_final ?? registro.monto_liquidado) || 0;
+  const ajustesGuardados = registro.ajustes || [];
+
+  const esFijo = v.propietarioTipoLiq === 'fijo';
+  const brutoPropietario = esFijo ? (v.propietarioValorFijo || 0) : (ingresos * (v.propietarioPorcentaje || 0) / 100);
+  const bloqueAjustes = ajustesGuardados.length > 0
+    ? '\nCuadres / gastos de cambio en este período:\n' + ajustesGuardados.map(a => `  • ${a.descripcion}: ${a.valor < 0 ? '-' : '+'}${formatCOP(Math.abs(a.valor))}${a.factura_url ? ` — Ver factura: ${a.factura_url}` : ''}`).join('\n') + '\n'
+    : '';
+  const bloqueFacturas = (gastosListaPropietario && gastosListaPropietario.length > 0)
+    ? '\nGastos descontados en este período:\n' + gastosListaPropietario.map(g => `  • ${g.descripcion || g.tipo}: ${formatCOP(g.valor)}${g.factura_url ? ` — Ver factura: ${g.factura_url}` : ''}`).join('\n') + '\n'
+    : '';
+
+  const cuerpo = `Hola ${nombreDest},
+
+Le reenviamos la liquidación de su vehículo ${v.nombre}${v.placa ? ' (' + v.placa + ')' : ''} con Car Help:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+PERÍODO: ${periodoLabel}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+${v.procedencia === 'propietario' ? `Valor correspondiente (antes de descuentos): ${formatCOP(brutoPropietario)}\nGastos/mantenimientos descontados:           ${formatCOP(gastosPropietario)}\n` : `Días de uso en el período:  ${dias}\n`}${bloqueFacturas}${bloqueAjustes}──────────────────────────────────
+VALOR A CONSIGNAR:      ${formatCOP(montoFinal)}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+En los próximos días le confirmaremos el pago correspondiente.
+
+Gracias por confiar su vehículo a Car Help.
+
+Equipo Car Help — Pereira, Colombia
+📱 WhatsApp: +57 310 743 6082`;
+
+  const asuntoCorreo = `Liquidación ${v.nombre} — Período ${fmtFecha(ciclo.inicio)} al ${fmtFecha(ciclo.fin)}`;
+  if (correo) await enviarCorreoDirecto(correo, asuntoCorreo, cuerpo);
+  await enviarCorreoDirecto('rdacarhelp@gmail.com', asuntoCorreo, cuerpo);
+
+  mostrarToast('📧 Correo reenviado tal como se envió la última vez');
 }
 
 async function guardarDetalleLiquidacion() {
