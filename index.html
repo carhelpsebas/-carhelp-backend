@@ -1670,9 +1670,21 @@
         </div>
         <div class="campo">
           <label>Vincular a vehículo (opcional)</label>
-          <select id="ct_vehiculo"><option value="">— Ninguno —</option></select>
+          <select id="ct_vehiculo" onchange="ctToggleAsume()"><option value="">— Ninguno —</option></select>
+        </div>
+        <div class="campo" id="ct-asume-wrap" style="display:none">
+          <label>¿Quién asume este gasto?</label>
+          <select id="ct_asume">
+            <option value="empresa">Car Help (empresa)</option>
+            <option value="propietario">Propietario del vehículo</option>
+          </select>
         </div>
         <div class="campo"><label>Notas</label><input type="text" id="ct_notas" placeholder="Observaciones adicionales"></div>
+        <div class="campo">
+          <label>Foto de la factura (opcional)</label>
+          <input type="file" id="ct_factura_file" accept="image/*" onchange="ctPreviewFactura(event)">
+          <img id="ct_factura_preview" style="display:none;max-width:100%;max-height:160px;border-radius:8px;margin-top:8px;border:1px solid var(--borde)">
+        </div>
         <button class="btn-primario full" onclick="guardarMovimientoContable()">Registrar movimiento</button>
       </div>
     </div>
@@ -5369,6 +5381,27 @@ function renderTablaMovimientos() {
   `).join('');
 }
 
+function ctToggleAsume() {
+  const vehId = document.getElementById('ct_vehiculo').value;
+  const v = vehiculos.find(x => x.id === vehId);
+  document.getElementById('ct-asume-wrap').style.display = (v && v.procedencia === 'propietario') ? 'block' : 'none';
+  document.getElementById('ct_asume').value = 'empresa';
+}
+
+let ctFacturaArchivo = null;
+function ctPreviewFactura(event) {
+  const file = event.target.files[0];
+  if (!file) { ctFacturaArchivo = null; return; }
+  ctFacturaArchivo = file;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = document.getElementById('ct_factura_preview');
+    img.src = e.target.result;
+    img.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
 async function guardarMovimientoContable() {
   const tipo = document.getElementById('ct_tipo').value;
   const categoria = document.getElementById('ct_categoria').value;
@@ -5379,14 +5412,38 @@ async function guardarMovimientoContable() {
   const orden_id = document.getElementById('ct_orden').value || null;
   const vehiculo_id = document.getElementById('ct_vehiculo').value || null;
   const notas = document.getElementById('ct_notas').value.trim();
+  const asume = document.getElementById('ct_asume')?.value || 'empresa';
 
   if (!concepto) { mostrarToast('⚠️ Ingresa el concepto del movimiento', '#E05252'); return; }
   if (!valor) { mostrarToast('⚠️ Ingresa el valor del movimiento', '#E05252'); return; }
 
+  let facturaUrl = null;
+  if (ctFacturaArchivo) {
+    try {
+      const ext = ctFacturaArchivo.name.split('.').pop() || 'jpg';
+      const path = `movimientos/${vehiculo_id || 'general'}-${Date.now()}.${ext}`;
+      const res = await fetch(`${SB_URL}/storage/v1/object/entregas-fotos/${path}`, {
+        method: 'POST',
+        headers: {
+          'apikey': SB_KEY,
+          'Authorization': `Bearer ${SB_KEY}`,
+          'Content-Type': ctFacturaArchivo.type || 'image/jpeg',
+          'x-upsert': 'true'
+        },
+        body: ctFacturaArchivo
+      });
+      if (res.ok) facturaUrl = `${SB_URL}/storage/v1/object/public/entregas-fotos/${path}`;
+    } catch(e) {
+      console.warn('Error subiendo la factura:', e.message);
+    }
+  }
+
   try {
     await sbInsert('movimientos_contables', {
       tipo, categoria, concepto, valor, fecha, metodo_pago,
-      orden_id: orden_id || null, vehiculo_id: vehiculo_id || null, notas
+      orden_id: orden_id || null, vehiculo_id: vehiculo_id || null, notas,
+      asume: vehiculo_id ? asume : null,
+      factura_url: facturaUrl
     });
     mostrarToast('✅ Movimiento registrado');
   } catch(e) {
@@ -5394,6 +5451,10 @@ async function guardarMovimientoContable() {
     mostrarToast('⚠️ No se pudo guardar el movimiento', '#E05252');
     return;
   }
+
+  document.getElementById('ct_factura_file').value = '';
+  document.getElementById('ct_factura_preview').style.display = 'none';
+  ctFacturaArchivo = null;
 
   document.getElementById('ct_concepto').value = '';
   document.getElementById('ct_valor').value = '';
@@ -5484,9 +5545,22 @@ async function renderLiquidaciones() {
       gastos.forEach(g => {
         if (g.asume === 'propietario') {
           gastosPropietario += parseFloat(g.valor);
-          gastosListaPropietario.push(g);
+          gastosListaPropietario.push({ descripcion: g.descripcion || g.tipo, valor: parseFloat(g.valor), factura_url: g.factura_url });
         } else {
           gastosEmpresa += parseFloat(g.valor);
+        }
+      });
+    } catch(e) {}
+    // Egresos registrados desde el panel general de Contabilidad y vinculados a este vehículo
+    // (se excluyen las liquidaciones ya pagadas para no contarlas como un gasto adicional)
+    try {
+      const movsEgreso = await sbSelect('movimientos_contables', `&vehiculo_id=eq.${v.id}&tipo=eq.egreso&categoria=neq.liquidacion&fecha=gte.${ciclo.inicio}&fecha=lte.${ciclo.fin}`);
+      movsEgreso.forEach(m => {
+        if (m.asume === 'propietario') {
+          gastosPropietario += parseFloat(m.valor);
+          gastosListaPropietario.push({ descripcion: m.concepto, valor: parseFloat(m.valor), factura_url: m.factura_url });
+        } else {
+          gastosEmpresa += parseFloat(m.valor);
         }
       });
     } catch(e) {}
