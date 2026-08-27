@@ -1907,6 +1907,11 @@
           <option value="propietario">Propietario del vehículo</option>
         </select>
       </div>
+      <div class="campo">
+        <label>Foto de la factura (opcional)</label>
+        <input type="file" id="g_factura_file" accept="image/*" onchange="gPreviewFactura(event)">
+        <img id="g_factura_preview" style="display:none;max-width:100%;max-height:160px;border-radius:8px;margin-top:8px;border:1px solid var(--borde)">
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn-secundario" onclick="cerrarModal('modal-gasto')">Cancelar</button>
@@ -3291,7 +3296,24 @@ function vAbrirGasto() {
   document.getElementById('g_fecha').value = new Date().toISOString().split('T')[0];
   document.getElementById('g_asume').value = 'empresa';
   document.getElementById('g-asume-wrap').style.display = (v && v.procedencia === 'propietario') ? 'block' : 'none';
+  document.getElementById('g_factura_file').value = '';
+  document.getElementById('g_factura_preview').style.display = 'none';
+  gFacturaArchivo = null;
   abrirModal('modal-gasto');
+}
+
+let gFacturaArchivo = null;
+function gPreviewFactura(event) {
+  const file = event.target.files[0];
+  if (!file) { gFacturaArchivo = null; return; }
+  gFacturaArchivo = file;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = document.getElementById('g_factura_preview');
+    img.src = e.target.result;
+    img.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
 }
 
 async function guardarGastoVehiculo() {
@@ -3304,9 +3326,30 @@ async function guardarGastoVehiculo() {
 
   if (!valor) { mostrarToast('⚠️ Ingresa el valor del gasto', '#E05252'); return; }
 
+  let facturaUrl = null;
+  if (gFacturaArchivo) {
+    try {
+      const ext = gFacturaArchivo.name.split('.').pop() || 'jpg';
+      const path = `gastos/${vehiculoId}-${Date.now()}.${ext}`;
+      const res = await fetch(`${SB_URL}/storage/v1/object/entregas-fotos/${path}`, {
+        method: 'POST',
+        headers: {
+          'apikey': SB_KEY,
+          'Authorization': `Bearer ${SB_KEY}`,
+          'Content-Type': gFacturaArchivo.type || 'image/jpeg',
+          'x-upsert': 'true'
+        },
+        body: gFacturaArchivo
+      });
+      if (res.ok) facturaUrl = `${SB_URL}/storage/v1/object/public/entregas-fotos/${path}`;
+    } catch(e) {
+      console.warn('Error subiendo la factura:', e.message);
+    }
+  }
+
   try {
     await sbInsert('vehiculo_gastos', {
-      vehiculo_id: vehiculoId, tipo, descripcion, valor, fecha, asume
+      vehiculo_id: vehiculoId, tipo, descripcion, valor, fecha, asume, factura_url: facturaUrl
     });
     mostrarToast('✅ Gasto registrado');
   } catch(e) {
@@ -3333,7 +3376,7 @@ async function vRenderGastos(vehiculoId) {
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--gris-oscuro);border:1px solid var(--borde);border-radius:8px;margin-bottom:6px;font-size:0.78rem">
         <div>
           <strong>${labels[g.tipo] || g.tipo}</strong> — ${g.descripcion || 'Sin descripción'}<br>
-          <span style="color:var(--blanco-suave)">${fmtFecha(g.fecha)}</span>${g.asume === 'propietario' ? ' · <span style="color:var(--azul-info)">Asume propietario</span>' : ''}
+          <span style="color:var(--blanco-suave)">${fmtFecha(g.fecha)}</span>${g.asume === 'propietario' ? ' · <span style="color:var(--azul-info)">Asume propietario</span>' : ''}${g.factura_url ? ` · <a href="${g.factura_url}" target="_blank" style="color:var(--dorado-suave)">📎 Ver factura</a>` : ''}
         </div>
         <div style="color:var(--dorado);font-weight:700">${formatCOP(g.valor)}</div>
       </div>
@@ -5425,13 +5468,21 @@ async function renderLiquidaciones() {
     const ciclo = calcularCicloVehiculo(v.fechaIngreso, liqModoPeriodo, liqOffsetCiclos);
 
     let ingresos = 0, gastosPropietario = 0, gastosEmpresa = 0;
+    let gastosListaPropietario = [];
     try {
       const movs = await sbSelect('movimientos_contables', `&vehiculo_id=eq.${v.id}&tipo=eq.ingreso&categoria=in.(renta,extension_renta)&fecha=gte.${ciclo.inicio}&fecha=lte.${ciclo.fin}`);
       ingresos = movs.reduce((s, m) => s + parseFloat(m.valor), 0);
     } catch(e) {}
     try {
       const gastos = await sbSelect('vehiculo_gastos', `&vehiculo_id=eq.${v.id}&fecha=gte.${ciclo.inicio}&fecha=lte.${ciclo.fin}`);
-      gastos.forEach(g => { if (g.asume === 'propietario') gastosPropietario += parseFloat(g.valor); else gastosEmpresa += parseFloat(g.valor); });
+      gastos.forEach(g => {
+        if (g.asume === 'propietario') {
+          gastosPropietario += parseFloat(g.valor);
+          gastosListaPropietario.push(g);
+        } else {
+          gastosEmpresa += parseFloat(g.valor);
+        }
+      });
     } catch(e) {}
 
     // ¿Ya se liquidó este ciclo exacto?
@@ -5455,7 +5506,7 @@ async function renderLiquidaciones() {
     }
 
     // Cachear todo el contexto para poder abrir el detalle sin volver a consultar
-    liqDatosPeriodo[v.id] = { vehiculo: v, ciclo, periodoLabel, ingresos, gastosPropietario, gastosEmpresa, dias, montoBase, registro: yaLiquidado };
+    liqDatosPeriodo[v.id] = { vehiculo: v, ciclo, periodoLabel, ingresos, gastosPropietario, gastosEmpresa, dias, montoBase, registro: yaLiquidado, gastosListaPropietario };
 
     if (v.procedencia === 'propietario') {
       const esFijo = v.propietarioTipoLiq === 'fijo';
@@ -5510,14 +5561,20 @@ function abrirDetalleLiquidacion(vehiculoId) {
   const ctx = liqDatosPeriodo[vehiculoId];
   if (!ctx) return;
   liqVehiculoModalActual = vehiculoId;
-  const { vehiculo: v, periodoLabel, ingresos, gastosPropietario, gastosEmpresa, dias, montoBase, registro } = ctx;
+  const { vehiculo: v, periodoLabel, ingresos, gastosPropietario, gastosEmpresa, dias, montoBase, registro, gastosListaPropietario } = ctx;
 
   document.getElementById('dl-vehiculo-nombre').textContent = `${v.nombre} ${v.placa ? '('+v.placa+')' : ''}`;
+
+  const listaGastosHtml = (gastosListaPropietario && gastosListaPropietario.length > 0)
+    ? '<div style="margin-top:8px">' + gastosListaPropietario.map(g =>
+        `<div style="font-size:0.75rem;color:var(--blanco-suave);margin-top:2px">• ${g.descripcion || g.tipo}: ${formatCOP(g.valor)}${g.factura_url ? ` — <a href="${g.factura_url}" target="_blank" style="color:var(--dorado-suave)">📎 ver factura</a>` : ''}</div>`
+      ).join('') + '</div>'
+    : '';
 
   document.getElementById('dl-resumen').innerHTML = v.procedencia === 'propietario'
     ? `Propietario: <strong>${v.propietarioNombre || 'Sin definir'}</strong> · Período: <strong>${periodoLabel}</strong><br>
        Ingresos del período: <strong>${formatCOP(ingresos)}</strong> · Gastos a su cargo: <strong>${formatCOP(gastosPropietario)}</strong>${gastosEmpresa > 0 ? ` · Gastos de Car Help: ${formatCOP(gastosEmpresa)}` : ''}<br>
-       Valor base calculado: <strong>${formatCOP(montoBase)}</strong>`
+       Valor base calculado: <strong>${formatCOP(montoBase)}</strong>${listaGastosHtml}`
     : `Aliado: <strong>${v.aliadoNombre || 'Sin definir'}</strong> · Período: <strong>${periodoLabel}</strong><br>
        Días de uso en el período: <strong>${dias}</strong>`;
 
@@ -5582,7 +5639,7 @@ async function guardarDetalleLiquidacion() {
   const vehiculoId = liqVehiculoModalActual;
   const ctx = liqDatosPeriodo[vehiculoId];
   if (!ctx) return;
-  const { vehiculo: v, ciclo, ingresos, gastosPropietario, dias, registro } = ctx;
+  const { vehiculo: v, ciclo, ingresos, gastosPropietario, dias, registro, gastosListaPropietario } = ctx;
   const montoFinal = parseFloat(document.getElementById('dl_monto_final').value) || 0;
   if (!montoFinal) { mostrarToast('⚠️ Ingresa el valor final a liquidar', '#E05252'); return; }
 
@@ -5635,9 +5692,12 @@ async function guardarDetalleLiquidacion() {
     return;
   }
 
-  if (correo) {
+  if (correo || true) {
     const bloqueAjustes = liqAjustesTrabajo.length > 0
       ? '\nCuadres / gastos de cambio en este período:\n' + liqAjustesTrabajo.map(a => `  • ${a.descripcion}: ${a.valor < 0 ? '-' : '+'}${formatCOP(Math.abs(a.valor))}`).join('\n') + '\n'
+      : '';
+    const bloqueFacturas = (gastosListaPropietario && gastosListaPropietario.length > 0)
+      ? '\nGastos descontados en este período:\n' + gastosListaPropietario.map(g => `  • ${g.descripcion || g.tipo}: ${formatCOP(g.valor)}${g.factura_url ? ` — Ver factura: ${g.factura_url}` : ''}`).join('\n') + '\n'
       : '';
     const cuerpo = `Hola ${nombreDest},
 
@@ -5646,7 +5706,7 @@ ${esCorreccion ? 'Le enviamos la liquidación corregida' : 'Aquí está el resum
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 PERÍODO: ${periodoLabel}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-${v.procedencia === 'propietario' ? `Ingresos generados en el período:  ${formatCOP(ingresos)}\nGastos/mantenimientos a su cargo:  ${formatCOP(gastosPropietario)}\n` : `Días de uso en el período:  ${dias}\n`}${bloqueAjustes}──────────────────────────────────
+${v.procedencia === 'propietario' ? `Ingresos generados en el período:  ${formatCOP(ingresos)}\nGastos/mantenimientos a su cargo:  ${formatCOP(gastosPropietario)}\n` : `Días de uso en el período:  ${dias}\n`}${bloqueFacturas}${bloqueAjustes}──────────────────────────────────
 VALOR ${esCorreccion ? 'CORREGIDO' : ''} A CONSIGNAR:      ${formatCOP(montoFinal)}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -5656,10 +5716,15 @@ Gracias por confiar su vehículo a Car Help.
 
 Equipo Car Help — Pereira, Colombia
 📱 WhatsApp: +57 310 743 6082`;
-    await enviarCorreoDirecto(correo, `${esCorreccion ? 'Liquidación corregida' : 'Liquidación'} ${v.nombre} — Período ${fmtFecha(ciclo.inicio)} al ${fmtFecha(ciclo.fin)}`, cuerpo);
+
+    const asuntoCorreo = `${esCorreccion ? 'Liquidación corregida' : 'Liquidación'} ${v.nombre} — Período ${fmtFecha(ciclo.inicio)} al ${fmtFecha(ciclo.fin)}`;
+
+    if (correo) await enviarCorreoDirecto(correo, asuntoCorreo, cuerpo);
+    // Copia siempre a contabilidad interna
+    await enviarCorreoDirecto('rdacarhelp@gmail.com', `[Contabilidad] ${asuntoCorreo}`, cuerpo);
   }
 
-  mostrarToast(correo ? `✅ Liquidación ${esCorreccion ? 'corregida y reenviada' : 'guardada y enviada'}` : '✅ Liquidación guardada (sin correo: falta el email)');
+  mostrarToast(`✅ Liquidación ${esCorreccion ? 'corregida y reenviada' : 'guardada y enviada'}${correo ? ' (con copia a contabilidad)' : ' — sin correo al propietario/aliado por falta de email, pero se envió copia a contabilidad'}`);
   cerrarModal('modal-detalle-liquidacion');
   await cargarMovimientosContables();
   await renderLiquidaciones();
