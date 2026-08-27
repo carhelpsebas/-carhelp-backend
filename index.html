@@ -2137,9 +2137,26 @@
       <div class="info-banner" id="dl-estado-envio"></div>
     </div>
     <div class="modal-footer">
+      <button class="btn-secundario" onclick="abrirHistorialLiquidaciones()">📜 Ver historial completo</button>
       <button class="btn-secundario" onclick="cerrarModal('modal-detalle-liquidacion')">Cerrar</button>
       <button class="btn-secundario" id="dl-btn-reenviar-igual" style="display:none" onclick="reenviarUltimoCorreoLiquidacion()">📧 Reenviar el mismo correo</button>
       <button class="btn-primario" id="dl-btn-guardar" onclick="guardarDetalleLiquidacion()">Guardar y enviar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ MODAL HISTORIAL DE LIQUIDACIONES ═══════════════════ -->
+<div class="modal-overlay" id="modal-historial-liquidaciones">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <div class="modal-titulo">📜 Historial de liquidaciones <span id="hl-vehiculo-nombre" style="color:var(--dorado)"></span></div>
+      <button class="modal-cerrar" onclick="cerrarModal('modal-historial-liquidaciones')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="hl-lista"><div class="estado-vacio"><div class="icono-grande">📜</div><p>Cargando...</p></div></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secundario" onclick="cerrarModal('modal-historial-liquidaciones')">Cerrar</button>
     </div>
   </div>
 </div>
@@ -5495,15 +5512,38 @@ function moverPeriodoLiq(delta) {
 }
 
 // Calcula el ciclo de liquidación de un vehículo, anclado a su fecha de ingreso a la flota
+// Suma N meses calendario a una fecha, manteniendo el mismo día del mes cuando es posible
+function sumarMesesCalendario(fecha, n) {
+  const d = new Date(fecha.getTime());
+  const diaOriginal = d.getDate();
+  d.setDate(1); // evita que noviembre + 1 mes "se pase" a diciembre por overflow de día
+  d.setMonth(d.getMonth() + n);
+  const ultimoDiaMes = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(diaOriginal, ultimoDiaMes));
+  return d;
+}
+
 function calcularCicloVehiculo(fechaIngresoStr, modo, offset) {
-  const largoDias = modo === 'quincenal' ? 15 : 30;
   const hoy = new Date();
   const ancla = fechaIngresoStr ? new Date(fechaIngresoStr + 'T00:00:00') : new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-  const diasDesdeAncla = Math.max(0, Math.floor((hoy - ancla) / 86400000));
-  const cicloActualIndex = Math.floor(diasDesdeAncla / largoDias);
-  const indiceObjetivo = Math.max(0, cicloActualIndex - offset);
-  const inicio = new Date(ancla.getTime() + indiceObjetivo * largoDias * 86400000);
-  const fin = new Date(inicio.getTime() + (largoDias - 1) * 86400000);
+
+  if (modo === 'quincenal') {
+    const largoDias = 15;
+    const diasDesdeAncla = Math.max(0, Math.floor((hoy - ancla) / 86400000));
+    const cicloActualIndex = Math.floor(diasDesdeAncla / largoDias);
+    const indiceObjetivo = Math.max(0, cicloActualIndex - offset);
+    const inicio = new Date(ancla.getTime() + indiceObjetivo * largoDias * 86400000);
+    const fin = new Date(inicio.getTime() + (largoDias - 1) * 86400000);
+    return { inicio: soloFecha(inicio), fin: soloFecha(fin) };
+  }
+
+  // Mensual: usa meses calendario reales anclados al día de ingreso (ej. 24 de cada mes)
+  let n = 0;
+  while (sumarMesesCalendario(ancla, n + 1) <= hoy) n++;
+  const indiceObjetivo = Math.max(0, n - offset);
+  const inicio = sumarMesesCalendario(ancla, indiceObjetivo);
+  const finBruto = sumarMesesCalendario(ancla, indiceObjetivo + 1);
+  const fin = new Date(finBruto.getTime() - 86400000); // un día antes de que empiece el siguiente ciclo
   return { inicio: soloFecha(inicio), fin: soloFecha(fin) };
 }
 
@@ -5651,7 +5691,47 @@ function dlPreviewFacturaAjuste(event) {
   reader.readAsDataURL(file);
 }
 
-function abrirDetalleLiquidacion(vehiculoId) {
+async function abrirHistorialLiquidaciones() {
+  const vehiculoId = liqVehiculoModalActual;
+  const ctx = liqDatosPeriodo[vehiculoId];
+  if (!ctx) return;
+  const v = ctx.vehiculo;
+  document.getElementById('hl-vehiculo-nombre').textContent = `${v.nombre} ${v.placa ? '('+v.placa+')' : ''}`;
+  document.getElementById('hl-lista').innerHTML = '<div class="estado-vacio"><div class="icono-grande">📜</div><p>Cargando...</p></div>';
+  abrirModal('modal-historial-liquidaciones');
+
+  let historial = [];
+  try {
+    historial = await sbSelect('liquidaciones', `&vehiculo_id=eq.${vehiculoId}&order=periodo_inicio.desc`);
+  } catch(e) {
+    document.getElementById('hl-lista').innerHTML = '<div class="estado-vacio"><p>No se pudo cargar el historial.</p></div>';
+    return;
+  }
+
+  if (historial.length === 0) {
+    document.getElementById('hl-lista').innerHTML = '<div class="estado-vacio"><div class="icono-grande">📜</div><p>Aún no hay liquidaciones registradas para este vehículo.</p></div>';
+    return;
+  }
+
+  document.getElementById('hl-lista').innerHTML = historial.map(h => {
+    const monto = parseFloat(h.monto_final ?? h.monto_liquidado);
+    const ajustesCount = (h.ajustes || []).length;
+    return `
+    <div style="background:var(--gris-oscuro);border:1px solid var(--borde);border-radius:8px;padding:10px 12px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <strong style="color:var(--dorado-suave)">${fmtFecha(h.periodo_inicio)} → ${fmtFecha(h.periodo_fin)}</strong>
+          <div style="font-size:0.72rem;color:var(--blanco-suave);margin-top:2px">
+            ${h.correo_enviado ? `📧 Enviado a ${h.correo_destino || '—'}` : '⚠️ No se envió correo'}${ajustesCount > 0 ? ` · ${ajustesCount} cuadre(s)` : ''}
+          </div>
+        </div>
+        <div style="font-family:'Syne',sans-serif;font-weight:800;color:var(--verde-ok)">${formatCOP(monto)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function abrirDetalleLiquidacion(vehiculoId) {
   const ctx = liqDatosPeriodo[vehiculoId];
   if (!ctx) return;
   liqVehiculoModalActual = vehiculoId;
