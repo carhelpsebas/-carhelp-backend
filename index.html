@@ -2192,6 +2192,24 @@
   </div>
 </div>
 
+<!-- ═══════════════════ MODAL PERFIL INVERSIONISTA ═══════════════════ -->
+<div class="modal-overlay" id="modal-perfil-inversionista">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <div class="modal-titulo">💼 <span id="pi-nombre"></span></div>
+      <button class="modal-cerrar" onclick="cerrarModal('modal-perfil-inversionista')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="info-banner" id="pi-info"></div>
+      <div class="seccion-label">Períodos de liquidación</div>
+      <div id="pi-lista-periodos"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secundario" onclick="cerrarModal('modal-perfil-inversionista')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL ENTREGAS -->
 <div class="entrega-overlay" id="entrega-overlay">
 
@@ -7003,11 +7021,154 @@ async function renderInversionistas() {
   }).join('');
 }
 
-// Lleva directo al detalle de liquidación de este inversionista desde su perfil
+// Genera la lista de todos los períodos de un vehículo desde su fecha de ingreso hasta hoy (el más reciente primero)
+function listarPeriodosVehiculo(v) {
+  const periodos = [];
+  if (!v.fechaIngreso) return periodos;
+  const modo = liqModoPeriodo;
+  const ancla = new Date(v.fechaIngreso + 'T00:00:00');
+  const hoy = new Date();
+  let n = 0;
+  while (true) {
+    const inicio = modo === 'quincenal'
+      ? new Date(ancla.getTime() + n * 15 * 86400000)
+      : sumarMesesCalendario(ancla, n);
+    if (inicio > hoy) break;
+    const fin = modo === 'quincenal'
+      ? new Date(inicio.getTime() + 14 * 86400000)
+      : new Date(sumarMesesCalendario(ancla, n + 1).getTime() - 86400000);
+    periodos.push({ numero: n + 1, inicio: soloFecha(inicio), fin: soloFecha(fin) });
+    n++;
+    if (n > 240) break; // seguridad para evitar bucles infinitos
+  }
+  return periodos.reverse();
+}
+
+// Perfil del inversionista: lista todos los períodos desde que ingresó el vehículo
 async function abrirPerfilInversionista(vehiculoId) {
-  cambiarVistaPorId('contabilidad');
-  await renderLiquidaciones();
+  const v = vehiculos.find(x => x.id === vehiculoId);
+  if (!v) return;
+
+  document.getElementById('pi-nombre').innerHTML = `${v.propietarioNombre || 'Inversionista'} <span style="color:var(--dorado);font-size:0.85rem">— ${v.nombre}${v.placa ? ' ('+v.placa+')' : ''}</span>`;
+  document.getElementById('pi-info').innerHTML = `Correo: <strong>${v.propietarioEmail || 'Sin registrar'}</strong> · ${v.propietarioTipoLiq === 'fijo' ? `Valor fijo: <strong>${formatCOP(v.propietarioValorFijo||0)}</strong>` : `% liquidación: <strong>${v.propietarioPorcentaje||0}%</strong>`} por período · Ingresó a la flota: <strong>${v.fechaIngreso ? fmtFecha(v.fechaIngreso) : 'sin fecha registrada'}</strong>`;
+  document.getElementById('pi-lista-periodos').innerHTML = '<div class="estado-vacio"><p>Cargando períodos...</p></div>';
+  abrirModal('modal-perfil-inversionista');
+
+  const periodos = listarPeriodosVehiculo(v);
+  if (periodos.length === 0) {
+    document.getElementById('pi-lista-periodos').innerHTML = '<div class="estado-vacio"><p>Este vehículo no tiene fecha de ingreso registrada, así que no se pueden calcular los períodos. Edítalo desde Vehículos.</p></div>';
+    return;
+  }
+
+  let registros = [];
+  try { registros = await sbSelect('liquidaciones', `&vehiculo_id=eq.${vehiculoId}`); } catch(e) {}
+
+  document.getElementById('pi-lista-periodos').innerHTML = periodos.map(p => {
+    const reg = registros.find(r => r.periodo_inicio === p.inicio && r.periodo_fin === p.fin);
+    return `
+    <div style="display:flex;justify-content:space-between;align-items:center;background:var(--gris-oscuro);border:1px solid var(--borde);border-radius:8px;padding:10px 12px;margin-bottom:8px">
+      <div>
+        <strong style="color:var(--dorado-suave)">Período ${p.numero}</strong>
+        <div style="font-size:0.78rem;color:var(--blanco-suave)">${fmtFecha(p.inicio)} → ${fmtFecha(p.fin)}</div>
+        <div style="font-size:0.7rem;margin-top:2px;color:${reg ? 'var(--verde-ok)' : 'var(--blanco-suave)'}">${reg ? `✅ Liquidado: ${formatCOP(reg.monto_final ?? reg.monto_liquidado)}` : '⚠️ Sin liquidar'}</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        ${reg ? `<button class="btn-secundario" style="font-size:0.7rem;padding:6px 10px" onclick="descargarLiquidacionPeriodo('${vehiculoId}','${p.inicio}','${p.fin}')">📥 Descargar</button>` : ''}
+        <button class="btn-primario" style="font-size:0.7rem;padding:6px 10px" onclick="abrirDetalleLiquidacionPeriodo('${vehiculoId}','${p.inicio}','${p.fin}')">${reg ? 'Ver / editar' : 'Liquidar'}</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Abre el detalle de liquidación (el mismo modal de siempre) para un período específico, no solo el actual
+async function abrirDetalleLiquidacionPeriodo(vehiculoId, periodoInicio, periodoFin) {
+  const v = vehiculos.find(x => x.id === vehiculoId);
+  if (!v) return;
+
+  let ingresos = 0, gastosPropietario = 0, gastosEmpresa = 0;
+  let gastosListaPropietario = [];
+  try {
+    const movs = await sbSelect('movimientos_contables', `&vehiculo_id=eq.${vehiculoId}&tipo=eq.ingreso&categoria=in.(renta,extension_renta)&fecha=gte.${periodoInicio}&fecha=lte.${periodoFin}`);
+    ingresos = movs.reduce((s, m) => s + parseFloat(m.valor), 0);
+  } catch(e) {}
+  try {
+    const gastos = await sbSelect('vehiculo_gastos', `&vehiculo_id=eq.${vehiculoId}&fecha=gte.${periodoInicio}&fecha=lte.${periodoFin}`);
+    gastos.forEach(g => {
+      if (g.asume === 'propietario') { gastosPropietario += parseFloat(g.valor); gastosListaPropietario.push({ descripcion: g.descripcion || g.tipo, valor: parseFloat(g.valor), factura_url: g.factura_url }); }
+      else gastosEmpresa += parseFloat(g.valor);
+    });
+  } catch(e) {}
+  try {
+    const movsEgreso = await sbSelect('movimientos_contables', `&vehiculo_id=eq.${vehiculoId}&tipo=eq.egreso&categoria=neq.liquidacion&fecha=gte.${periodoInicio}&fecha=lte.${periodoFin}`);
+    movsEgreso.forEach(m => {
+      if (m.asume === 'propietario') { gastosPropietario += parseFloat(m.valor); gastosListaPropietario.push({ descripcion: m.concepto, valor: parseFloat(m.valor), factura_url: m.factura_url }); }
+      else gastosEmpresa += parseFloat(m.valor);
+    });
+  } catch(e) {}
+
+  let registro = null;
+  try {
+    const regs = await sbSelect('liquidaciones', `&vehiculo_id=eq.${vehiculoId}&periodo_inicio=eq.${periodoInicio}&periodo_fin=eq.${periodoFin}`);
+    registro = regs[0] || null;
+  } catch(e) {}
+
+  const esFijo = v.propietarioTipoLiq === 'fijo';
+  const pct = v.propietarioPorcentaje || 0;
+  const valorFijo = v.propietarioValorFijo || 0;
+  const montoBase = esFijo
+    ? Math.max(valorFijo - gastosPropietario, 0)
+    : Math.max(ingresos * (pct / 100) - gastosPropietario, 0);
+  const dias = v.procedencia === 'aliado' ? diasUsoAliadoEnRango(vehiculoId, periodoInicio, periodoFin) : 0;
+  const periodoLabel = `${fmtFecha(periodoInicio)} → ${fmtFecha(periodoFin)}`;
+
+  liqDatosPeriodo[vehiculoId] = { vehiculo: v, ciclo: { inicio: periodoInicio, fin: periodoFin }, periodoLabel, ingresos, gastosPropietario, gastosEmpresa, dias, montoBase, registro, gastosListaPropietario };
+  cerrarModal('modal-perfil-inversionista');
   abrirDetalleLiquidacion(vehiculoId);
+}
+
+// Descarga en un archivo de texto la liquidación exacta que se envió en un período ya liquidado
+async function descargarLiquidacionPeriodo(vehiculoId, periodoInicio, periodoFin) {
+  const v = vehiculos.find(x => x.id === vehiculoId);
+  if (!v) return;
+  let registro = null;
+  try {
+    const regs = await sbSelect('liquidaciones', `&vehiculo_id=eq.${vehiculoId}&periodo_inicio=eq.${periodoInicio}&periodo_fin=eq.${periodoFin}`);
+    registro = regs[0] || null;
+  } catch(e) {}
+  if (!registro) { mostrarToast('⚠️ No hay una liquidación guardada para ese período', '#E05252'); return; }
+
+  const periodoLabel = `${fmtFecha(periodoInicio)} al ${fmtFecha(periodoFin)}`;
+  const monto = parseFloat(registro.monto_final ?? registro.monto_liquidado);
+  const esFijo = v.propietarioTipoLiq === 'fijo';
+  const brutoPropietario = esFijo ? (v.propietarioValorFijo || 0) : ((registro.ingresos || 0) * (v.propietarioPorcentaje || 0) / 100);
+  const ajustes = registro.ajustes || [];
+  const bloqueAjustes = ajustes.length > 0
+    ? 'Cuadres / gastos de cambio en este período:\n' + ajustes.map(a => `  • ${a.descripcion}: ${a.valor < 0 ? '-' : '+'}${formatCOP(Math.abs(a.valor))}${a.factura_url ? ` — Factura: ${a.factura_url}` : ''}`).join('\n') + '\n\n'
+    : '';
+
+  const contenido = `CAR HELP — LIQUIDACIÓN
+Vehículo: ${v.nombre}${v.placa ? ' (' + v.placa + ')' : ''}
+Propietario: ${v.propietarioNombre || '—'}
+Período: ${periodoLabel}
+────────────────────────────────────
+Valor correspondiente (antes de descuentos): ${formatCOP(brutoPropietario)}
+Gastos/mantenimientos descontados:           ${formatCOP(registro.gastos_deducidos || 0)}
+${bloqueAjustes}────────────────────────────────────
+VALOR CONSIGNADO: ${formatCOP(monto)}
+────────────────────────────────────
+Enviado a: ${registro.correo_destino || '—'}
+Fecha de registro: ${registro.created_at ? fmtFecha(registro.created_at.split('T')[0]) : '—'}
+`;
+
+  const blob = new Blob([contenido], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Liquidacion_${v.nombre.replace(/\s+/g,'_')}_${periodoInicio}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 function renderClientes(lista = clientesData) {
