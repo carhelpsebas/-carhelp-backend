@@ -3225,9 +3225,25 @@ async function vRenderGastos(vehiculoId) {
 
 async function eliminarVehiculo(id) {
   try {
+    // Desvincular referencias en otras tablas para que Supabase no rechace el borrado
+    try {
+      const movs = await sbSelect('movimientos_contables', `&vehiculo_id=eq.${id}`);
+      for (const m of movs) await sbUpdate('movimientos_contables', m.id, { vehiculo_id: null });
+    } catch(e) { console.warn('No se pudieron desvincular movimientos contables:', e.message); }
+    try {
+      const ordenesVeh = await sbSelect('ordenes', `&vehiculo_id=eq.${id}`);
+      for (const o of ordenesVeh) await sbUpdate('ordenes', o.id, { vehiculo_id: null });
+    } catch(e) { console.warn('No se pudieron desvincular las órdenes:', e.message); }
+    try {
+      const gastos = await sbSelect('vehiculo_gastos', `&vehiculo_id=eq.${id}`);
+      for (const g of gastos) await sbDelete('vehiculo_gastos', g.id);
+    } catch(e) { console.warn('No se pudieron eliminar los gastos del vehículo:', e.message); }
+
     await sbDelete('vehiculos', id);
   } catch(e) {
     console.error('Error eliminando de Supabase:', e);
+    mostrarToast('⚠️ No se pudo eliminar en Supabase: ' + e.message, 'var(--rojo-alerta)');
+    return;
   }
   vehiculos = vehiculos.filter(v => v.id !== id);
   lsSet('carhelp:vehiculos', vehiculos);
@@ -3724,10 +3740,31 @@ async function cambiarEstadoReserva(num, estado) {
 
 async function eliminarReserva(num) {
   const r = reservas.find(x => x.num_reserva === num);
-  reservas = reservas.filter(r => r.num_reserva !== num);
+  if (!r) return;
+
   try {
-    if (r?.id) await sbDelete('ordenes', r.id);
-  } catch(e) { console.warn('Error eliminando de Supabase:', e.message); }
+    if (r.id) {
+      // Desvincular (no borrar) los movimientos contables asociados a esta reserva,
+      // para no perder el historial de contabilidad y evitar que Supabase rechace
+      // el borrado por la relación entre movimientos_contables y ordenes.
+      try {
+        const movs = await sbSelect('movimientos_contables', `&orden_id=eq.${r.id}`);
+        for (const m of movs) {
+          await sbUpdate('movimientos_contables', m.id, { orden_id: null });
+        }
+      } catch(e) {
+        console.warn('No se pudieron desvincular los movimientos contables:', e.message);
+      }
+
+      await sbDelete('ordenes', r.id);
+    }
+  } catch(e) {
+    console.error('Error eliminando reserva de Supabase:', e);
+    mostrarToast('⚠️ No se pudo eliminar en Supabase: ' + e.message, 'var(--rojo-alerta)');
+    return; // No quitarla localmente si Supabase no la eliminó de verdad
+  }
+
+  reservas = reservas.filter(x => x.num_reserva !== num);
   await guardar('carhelp:reservas', reservas);
   renderReservas(); renderStats(); renderProximas();
   mostrarToast('🗑️ Reserva eliminada');
@@ -4008,7 +4045,11 @@ async function guardarTour() {
 async function eliminarTour(id) {
   try {
     await sbDelete('tours', id);
-  } catch(e) { console.warn('Error eliminando tour de Supabase:', e.message); }
+  } catch(e) {
+    console.error('Error eliminando tour de Supabase:', e);
+    mostrarToast('⚠️ No se pudo eliminar en Supabase: ' + e.message, 'var(--rojo-alerta)');
+    return;
+  }
   tours = tours.filter(t => t.id !== id);
   lsSet('carhelp:tours', tours);
   renderTours(); renderToursSelect(); renderStats();
@@ -4147,7 +4188,11 @@ async function eliminarReservaTour(num) {
   const r = reservasTour.find(x => x.num_reserva === num);
   try {
     if (r?.id) await sbDelete('reservas_tour', r.id);
-  } catch(e) { console.warn('Error eliminando de Supabase:', e.message); }
+  } catch(e) {
+    console.error('Error eliminando de Supabase:', e);
+    mostrarToast('⚠️ No se pudo eliminar en Supabase: ' + e.message, 'var(--rojo-alerta)');
+    return;
+  }
   reservasTour = reservasTour.filter(r => r.num_reserva !== num);
   lsSet('carhelp:reservas_tour', reservasTour);
   renderReservasTour();
@@ -4289,7 +4334,11 @@ async function eliminarSeguridad(num) {
   const s = solicitudesSeguridad.find(x => x.num_reserva === num);
   try {
     if (s?.id) await sbDelete('solicitudes_seguridad', s.id);
-  } catch(e) { console.warn('Error eliminando de Supabase:', e.message); }
+  } catch(e) {
+    console.error('Error eliminando de Supabase:', e);
+    mostrarToast('⚠️ No se pudo eliminar en Supabase: ' + e.message, 'var(--rojo-alerta)');
+    return;
+  }
   solicitudesSeguridad = solicitudesSeguridad.filter(s => s.num_reserva !== num);
   lsSet('carhelp:seguridad', solicitudesSeguridad);
   renderSeguridad();
