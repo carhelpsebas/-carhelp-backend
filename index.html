@@ -2110,6 +2110,11 @@
         <div class="campo"><label>Descripción</label><input type="text" id="dl_ajuste_desc" placeholder="Ej. Cambio de aceite descontado, cuadre de caja..."></div>
         <div class="campo"><label>Valor (usa negativo para descontar)</label><input type="number" id="dl_ajuste_valor" placeholder="Ej. -50000 o 30000"></div>
       </div>
+      <div class="campo">
+        <label>Foto de la factura / soporte (opcional)</label>
+        <input type="file" id="dl_ajuste_factura_file" accept="image/*" onchange="dlPreviewFacturaAjuste(event)">
+        <img id="dl_ajuste_factura_preview" style="display:none;max-width:100%;max-height:140px;border-radius:8px;margin-top:8px;border:1px solid var(--borde)">
+      </div>
       <button type="button" class="btn-secundario" onclick="agregarAjusteLiquidacion()" style="width:100%;margin-bottom:14px">+ Agregar cuadre / gasto</button>
 
       <hr class="divider">
@@ -5556,6 +5561,20 @@ async function renderLiquidaciones() {
 let liqDatosPeriodo = {};
 let liqVehiculoModalActual = null;
 let liqAjustesTrabajo = [];
+let dlAjusteFacturaArchivo = null;
+
+function dlPreviewFacturaAjuste(event) {
+  const file = event.target.files[0];
+  if (!file) { dlAjusteFacturaArchivo = null; return; }
+  dlAjusteFacturaArchivo = file;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = document.getElementById('dl_ajuste_factura_preview');
+    img.src = e.target.result;
+    img.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
 
 function abrirDetalleLiquidacion(vehiculoId) {
   const ctx = liqDatosPeriodo[vehiculoId];
@@ -5602,7 +5621,7 @@ function renderAjustesLiquidacion() {
   }
   cont.innerHTML = liqAjustesTrabajo.map((a, i) => `
     <div style="display:flex;justify-content:space-between;align-items:center;background:var(--gris-oscuro);border:1px solid var(--borde);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:0.78rem">
-      <span>${a.descripcion}</span>
+      <span>${a.descripcion}${a.factura_url ? ` — <a href="${a.factura_url}" target="_blank" style="color:var(--dorado-suave)">📎 ver factura</a>` : ''}</span>
       <span style="display:flex;align-items:center;gap:8px">
         <strong style="color:${a.valor < 0 ? 'var(--rojo-alerta)' : 'var(--verde-ok)'}">${a.valor < 0 ? '- ' : '+ '}${formatCOP(Math.abs(a.valor))}</strong>
         <button class="btn-peligro" style="font-size:0.68rem;padding:3px 8px" onclick="quitarAjusteLiquidacion(${i})">✕</button>
@@ -5611,14 +5630,38 @@ function renderAjustesLiquidacion() {
   `).join('');
 }
 
-function agregarAjusteLiquidacion() {
+async function agregarAjusteLiquidacion() {
   const desc = document.getElementById('dl_ajuste_desc').value.trim();
   const valor = parseFloat(document.getElementById('dl_ajuste_valor').value);
   if (!desc || !valor) { mostrarToast('⚠️ Escribe la descripción y el valor del cuadre', '#E05252'); return; }
 
-  liqAjustesTrabajo.push({ descripcion: desc, valor, fecha: new Date().toISOString().split('T')[0] });
+  let facturaUrl = null;
+  if (dlAjusteFacturaArchivo) {
+    try {
+      const ext = dlAjusteFacturaArchivo.name.split('.').pop() || 'jpg';
+      const path = `ajustes/${liqVehiculoModalActual}-${Date.now()}.${ext}`;
+      const res = await fetch(`${SB_URL}/storage/v1/object/entregas-fotos/${path}`, {
+        method: 'POST',
+        headers: {
+          'apikey': SB_KEY,
+          'Authorization': `Bearer ${SB_KEY}`,
+          'Content-Type': dlAjusteFacturaArchivo.type || 'image/jpeg',
+          'x-upsert': 'true'
+        },
+        body: dlAjusteFacturaArchivo
+      });
+      if (res.ok) facturaUrl = `${SB_URL}/storage/v1/object/public/entregas-fotos/${path}`;
+    } catch(e) {
+      console.warn('Error subiendo la factura del ajuste:', e.message);
+    }
+  }
+
+  liqAjustesTrabajo.push({ descripcion: desc, valor, fecha: new Date().toISOString().split('T')[0], factura_url: facturaUrl });
   document.getElementById('dl_ajuste_desc').value = '';
   document.getElementById('dl_ajuste_valor').value = '';
+  document.getElementById('dl_ajuste_factura_file').value = '';
+  document.getElementById('dl_ajuste_factura_preview').style.display = 'none';
+  dlAjusteFacturaArchivo = null;
   renderAjustesLiquidacion();
 
   // Recalcular el monto final sugerido sumando los ajustes al valor actual del campo
@@ -5694,7 +5737,7 @@ async function guardarDetalleLiquidacion() {
 
   if (correo || true) {
     const bloqueAjustes = liqAjustesTrabajo.length > 0
-      ? '\nCuadres / gastos de cambio en este período:\n' + liqAjustesTrabajo.map(a => `  • ${a.descripcion}: ${a.valor < 0 ? '-' : '+'}${formatCOP(Math.abs(a.valor))}`).join('\n') + '\n'
+      ? '\nCuadres / gastos de cambio en este período:\n' + liqAjustesTrabajo.map(a => `  • ${a.descripcion}: ${a.valor < 0 ? '-' : '+'}${formatCOP(Math.abs(a.valor))}${a.factura_url ? ` — Ver factura: ${a.factura_url}` : ''}`).join('\n') + '\n'
       : '';
     const bloqueFacturas = (gastosListaPropietario && gastosListaPropietario.length > 0)
       ? '\nGastos descontados en este período:\n' + gastosListaPropietario.map(g => `  • ${g.descripcion || g.tipo}: ${formatCOP(g.valor)}${g.factura_url ? ` — Ver factura: ${g.factura_url}` : ''}`).join('\n') + '\n'
