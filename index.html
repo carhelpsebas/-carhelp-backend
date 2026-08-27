@@ -739,13 +739,23 @@
           <div class="panel-icono">🗓️</div>
           <div>
             <div class="panel-titulo">Disponibilidad de la flota</div>
-            <div class="panel-sub">Próximos 14 días · una fila por vehículo</div>
+            <div class="panel-sub" id="gantt-sub-label">Próximos 14 días · una fila por vehículo</div>
           </div>
         </div>
-        <div style="display:flex;gap:14px;font-size:0.7rem;color:var(--blanco-suave);flex-wrap:wrap">
-          <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--azul-info);margin-right:5px"></span>Pendiente</span>
-          <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--verde-ok);margin-right:5px"></span>Confirmada</span>
-          <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--dorado);margin-right:5px"></span>En curso</span>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+          <div style="display:flex;gap:14px;font-size:0.7rem;color:var(--blanco-suave);flex-wrap:wrap">
+            <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--azul-info);margin-right:5px"></span>Pendiente</span>
+            <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--verde-ok);margin-right:5px"></span>Confirmada</span>
+            <span><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--dorado);margin-right:5px"></span>En curso</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div id="gantt-nav-mes" style="display:none;align-items:center;gap:8px">
+              <button class="btn-secundario" style="padding:6px 10px;font-size:0.72rem" onclick="ganttCambiarMes(-1)">←</button>
+              <span id="gantt-mes-label" style="font-size:0.78rem;font-weight:700;color:var(--dorado-suave);min-width:110px;text-align:center"></span>
+              <button class="btn-secundario" style="padding:6px 10px;font-size:0.72rem" onclick="ganttCambiarMes(1)">→</button>
+            </div>
+            <button class="btn-secundario" id="btn-gantt-modo" style="padding:6px 12px;font-size:0.72rem" onclick="ganttToggleModo()">📅 Ver por mes</button>
+          </div>
         </div>
       </div>
       <div class="panel-body">
@@ -3088,8 +3098,22 @@ function diasEntre(fechaA, fechaB) {
   return Math.round((db - da) / 86400000);
 }
 
-const GANTT_NUM_DIAS = 14;
 const GANTT_COLOR_ESTADO = { pendiente: 'var(--azul-info)', confirmada: 'var(--verde-ok)', entregado: 'var(--dorado)' };
+let ganttModoMes = false;
+let ganttMesActual = new Date();
+
+function ganttToggleModo() {
+  ganttModoMes = !ganttModoMes;
+  document.getElementById('btn-gantt-modo').textContent = ganttModoMes ? '📆 Ver 14 días' : '📅 Ver por mes';
+  document.getElementById('gantt-nav-mes').style.display = ganttModoMes ? 'flex' : 'none';
+  if (ganttModoMes) ganttMesActual = new Date();
+  renderGanttFlota();
+}
+
+function ganttCambiarMes(delta) {
+  ganttMesActual = new Date(ganttMesActual.getFullYear(), ganttMesActual.getMonth() + delta, 1);
+  renderGanttFlota();
+}
 
 function renderGanttFlota() {
   const cont = document.getElementById('gantt-flota');
@@ -3100,15 +3124,34 @@ function renderGanttFlota() {
     return;
   }
 
-  const hoy = soloFecha(new Date());
   const diasSemana = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const hoyStr = soloFecha(new Date());
+
+  let fechaInicioVentana, numDias;
+  if (ganttModoMes) {
+    const anio = ganttMesActual.getFullYear();
+    const mes = ganttMesActual.getMonth();
+    fechaInicioVentana = new Date(anio, mes, 1);
+    numDias = new Date(anio, mes + 1, 0).getDate();
+    const mesLabel = fechaInicioVentana.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' });
+    document.getElementById('gantt-mes-label').textContent = mesLabel.charAt(0).toUpperCase() + mesLabel.slice(1);
+    document.getElementById('gantt-sub-label').textContent = `${mesLabel.charAt(0).toUpperCase() + mesLabel.slice(1)} completo · una fila por vehículo`;
+    cont.style.minWidth = Math.max(760, numDias * 42) + 'px';
+  } else {
+    fechaInicioVentana = new Date();
+    numDias = 14;
+    document.getElementById('gantt-sub-label').textContent = 'Próximos 14 días · una fila por vehículo';
+    cont.style.minWidth = '760px';
+  }
+  const inicioVentanaStr = soloFecha(fechaInicioVentana);
+  const fondoLineas = `repeating-linear-gradient(to right, var(--borde) 0, var(--borde) 1px, transparent 1px, transparent calc(100%/${numDias}))`;
 
   // Fila de encabezado con los días
   let headerDias = '';
-  for (let i = 0; i < GANTT_NUM_DIAS; i++) {
-    const d = new Date(); d.setDate(d.getDate() + i);
-    const esHoy = i === 0;
-    headerDias += `<div class="gantt-dia-header ${esHoy ? 'gantt-hoy' : ''}" style="left:${(i/GANTT_NUM_DIAS)*100}%;width:${(1/GANTT_NUM_DIAS)*100}%">
+  for (let i = 0; i < numDias; i++) {
+    const d = new Date(fechaInicioVentana); d.setDate(d.getDate() + i);
+    const esHoy = soloFecha(d) === hoyStr;
+    headerDias += `<div class="gantt-dia-header ${esHoy ? 'gantt-hoy' : ''}" style="left:${(i/numDias)*100}%;width:${(1/numDias)*100}%">
       <span>${esHoy ? 'HOY' : diasSemana[d.getDay()]}</span><span>${d.getDate()}/${d.getMonth()+1}</span>
     </div>`;
   }
@@ -3125,14 +3168,14 @@ function renderGanttFlota() {
 
     let barras = '';
     reservasVeh.forEach(r => {
-      const diaInicio = diasEntre(hoy, r.fecha_inicio);
-      const diaFin = diasEntre(hoy, r.fecha_fin) + 1; // incluye el día de devolución completo
+      const diaInicio = diasEntre(inicioVentanaStr, r.fecha_inicio);
+      const diaFin = diasEntre(inicioVentanaStr, r.fecha_fin) + 1; // incluye el día de devolución completo
       const inicioClip = Math.max(0, diaInicio);
-      const finClip = Math.min(GANTT_NUM_DIAS, diaFin);
+      const finClip = Math.min(numDias, diaFin);
       if (finClip <= inicioClip) return; // fuera de la ventana visible
 
-      const leftPct = (inicioClip / GANTT_NUM_DIAS) * 100;
-      const widthPct = ((finClip - inicioClip) / GANTT_NUM_DIAS) * 100;
+      const leftPct = (inicioClip / numDias) * 100;
+      const widthPct = ((finClip - inicioClip) / numDias) * 100;
       const color = GANTT_COLOR_ESTADO[r.estado] || 'var(--blanco-suave)';
       const titulo = `${r.nombre} · ${r.num_reserva} · ${fmtFechaHora(r.fecha_inicio, r.hora_inicio)} → ${fmtFechaHora(r.fecha_fin, r.hora_fin)}`;
       barras += `<div class="gantt-bar" style="left:${leftPct}%;width:${widthPct}%;background:${color}" title="${titulo.replace(/"/g,'&quot;')}">${r.nombre}</div>`;
@@ -3143,7 +3186,7 @@ function renderGanttFlota() {
         <div class="gantt-vehiculo-nombre">${v.nombre}</div>
         <div class="gantt-vehiculo-placa">${v.placa || '—'}</div>
       </div>
-      <div class="gantt-track">${barras}</div>
+      <div class="gantt-track" style="background-image:${fondoLineas}">${barras}</div>
     </div>`;
   });
 
