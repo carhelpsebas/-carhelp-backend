@@ -853,6 +853,7 @@
               <option>Cédula de extranjería</option>
               <option>Pasaporte</option>
               <option>PEP</option>
+              <option>NIT</option>
             </select>
           </div>
           <div class="campo">
@@ -3998,7 +3999,7 @@ async function generarReserva() {
     const clienteSB = await sbInsert('clientes', {
       nombre: valores.nombre,
       documento: valores.num_doc,
-      tipo_doc: valores.tipo_doc === 'Cédula de ciudadanía' ? 'CC' : (valores.tipo_doc === 'Pasaporte' ? 'PAS' : 'CE'),
+      tipo_doc: { 'Cédula de ciudadanía':'CC', 'Cédula de extranjería':'CE', 'Pasaporte':'PAS', 'PEP':'PEP', 'NIT':'NIT' }[valores.tipo_doc] || 'CC',
       telefono: valores.celular,
       email: valores.email,
       direccion: valores.direccion
@@ -7786,12 +7787,13 @@ async function guardarCliente() {
   if (!nombre) { mostrarToast('⚠️ El nombre es obligatorio', '#C9A84C'); return; }
 
   const id = document.getElementById('cli-id').value;
-  const datos = {
+  const celular = document.getElementById('cli-celular').value.trim();
+  const datosDB = {
     nombre,
     tipo_doc: document.getElementById('cli-tipo-doc').value,
     num_doc: document.getElementById('cli-num-doc').value.trim(),
     documento: document.getElementById('cli-num-doc').value.trim(), // compatibilidad con columna existente
-    celular: document.getElementById('cli-celular').value.trim(),
+    telefono: celular, // la columna real en Supabase se llama 'telefono', no 'celular'
     email: document.getElementById('cli-email-campo').value.trim(),
     ciudad: document.getElementById('cli-ciudad').value.trim(),
     direccion: document.getElementById('cli-direccion-campo').value.trim(),
@@ -7802,15 +7804,16 @@ async function guardarCliente() {
     clasificacion: document.getElementById('cli-clasificacion').value,
     notas: document.getElementById('cli-notas').value.trim(),
   };
+  const datos = { ...datosDB, celular }; // el resto de la app usa 'celular' en los objetos locales
 
   try {
     let clienteId = id;
     if (id) {
-      await sbUpdate('clientes', id, datos);
+      await sbUpdate('clientes', id, datosDB);
       const idx = clientesData.findIndex(c => c.id === id);
       if (idx >= 0) clientesData[idx] = { ...clientesData[idx], ...datos };
     } else {
-      const creado = await sbInsert('clientes', datos);
+      const creado = await sbInsert('clientes', datosDB);
       clienteId = creado[0]?.id;
       clientesData.unshift({ ...datos, id: clienteId });
     }
