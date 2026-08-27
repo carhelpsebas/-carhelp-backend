@@ -2116,6 +2116,10 @@
         <select id="cv_vehiculo_id"></select>
       </div>
       <div class="campo">
+        <label>Fecha desde la cual aplica el cambio <span class="req">*</span></label>
+        <input type="date" id="cv_fecha_cambio">
+      </div>
+      <div class="campo">
         <label>Motivo del cambio (opcional)</label>
         <textarea id="cv_notas" placeholder="Ej. Vehículo original en mantenimiento"></textarea>
       </div>
@@ -4487,6 +4491,7 @@ function abrirModalCambiarVehiculo(num) {
     `<option value="${v.id}" ${v.id === r.vehiculo_id ? 'selected' : ''}>${v.nombre}${v.placa ? ' — ' + v.placa : ''}</option>`
   ).join('');
   document.getElementById('cv_notas').value = '';
+  document.getElementById('cv_fecha_cambio').value = new Date().toISOString().split('T')[0];
   abrirModal('modal-cambiar-vehiculo');
 }
 
@@ -4497,7 +4502,10 @@ async function confirmarCambioVehiculo() {
   if (!nuevoId) { mostrarToast('⚠️ Selecciona un vehículo', '#E05252'); return; }
   const nuevoVeh = vehiculos.find(v => v.id === nuevoId);
   if (!nuevoVeh) { mostrarToast('⚠️ Vehículo no encontrado', '#E05252'); return; }
+  const fechaCambio = document.getElementById('cv_fecha_cambio').value;
+  if (!fechaCambio) { mostrarToast('⚠️ Indica desde qué fecha aplica el cambio', '#E05252'); return; }
   const vehiculoAnterior = r.vehiculo;
+  const vehiculoAnteriorId = r.vehiculo_id;
   const notasCambio = document.getElementById('cv_notas').value.trim();
 
   if (nuevoId === r.vehiculo_id) {
@@ -4505,12 +4513,32 @@ async function confirmarCambioVehiculo() {
     return;
   }
 
+  // Traspasa el ingreso de los días restantes (desde la fecha del cambio hasta la devolución)
+  // del vehículo anterior al nuevo, para que la liquidación de cada propietario/aliado sea correcta.
+  const diasRestantes = Math.max(diasEntre(fechaCambio, r.fecha_fin) + 1, 0);
+  const valorTraspaso = diasRestantes * (r.tarifa || 0);
+
   try {
     if (r.id) {
       await sbUpdate('ordenes', r.id, {
         vehiculo_id: nuevoId,
-        notas: (r.notas || '') + ` · Cambio de vehículo: ${vehiculoAnterior} → ${nuevoVeh.nombre}` + (notasCambio ? ` (${notasCambio})` : '')
+        notas: (r.notas || '') + ` · Cambio de vehículo desde ${fmtFecha(fechaCambio)}: ${vehiculoAnterior} → ${nuevoVeh.nombre}` + (notasCambio ? ` (${notasCambio})` : '')
       });
+
+      if (valorTraspaso > 0) {
+        await sbInsert('movimientos_contables', {
+          tipo: 'ingreso', categoria: 'ajuste_cambio_vehiculo',
+          concepto: `Traspaso por cambio de vehículo: sale ${vehiculoAnterior} (${diasRestantes} día(s) desde ${fmtFecha(fechaCambio)})`,
+          valor: -valorTraspaso, fecha: fechaCambio, vehiculo_id: vehiculoAnteriorId, orden_id: r.id,
+          notas: `Reserva ${r.num_reserva}`
+        });
+        await sbInsert('movimientos_contables', {
+          tipo: 'ingreso', categoria: 'ajuste_cambio_vehiculo',
+          concepto: `Traspaso por cambio de vehículo: entra ${nuevoVeh.nombre} (${diasRestantes} día(s) desde ${fmtFecha(fechaCambio)})`,
+          valor: valorTraspaso, fecha: fechaCambio, vehiculo_id: nuevoId, orden_id: r.id,
+          notas: `Reserva ${r.num_reserva}`
+        });
+      }
     }
   } catch(e) {
     console.error('Error guardando cambio de vehículo en Supabase:', e);
@@ -4525,7 +4553,7 @@ async function confirmarCambioVehiculo() {
 
   cerrarModal('modal-cambiar-vehiculo');
   renderReservas(); renderStats(); renderProximas(); renderEnCurso();
-  mostrarToast(`✅ Vehículo actualizado: ${vehiculoAnterior} → ${nuevoVeh.nombre}`);
+  mostrarToast(`✅ Vehículo actualizado desde ${fmtFecha(fechaCambio)}: ${vehiculoAnterior} → ${nuevoVeh.nombre}`);
 }
 
 /* ════════════════════════════════════════════
@@ -5784,7 +5812,7 @@ async function renderLiquidaciones() {
     let ingresos = 0, gastosPropietario = 0, gastosEmpresa = 0;
     let gastosListaPropietario = [];
     try {
-      const movs = await sbSelect('movimientos_contables', `&vehiculo_id=eq.${v.id}&tipo=eq.ingreso&categoria=in.(renta,extension_renta)&fecha=gte.${ciclo.inicio}&fecha=lte.${ciclo.fin}`);
+      const movs = await sbSelect('movimientos_contables', `&vehiculo_id=eq.${v.id}&tipo=eq.ingreso&categoria=in.(renta,extension_renta,ajuste_cambio_vehiculo)&fecha=gte.${ciclo.inicio}&fecha=lte.${ciclo.fin}`);
       ingresos = movs.reduce((s, m) => s + parseFloat(m.valor), 0);
     } catch(e) {}
     try {
@@ -7177,7 +7205,7 @@ async function abrirDetalleLiquidacionPeriodo(vehiculoId, periodoInicio, periodo
   let ingresos = 0, gastosPropietario = 0, gastosEmpresa = 0;
   let gastosListaPropietario = [];
   try {
-    const movs = await sbSelect('movimientos_contables', `&vehiculo_id=eq.${vehiculoId}&tipo=eq.ingreso&categoria=in.(renta,extension_renta)&fecha=gte.${periodoInicio}&fecha=lte.${periodoFin}`);
+    const movs = await sbSelect('movimientos_contables', `&vehiculo_id=eq.${vehiculoId}&tipo=eq.ingreso&categoria=in.(renta,extension_renta,ajuste_cambio_vehiculo)&fecha=gte.${periodoInicio}&fecha=lte.${periodoFin}`);
     ingresos = movs.reduce((s, m) => s + parseFloat(m.valor), 0);
   } catch(e) {}
   try {
