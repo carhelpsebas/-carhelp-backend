@@ -2621,6 +2621,7 @@ let reservasTour = [];
 let solicitudesSeguridad = [];
 let solicitudesClientes = [];
 let usuarios = [];
+let historialVehiculos = [];
 let picoPlacaCiudades = [];
 let correosReservaActual = [];
 let tabCorreoActual = 0;
@@ -2713,6 +2714,11 @@ async function cargarDatos() {
   try {
     picoPlacaCiudades = await sbSelect('pico_placa_ciudades', '&order=ciudad.asc');
   } catch(e) { console.warn('Error cargando pico y placa:', e.message); picoPlacaCiudades = []; }
+
+  // Historial de tramos de vehículo por reserva (para cambios de vehículo)
+  try {
+    historialVehiculos = await sbSelect('historial_vehiculo_orden', '&order=fecha_inicio.asc');
+  } catch(e) { console.warn('Error cargando historial de vehículos:', e.message); historialVehiculos = []; }
 
   // Usuarios (colaboradores)
   try {
@@ -3164,16 +3170,32 @@ function renderGanttFlota() {
     <div class="gantt-track" style="background-image:none">${headerDias}</div>
   </div>`;
 
+  // Órdenes que sí tienen tramos registrados en el historial (por haber cambiado de vehículo alguna vez)
+  const ordenesConHistorial = new Set(historialVehiculos.map(h => h.orden_id));
+
   // Una fila por vehículo con las barras de ocupación
   vehiculos.forEach(v => {
-    const reservasVeh = reservas.filter(r =>
-      r.vehiculo_id === v.id && r.estado !== 'finalizada' && r.fecha_inicio && r.fecha_fin
-    );
+    // Tramos reales de este vehículo (incluye reservas que cambiaron de vehículo)
+    const tramosVeh = historialVehiculos
+      .filter(h => h.vehiculo_id === v.id)
+      .map(h => {
+        const r = reservas.find(x => x.id === h.orden_id);
+        if (!r || r.estado === 'finalizada') return null;
+        return { r, fecha_inicio: h.fecha_inicio, fecha_fin: h.fecha_fin };
+      })
+      .filter(Boolean);
+
+    // Compatibilidad hacia atrás: reservas de este vehículo que nunca tuvieron un tramo registrado
+    const reservasSinHistorial = reservas.filter(r =>
+      r.vehiculo_id === v.id && r.estado !== 'finalizada' && r.fecha_inicio && r.fecha_fin && !ordenesConHistorial.has(r.id)
+    ).map(r => ({ r, fecha_inicio: r.fecha_inicio, fecha_fin: r.fecha_fin }));
+
+    const tramos = [...tramosVeh, ...reservasSinHistorial];
 
     let barras = '';
-    reservasVeh.forEach(r => {
-      const diaInicio = diasEntre(inicioVentanaStr, r.fecha_inicio);
-      const diaFin = diasEntre(inicioVentanaStr, r.fecha_fin) + 1; // incluye el día de devolución completo
+    tramos.forEach(({ r, fecha_inicio, fecha_fin }) => {
+      const diaInicio = diasEntre(inicioVentanaStr, fecha_inicio);
+      const diaFin = diasEntre(inicioVentanaStr, fecha_fin) + 1; // incluye el día de devolución completo
       const inicioClip = Math.max(0, diaInicio);
       const finClip = Math.min(numDias, diaFin);
       if (finClip <= inicioClip) return; // fuera de la ventana visible
@@ -3181,7 +3203,7 @@ function renderGanttFlota() {
       const leftPct = (inicioClip / numDias) * 100;
       const widthPct = ((finClip - inicioClip) / numDias) * 100;
       const color = GANTT_COLOR_ESTADO[r.estado] || 'var(--blanco-suave)';
-      const titulo = `${r.nombre} · ${r.num_reserva} · ${fmtFechaHora(r.fecha_inicio, r.hora_inicio)} → ${fmtFechaHora(r.fecha_fin, r.hora_fin)}`;
+      const titulo = `${r.nombre} · ${r.num_reserva} · ${fmtFecha(fecha_inicio)} → ${fmtFecha(fecha_fin)}`;
       barras += `<div class="gantt-bar" style="left:${leftPct}%;width:${widthPct}%;background:${color}" title="${titulo.replace(/"/g,'&quot;')}">${r.nombre}</div>`;
     });
 
@@ -3973,6 +3995,15 @@ async function generarReserva() {
     });
     nuevaReserva.id = ordenSB[0]?.id;
 
+    // Registrar el tramo inicial de ocupación de vehículo para esta reserva
+    try {
+      const segNuevo = await sbInsert('historial_vehiculo_orden', {
+        orden_id: nuevaReserva.id, vehiculo_id: valores.vehiculo_id,
+        fecha_inicio: valores.fecha_inicio, fecha_fin: valores.fecha_fin
+      });
+      if (segNuevo?.[0]) historialVehiculos.push(segNuevo[0]);
+    } catch(e) { console.warn('No se pudo registrar el tramo de vehículo:', e.message); }
+
     // Generar movimiento contable automático
     const fechaIngreso = valores.fecha_inicio || new Date().toISOString().split('T')[0];
     await sbInsert('movimientos_contables', {
@@ -4428,6 +4459,16 @@ async function confirmarExtensionRenta() {
       vehiculo_id: r.vehiculo_id || null,
       orden_id: r.id || null,
     });
+
+    // Alargar el último tramo de ocupación de vehículo para que coincida con la nueva fecha de devolución
+    try {
+      const segmentosOrden = historialVehiculos.filter(h => h.orden_id === r.id).sort((a,b) => a.fecha_inicio.localeCompare(b.fecha_inicio));
+      const ultimoSeg = segmentosOrden[segmentosOrden.length - 1];
+      if (ultimoSeg) {
+        await sbUpdate('historial_vehiculo_orden', ultimoSeg.id, { fecha_fin: nff });
+        ultimoSeg.fecha_fin = nff;
+      }
+    } catch(e) { console.warn('No se pudo actualizar el tramo de vehículo en la extensión:', e.message); }
   } catch(e) {
     console.error('Error guardando extensión en Supabase:', e);
     mostrarToast('⚠️ Error guardando la extensión en Supabase: ' + e.message, 'var(--rojo-alerta)');
@@ -4524,6 +4565,32 @@ async function confirmarCambioVehiculo() {
         vehiculo_id: nuevoId,
         notas: (r.notas || '') + ` · Cambio de vehículo desde ${fmtFecha(fechaCambio)}: ${vehiculoAnterior} → ${nuevoVeh.nombre}` + (notasCambio ? ` (${notasCambio})` : '')
       });
+
+      // Cerrar el tramo de ocupación del vehículo anterior en la fecha del cambio,
+      // y abrir uno nuevo para el vehículo entrante, para no perder el historial de ocupación.
+      try {
+        const segmentosOrden = historialVehiculos.filter(h => h.orden_id === r.id).sort((a,b) => a.fecha_inicio.localeCompare(b.fecha_inicio));
+        const segAbierto = segmentosOrden[segmentosOrden.length - 1];
+        const diaAntes = new Date(fechaCambio + 'T00:00:00');
+        diaAntes.setDate(diaAntes.getDate() - 1);
+        const cierreAnteriorStr = soloFecha(diaAntes);
+
+        if (segAbierto && segAbierto.fecha_inicio <= cierreAnteriorStr) {
+          await sbUpdate('historial_vehiculo_orden', segAbierto.id, { fecha_fin: cierreAnteriorStr });
+          segAbierto.fecha_fin = cierreAnteriorStr;
+        } else if (segAbierto) {
+          // El cambio aplica desde el mismo día que empezó el tramo actual: se reemplaza directo
+          await sbDelete('historial_vehiculo_orden', segAbierto.id);
+          historialVehiculos = historialVehiculos.filter(h => h.id !== segAbierto.id);
+        }
+
+        const segNuevo = await sbInsert('historial_vehiculo_orden', {
+          orden_id: r.id, vehiculo_id: nuevoId, fecha_inicio: fechaCambio, fecha_fin: r.fecha_fin
+        });
+        if (segNuevo?.[0]) historialVehiculos.push(segNuevo[0]);
+      } catch(e) {
+        console.warn('No se pudo actualizar el historial de tramos de vehículo:', e.message);
+      }
 
       if (valorTraspaso > 0) {
         await sbInsert('movimientos_contables', {
