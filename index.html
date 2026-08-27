@@ -2131,6 +2131,37 @@
   </div>
 </div>
 
+<!-- ═══════════════════ MODAL TRAMOS DE VEHÍCULO POR FECHA ═══════════════════ -->
+<div class="modal-overlay" id="modal-tramos-vehiculo">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <div class="modal-titulo">🚗 Vehículos asignados <span id="tv-num-reserva" style="color:var(--dorado)"></span></div>
+      <button class="modal-cerrar" onclick="cerrarModal('modal-tramos-vehiculo')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="info-banner" id="tv-info-reserva"></div>
+      <div class="seccion-label">Tramos asignados</div>
+      <div id="tv-lista-tramos" style="margin-bottom:16px"></div>
+
+      <hr class="divider">
+      <div class="seccion-label">Agregar / editar tramo</div>
+      <input type="hidden" id="tv_tramo_id">
+      <div class="campo">
+        <label>Vehículo</label>
+        <select id="tv_vehiculo_id"></select>
+      </div>
+      <div class="fila-2">
+        <div class="campo"><label>Desde</label><input type="date" id="tv_fecha_inicio"></div>
+        <div class="campo"><label>Hasta</label><input type="date" id="tv_fecha_fin"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secundario" onclick="tvLimpiarForm()">Limpiar</button>
+      <button class="btn-primario" onclick="guardarTramoVehiculo()">Guardar tramo</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════════ MODAL PICO Y PLACA POR CIUDAD ═══════════════════ -->
 <div class="modal-overlay" id="modal-pico-placa">
   <div class="modal" style="max-width:680px">
@@ -4344,6 +4375,7 @@ function renderReservas() {
         ${r.estado === 'entregado' && r.celular ? `<a class="btn-secundario" style="text-decoration:none;color:#25D366;border-color:#25D366" target="_blank" href="${waLink(r.celular, `Hola ${r.nombre}, te recordamos que la devolución de tu ${r.vehiculo} (reserva ${r.num_reserva}) está programada para ${fmtFechaHora(r.fecha_fin, r.hora_fin)}. Cualquier novedad avísanos. — Car Help`)}">💬 Recordar por WhatsApp</a>` : ''}
         <button class="btn-secundario" onclick="abrirModalExtenderRenta('${r.num_reserva}')">📅 Extender</button>
         <button class="btn-secundario" onclick="abrirModalCambiarVehiculo('${r.num_reserva}')">🔄 Cambiar vehículo</button>
+        <button class="btn-secundario" onclick="abrirModalTramosVehiculo('${r.num_reserva}')">🚗 Vehículos por fecha</button>
         <button class="btn-secundario" onclick="reenviarCorreoReserva('${r.num_reserva}')">📧 Ver / reenviar correo</button>
         <button class="btn-peligro" onclick="eliminarReserva('${r.num_reserva}')">Eliminar</button>
       </div>
@@ -4539,6 +4571,144 @@ Equipo Car Help — Pereira, Colombia
 
   // Mostrar en pantalla el correo actualizado con los nuevos datos, para verlo o reenviarlo cuando haga falta
   reenviarCorreoReserva(r.num_reserva);
+}
+
+/* ════════════════════════════════════════════
+   VEHÍCULOS POR FECHA — editor libre de tramos dentro de una reserva
+   ════════════════════════════════════════════ */
+let tvReservaActual = null;
+
+async function abrirModalTramosVehiculo(num) {
+  const r = reservas.find(x => x.num_reserva === num);
+  if (!r) return;
+  if (!r.id) {
+    mostrarToast('⚠️ Esta reserva nunca se guardó en Supabase (quedó solo local). Elimínala y créala de nuevo para poder editarla.', 'var(--rojo-alerta)');
+    return;
+  }
+  tvReservaActual = r;
+  document.getElementById('tv-num-reserva').textContent = num;
+  document.getElementById('tv-info-reserva').innerHTML = `<strong>${r.nombre}</strong> · Período total de la reserva: <strong>${fmtFecha(r.fecha_inicio)} → ${fmtFecha(r.fecha_fin)}</strong>`;
+  const sel = document.getElementById('tv_vehiculo_id');
+  sel.innerHTML = vehiculos.map(v => `<option value="${v.id}">${v.nombre}${v.placa ? ' — ' + v.placa : ''}</option>`).join('');
+  tvLimpiarForm();
+  abrirModal('modal-tramos-vehiculo');
+  await renderTramosVehiculo();
+}
+
+async function renderTramosVehiculo() {
+  const r = tvReservaActual;
+  if (!r) return;
+  let tramos = historialVehiculos.filter(h => h.orden_id === r.id).sort((a,b) => a.fecha_inicio.localeCompare(b.fecha_inicio));
+
+  // Si esta reserva nunca tuvo tramos registrados, materializar el tramo implícito (su vehículo y fechas actuales)
+  if (tramos.length === 0 && r.vehiculo_id && r.fecha_inicio && r.fecha_fin) {
+    try {
+      const segNuevo = await sbInsert('historial_vehiculo_orden', {
+        orden_id: r.id, vehiculo_id: r.vehiculo_id, fecha_inicio: r.fecha_inicio, fecha_fin: r.fecha_fin
+      });
+      if (segNuevo?.[0]) { historialVehiculos.push(segNuevo[0]); tramos = [segNuevo[0]]; }
+    } catch(e) { console.warn('No se pudo materializar el tramo inicial:', e.message); }
+  }
+
+  const cont = document.getElementById('tv-lista-tramos');
+  if (tramos.length === 0) {
+    cont.innerHTML = '<div style="font-size:0.8rem;color:var(--blanco-suave)">Sin tramos registrados aún.</div>';
+    return;
+  }
+  cont.innerHTML = tramos.map(t => {
+    const v = vehiculos.find(x => x.id === t.vehiculo_id);
+    return `
+    <div style="display:flex;justify-content:space-between;align-items:center;background:var(--gris-oscuro);border:1px solid var(--borde);border-radius:8px;padding:10px 12px;margin-bottom:8px">
+      <div>
+        <strong>${v ? v.nombre : 'Vehículo eliminado'}</strong>${v && v.placa ? ' (' + v.placa + ')' : ''}
+        <div style="font-size:0.78rem;color:var(--blanco-suave)">${fmtFecha(t.fecha_inicio)} → ${fmtFecha(t.fecha_fin)}</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn-secundario" style="font-size:0.7rem;padding:5px 10px" onclick="tvEditarTramo('${t.id}')">Editar</button>
+        <button class="btn-peligro" style="font-size:0.7rem;padding:5px 10px" onclick="tvEliminarTramo('${t.id}')">Eliminar</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function tvLimpiarForm() {
+  document.getElementById('tv_tramo_id').value = '';
+  document.getElementById('tv_vehiculo_id').value = tvReservaActual?.vehiculo_id || '';
+  document.getElementById('tv_fecha_inicio').value = '';
+  document.getElementById('tv_fecha_fin').value = '';
+}
+
+function tvEditarTramo(id) {
+  const t = historialVehiculos.find(x => x.id === id);
+  if (!t) return;
+  document.getElementById('tv_tramo_id').value = t.id;
+  document.getElementById('tv_vehiculo_id').value = t.vehiculo_id;
+  document.getElementById('tv_fecha_inicio').value = t.fecha_inicio;
+  document.getElementById('tv_fecha_fin').value = t.fecha_fin;
+}
+
+async function tvEliminarTramo(id) {
+  try {
+    await sbDelete('historial_vehiculo_orden', id);
+  } catch(e) {
+    console.error(e);
+    mostrarToast('⚠️ No se pudo eliminar el tramo: ' + e.message, 'var(--rojo-alerta)');
+    return;
+  }
+  historialVehiculos = historialVehiculos.filter(h => h.id !== id);
+  await sincronizarVehiculoActualReserva(tvReservaActual);
+  await renderTramosVehiculo();
+  renderGanttFlota();
+  mostrarToast('🗑️ Tramo eliminado');
+}
+
+async function guardarTramoVehiculo() {
+  const r = tvReservaActual;
+  if (!r) return;
+  const idTramo = document.getElementById('tv_tramo_id').value;
+  const vehiculoId = document.getElementById('tv_vehiculo_id').value;
+  const fi = document.getElementById('tv_fecha_inicio').value;
+  const ff = document.getElementById('tv_fecha_fin').value;
+
+  if (!vehiculoId || !fi || !ff) { mostrarToast('⚠️ Completa vehículo, fecha desde y fecha hasta', '#E05252'); return; }
+  if (ff < fi) { mostrarToast('⚠️ La fecha "hasta" debe ser igual o posterior a la fecha "desde"', '#E05252'); return; }
+
+  try {
+    if (idTramo) {
+      await sbUpdate('historial_vehiculo_orden', idTramo, { vehiculo_id: vehiculoId, fecha_inicio: fi, fecha_fin: ff });
+      const t = historialVehiculos.find(x => x.id === idTramo);
+      if (t) { t.vehiculo_id = vehiculoId; t.fecha_inicio = fi; t.fecha_fin = ff; }
+    } else {
+      const segNuevo = await sbInsert('historial_vehiculo_orden', { orden_id: r.id, vehiculo_id: vehiculoId, fecha_inicio: fi, fecha_fin: ff });
+      if (segNuevo?.[0]) historialVehiculos.push(segNuevo[0]);
+    }
+  } catch(e) {
+    console.error(e);
+    mostrarToast('⚠️ No se pudo guardar el tramo: ' + e.message, 'var(--rojo-alerta)');
+    return;
+  }
+
+  await sincronizarVehiculoActualReserva(r);
+  tvLimpiarForm();
+  await renderTramosVehiculo();
+  renderGanttFlota();
+  mostrarToast('✅ Tramo guardado');
+}
+
+// Mantiene el vehiculo_id "principal" de la reserva sincronizado con el tramo vigente hoy (o el más reciente)
+async function sincronizarVehiculoActualReserva(r) {
+  const tramos = historialVehiculos.filter(h => h.orden_id === r.id).sort((a,b) => a.fecha_inicio.localeCompare(b.fecha_inicio));
+  if (tramos.length === 0) return;
+  const hoy = soloFecha(new Date());
+  const vigente = tramos.find(t => t.fecha_inicio <= hoy && t.fecha_fin >= hoy) || tramos[tramos.length - 1];
+  const veh = vehiculos.find(v => v.id === vigente.vehiculo_id);
+  if (!veh) return;
+  r.vehiculo_id = veh.id;
+  r.vehiculo = veh.nombre;
+  r.placa = veh.placa || '';
+  try { await sbUpdate('ordenes', r.id, { vehiculo_id: veh.id }); } catch(e) { console.warn('No se pudo sincronizar el vehículo principal:', e.message); }
+  await guardar('carhelp:reservas', reservas);
+  renderReservas(); renderStats(); renderProximas(); renderEnCurso();
 }
 
 /* ════════════════════════════════════════════
