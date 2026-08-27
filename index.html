@@ -2089,6 +2089,38 @@
   </div>
 </div>
 
+<!-- ═══════════════════ MODAL DETALLE DE LIQUIDACIÓN ═══════════════════ -->
+<div class="modal-overlay" id="modal-detalle-liquidacion">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <div class="modal-titulo">📄 Detalle de liquidación <span id="dl-vehiculo-nombre" style="color:var(--dorado)"></span></div>
+      <button class="modal-cerrar" onclick="cerrarModal('modal-detalle-liquidacion')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="info-banner" id="dl-resumen"></div>
+
+      <div class="seccion-label">Cuadres / gastos de cambio de este período</div>
+      <div id="dl-ajustes-lista" style="margin-bottom:10px"></div>
+      <div class="fila-2">
+        <div class="campo"><label>Descripción</label><input type="text" id="dl_ajuste_desc" placeholder="Ej. Cambio de aceite descontado, cuadre de caja..."></div>
+        <div class="campo"><label>Valor (usa negativo para descontar)</label><input type="number" id="dl_ajuste_valor" placeholder="Ej. -50000 o 30000"></div>
+      </div>
+      <button type="button" class="btn-secundario" onclick="agregarAjusteLiquidacion()" style="width:100%;margin-bottom:14px">+ Agregar cuadre / gasto</button>
+
+      <hr class="divider">
+      <div class="campo">
+        <label>Valor final a liquidar (COP)</label>
+        <input type="number" id="dl_monto_final" style="font-weight:700;color:var(--dorado)">
+      </div>
+      <div class="info-banner" id="dl-estado-envio"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secundario" onclick="cerrarModal('modal-detalle-liquidacion')">Cerrar</button>
+      <button class="btn-primario" id="dl-btn-guardar" onclick="guardarDetalleLiquidacion()">Guardar y enviar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL ENTREGAS -->
 <div class="entrega-overlay" id="entrega-overlay">
 
@@ -5387,6 +5419,7 @@ async function renderLiquidaciones() {
   }
 
   let totalPendienteGlobal = 0;
+  liqDatosPeriodo = {};
 
   const filas = await Promise.all(relevantes.map(async (v) => {
     const ciclo = calcularCicloVehiculo(v.fechaIngreso, liqModoPeriodo, liqOffsetCiclos);
@@ -5409,48 +5442,57 @@ async function renderLiquidaciones() {
     } catch(e) {}
 
     const periodoLabel = `${fmtFecha(ciclo.inicio)} → ${fmtFecha(ciclo.fin)}`;
+    const dias = v.procedencia === 'aliado' ? diasUsoAliadoEnRango(v.id, ciclo.inicio, ciclo.fin) : 0;
+
+    let montoBase = 0;
+    if (v.procedencia === 'propietario') {
+      const esFijo = v.propietarioTipoLiq === 'fijo';
+      const pct = v.propietarioPorcentaje || 0;
+      const valorFijo = v.propietarioValorFijo || 0;
+      montoBase = esFijo
+        ? Math.max(valorFijo - gastosPropietario, 0)
+        : Math.max(ingresos * (pct / 100) - gastosPropietario, 0);
+    }
+
+    // Cachear todo el contexto para poder abrir el detalle sin volver a consultar
+    liqDatosPeriodo[v.id] = { vehiculo: v, ciclo, periodoLabel, ingresos, gastosPropietario, gastosEmpresa, dias, montoBase, registro: yaLiquidado };
 
     if (v.procedencia === 'propietario') {
       const esFijo = v.propietarioTipoLiq === 'fijo';
       const pct = v.propietarioPorcentaje || 0;
       const valorFijo = v.propietarioValorFijo || 0;
-      const monto = esFijo
-        ? Math.max(valorFijo - gastosPropietario, 0)
-        : Math.max(ingresos * (pct / 100) - gastosPropietario, 0);
-      if (!yaLiquidado) totalPendienteGlobal += monto;
+      const montoMostrado = yaLiquidado ? parseFloat(yaLiquidado.monto_final ?? yaLiquidado.monto_liquidado) : montoBase;
+      if (!yaLiquidado) totalPendienteGlobal += montoBase;
 
       return `
-      <div class="item-card">
+      <div class="item-card" style="cursor:pointer" onclick="abrirDetalleLiquidacion('${v.id}')">
         <div class="item-info">
           <div class="item-titulo">${v.nombre} ${v.placa ? '('+v.placa+')' : ''} <span class="num-reserva">Propietario</span></div>
           <div class="item-detalle">Propietario: <strong>${v.propietarioNombre || 'Sin definir'}</strong> · Período: <strong>${periodoLabel}</strong></div>
           <div class="item-detalle">Ingresos del período: <strong>${formatCOP(ingresos)}</strong> · ${esFijo ? `Valor fijo pactado: <strong>${formatCOP(valorFijo)}</strong>` : `% propietario: <strong>${pct}%</strong>`} · Gastos que asumió: <strong>${formatCOP(gastosPropietario)}</strong></div>
           ${gastosEmpresa > 0 ? `<div class="item-detalle">Gastos que asumió Car Help en el período: ${formatCOP(gastosEmpresa)}</div>` : ''}
+          <div style="font-size:0.7rem;color:var(--azul-info);margin-top:4px">Toca la tarjeta para ver el detalle, hacer cuadres o editar →</div>
         </div>
         <div style="text-align:right">
-          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:${yaLiquidado ? 'var(--verde-ok)' : 'var(--dorado-suave)'}">${formatCOP(monto)}</div>
+          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:${yaLiquidado ? 'var(--verde-ok)' : 'var(--dorado-suave)'}">${formatCOP(montoMostrado)}</div>
           <div style="font-size:0.7rem;color:var(--blanco-suave);margin-bottom:6px">${yaLiquidado ? '✅ liquidado' : 'por liquidar'}</div>
-          ${!yaLiquidado ? `<button class="btn-primario" style="font-size:0.72rem;padding:8px 14px" onclick="liquidarYEnviar('${v.id}','propietario','${ciclo.inicio}','${ciclo.fin}',${monto},${ingresos},${gastosPropietario})">Generar y enviar</button>` : ''}
         </div>
       </div>`;
     }
 
-    // Aliado: el monto se ingresa manualmente por variar cada vez
-    const dias = diasUsoAliadoEnRango(v.id, ciclo.inicio, ciclo.fin);
+    // Aliado
+    const montoMostradoAliado = yaLiquidado ? parseFloat(yaLiquidado.monto_final ?? yaLiquidado.monto_liquidado) : null;
     return `
-    <div class="item-card">
+    <div class="item-card" style="cursor:pointer" onclick="abrirDetalleLiquidacion('${v.id}')">
       <div class="item-info">
         <div class="item-titulo">${v.nombre} ${v.placa ? '('+v.placa+')' : ''} <span class="num-reserva">Aliado</span></div>
         <div class="item-detalle">Aliado: <strong>${v.aliadoNombre || 'Sin definir'}</strong> · Período: <strong>${periodoLabel}</strong></div>
         <div class="item-detalle">Días de uso en el período: <strong>${dias}</strong></div>
-        ${yaLiquidado ? `<div class="item-detalle" style="color:var(--verde-ok)">✅ Liquidado: ${formatCOP(yaLiquidado.monto_liquidado)}</div>` : ''}
+        ${yaLiquidado ? `<div class="item-detalle" style="color:var(--verde-ok)">✅ Liquidado: ${formatCOP(montoMostradoAliado)}</div>` : ''}
+        <div style="font-size:0.7rem;color:var(--azul-info);margin-top:4px">Toca la tarjeta para ver el detalle, hacer cuadres o editar →</div>
       </div>
       <div style="text-align:right">
-        ${!yaLiquidado ? `
-          <input type="number" id="liq-aliado-valor-${v.id}" placeholder="Valor a pagar" style="width:130px;background:var(--gris-medio);color:var(--blanco);border:1px solid var(--borde);border-radius:6px;padding:6px 8px;font-size:0.78rem;margin-bottom:6px">
-          <br>
-          <button class="btn-primario" style="font-size:0.72rem;padding:8px 14px" onclick="liquidarAliado('${v.id}','${ciclo.inicio}','${ciclo.fin}',${dias})">Generar y enviar</button>
-        ` : `<div style="font-size:0.7rem;color:var(--verde-ok)">Período cerrado</div>`}
+        <div style="font-size:0.7rem;color:${yaLiquidado ? 'var(--verde-ok)' : 'var(--blanco-suave)'}">${yaLiquidado ? 'Período cerrado' : 'por liquidar'}</div>
       </div>
     </div>`;
   }));
@@ -5459,53 +5501,153 @@ async function renderLiquidaciones() {
   document.getElementById('ct-pendiente-liquidar').textContent = formatCOP(totalPendienteGlobal);
 }
 
-async function liquidarYEnviar(vehiculoId, tipo, periodoInicio, periodoFin, monto, ingresos, gastos) {
-  const v = vehiculos.find(x => x.id === vehiculoId);
-  if (!v) return;
-  const correo = v.propietarioEmail;
-  const nombreDest = v.propietarioNombre || 'Propietario';
-  const periodoLabel = `${fmtFecha(periodoInicio)} al ${fmtFecha(periodoFin)}`;
+/* ── Detalle de liquidación: cuadres, edición y reenvío ── */
+let liqDatosPeriodo = {};
+let liqVehiculoModalActual = null;
+let liqAjustesTrabajo = [];
+
+function abrirDetalleLiquidacion(vehiculoId) {
+  const ctx = liqDatosPeriodo[vehiculoId];
+  if (!ctx) return;
+  liqVehiculoModalActual = vehiculoId;
+  const { vehiculo: v, periodoLabel, ingresos, gastosPropietario, gastosEmpresa, dias, montoBase, registro } = ctx;
+
+  document.getElementById('dl-vehiculo-nombre').textContent = `${v.nombre} ${v.placa ? '('+v.placa+')' : ''}`;
+
+  document.getElementById('dl-resumen').innerHTML = v.procedencia === 'propietario'
+    ? `Propietario: <strong>${v.propietarioNombre || 'Sin definir'}</strong> · Período: <strong>${periodoLabel}</strong><br>
+       Ingresos del período: <strong>${formatCOP(ingresos)}</strong> · Gastos a su cargo: <strong>${formatCOP(gastosPropietario)}</strong>${gastosEmpresa > 0 ? ` · Gastos de Car Help: ${formatCOP(gastosEmpresa)}` : ''}<br>
+       Valor base calculado: <strong>${formatCOP(montoBase)}</strong>`
+    : `Aliado: <strong>${v.aliadoNombre || 'Sin definir'}</strong> · Período: <strong>${periodoLabel}</strong><br>
+       Días de uso en el período: <strong>${dias}</strong>`;
+
+  liqAjustesTrabajo = registro?.ajustes ? JSON.parse(JSON.stringify(registro.ajustes)) : [];
+  const montoInicial = registro ? parseFloat(registro.monto_final ?? registro.monto_liquidado) : montoBase;
+  document.getElementById('dl_monto_final').value = montoInicial || '';
+  document.getElementById('dl_ajuste_desc').value = '';
+  document.getElementById('dl_ajuste_valor').value = '';
+
+  document.getElementById('dl-estado-envio').innerHTML = registro
+    ? `📧 Ya se ${registro.correo_enviado ? 'envió' : 'registró'} esta liquidación${registro.correo_destino ? ' a ' + registro.correo_destino : ''}. Guardar aquí actualizará el registro y reenviará el correo con el valor corregido.`
+    : `Esta liquidación aún no se ha generado ni enviado. Los cuadres que agregues aquí se incluirán al generarla.`;
+
+  document.getElementById('dl-btn-guardar').textContent = registro ? 'Guardar y reenviar corregida' : 'Guardar y enviar';
+
+  renderAjustesLiquidacion();
+  abrirModal('modal-detalle-liquidacion');
+}
+
+function renderAjustesLiquidacion() {
+  const cont = document.getElementById('dl-ajustes-lista');
+  if (liqAjustesTrabajo.length === 0) {
+    cont.innerHTML = '<div style="font-size:0.78rem;color:var(--blanco-suave);padding:6px 0">Sin cuadres o gastos adicionales registrados en este período.</div>';
+    return;
+  }
+  cont.innerHTML = liqAjustesTrabajo.map((a, i) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;background:var(--gris-oscuro);border:1px solid var(--borde);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:0.78rem">
+      <span>${a.descripcion}</span>
+      <span style="display:flex;align-items:center;gap:8px">
+        <strong style="color:${a.valor < 0 ? 'var(--rojo-alerta)' : 'var(--verde-ok)'}">${a.valor < 0 ? '- ' : '+ '}${formatCOP(Math.abs(a.valor))}</strong>
+        <button class="btn-peligro" style="font-size:0.68rem;padding:3px 8px" onclick="quitarAjusteLiquidacion(${i})">✕</button>
+      </span>
+    </div>
+  `).join('');
+}
+
+function agregarAjusteLiquidacion() {
+  const desc = document.getElementById('dl_ajuste_desc').value.trim();
+  const valor = parseFloat(document.getElementById('dl_ajuste_valor').value);
+  if (!desc || !valor) { mostrarToast('⚠️ Escribe la descripción y el valor del cuadre', '#E05252'); return; }
+
+  liqAjustesTrabajo.push({ descripcion: desc, valor, fecha: new Date().toISOString().split('T')[0] });
+  document.getElementById('dl_ajuste_desc').value = '';
+  document.getElementById('dl_ajuste_valor').value = '';
+  renderAjustesLiquidacion();
+
+  // Recalcular el monto final sugerido sumando los ajustes al valor actual del campo
+  const actual = parseFloat(document.getElementById('dl_monto_final').value) || 0;
+  document.getElementById('dl_monto_final').value = Math.max(actual + valor, 0);
+}
+
+function quitarAjusteLiquidacion(idx) {
+  const ajuste = liqAjustesTrabajo[idx];
+  if (!ajuste) return;
+  liqAjustesTrabajo.splice(idx, 1);
+  renderAjustesLiquidacion();
+  const actual = parseFloat(document.getElementById('dl_monto_final').value) || 0;
+  document.getElementById('dl_monto_final').value = Math.max(actual - ajuste.valor, 0);
+}
+
+async function guardarDetalleLiquidacion() {
+  const vehiculoId = liqVehiculoModalActual;
+  const ctx = liqDatosPeriodo[vehiculoId];
+  if (!ctx) return;
+  const { vehiculo: v, ciclo, ingresos, gastosPropietario, dias, registro } = ctx;
+  const montoFinal = parseFloat(document.getElementById('dl_monto_final').value) || 0;
+  if (!montoFinal) { mostrarToast('⚠️ Ingresa el valor final a liquidar', '#E05252'); return; }
+
+  const esCorreccion = !!registro;
+  const correo = v.procedencia === 'propietario' ? v.propietarioEmail : v.aliadoEmail;
+  const nombreDest = v.procedencia === 'propietario' ? (v.propietarioNombre || 'Propietario') : (v.aliadoNombre || 'Aliado');
+  const periodoLabel = `${fmtFecha(ciclo.inicio)} al ${fmtFecha(ciclo.fin)}`;
 
   try {
-    await sbInsert('movimientos_contables', {
-      tipo: 'egreso',
-      categoria: 'liquidacion',
-      concepto: `Liquidación a ${nombreDest} · ${v.nombre}`,
-      valor: monto,
-      fecha: new Date().toISOString().split('T')[0],
+    // Movimiento contable: actualizar el existente si ya había uno, o crear uno nuevo
+    if (registro?.movimiento_id) {
+      await sbUpdate('movimientos_contables', registro.movimiento_id, { valor: montoFinal, notas: `Período ${periodoLabel}${esCorreccion ? ' · corregido' : ''}` });
+    } else {
+      const mov = await sbInsert('movimientos_contables', {
+        tipo: 'egreso',
+        categoria: 'liquidacion',
+        concepto: `Liquidación a ${nombreDest} · ${v.nombre}`,
+        valor: montoFinal,
+        fecha: new Date().toISOString().split('T')[0],
+        vehiculo_id: vehiculoId,
+        notas: `Período ${periodoLabel}`
+      });
+      var nuevoMovimientoId = mov[0]?.id;
+    }
+
+    const datosLiquidacion = {
       vehiculo_id: vehiculoId,
-      notas: `Período ${periodoLabel}`
-    });
-    await sbInsert('liquidaciones', {
-      vehiculo_id: vehiculoId,
-      tipo,
-      periodo_inicio: periodoInicio,
-      periodo_fin: periodoFin,
+      tipo: v.procedencia,
+      periodo_inicio: ciclo.inicio,
+      periodo_fin: ciclo.fin,
       ingresos,
-      gastos_deducidos: gastos,
-      monto_liquidado: monto,
+      gastos_deducidos: gastosPropietario,
+      dias_utilizados: dias,
+      monto_liquidado: ctx.montoBase || montoFinal,
+      monto_final: montoFinal,
+      ajustes: liqAjustesTrabajo,
       correo_enviado: !!correo,
-      correo_destino: correo || null
-    });
+      correo_destino: correo || null,
+      movimiento_id: registro?.movimiento_id || nuevoMovimientoId || null
+    };
+
+    if (registro?.id) {
+      await sbUpdate('liquidaciones', registro.id, datosLiquidacion);
+    } else {
+      await sbInsert('liquidaciones', datosLiquidacion);
+    }
   } catch(e) {
-    console.error('Error registrando liquidación:', e);
-    mostrarToast('⚠️ No se pudo registrar la liquidación', '#E05252');
+    console.error('Error guardando la liquidación:', e);
+    mostrarToast('⚠️ No se pudo guardar: ' + e.message, 'var(--rojo-alerta)');
     return;
   }
 
   if (correo) {
+    const bloqueAjustes = liqAjustesTrabajo.length > 0
+      ? '\nCuadres / gastos de cambio en este período:\n' + liqAjustesTrabajo.map(a => `  • ${a.descripcion}: ${a.valor < 0 ? '-' : '+'}${formatCOP(Math.abs(a.valor))}`).join('\n') + '\n'
+      : '';
     const cuerpo = `Hola ${nombreDest},
 
-Aquí está el resumen de la liquidación de su vehículo ${v.nombre}${v.placa ? ' (' + v.placa + ')' : ''} con Car Help:
+${esCorreccion ? 'Le enviamos la liquidación corregida' : 'Aquí está el resumen de la liquidación'} de su vehículo ${v.nombre}${v.placa ? ' (' + v.placa + ')' : ''} con Car Help:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-PERÍODO LIQUIDADO: ${periodoLabel}
+PERÍODO: ${periodoLabel}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-Ingresos generados en el período:  ${formatCOP(ingresos)}
-${v.propietarioTipoLiq === 'fijo' ? `Valor fijo pactado:                 ${formatCOP(v.propietarioValorFijo || 0)}` : `% que le corresponde:              ${v.propietarioPorcentaje || 0}%`}
-Gastos/mantenimientos a su cargo:  ${formatCOP(gastos)}
-──────────────────────────────────
-VALOR A CONSIGNAR:                 ${formatCOP(monto)}
+${v.procedencia === 'propietario' ? `Ingresos generados en el período:  ${formatCOP(ingresos)}\nGastos/mantenimientos a su cargo:  ${formatCOP(gastosPropietario)}\n` : `Días de uso en el período:  ${dias}\n`}${bloqueAjustes}──────────────────────────────────
+VALOR ${esCorreccion ? 'CORREGIDO' : ''} A CONSIGNAR:      ${formatCOP(montoFinal)}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 En los próximos días le confirmaremos el pago correspondiente.
@@ -5514,77 +5656,14 @@ Gracias por confiar su vehículo a Car Help.
 
 Equipo Car Help — Pereira, Colombia
 📱 WhatsApp: +57 310 743 6082`;
-    await enviarCorreoDirecto(correo, `Liquidación ${v.nombre} — Período ${fmtFecha(periodoInicio)} al ${fmtFecha(periodoFin)}`, cuerpo);
+    await enviarCorreoDirecto(correo, `${esCorreccion ? 'Liquidación corregida' : 'Liquidación'} ${v.nombre} — Período ${fmtFecha(ciclo.inicio)} al ${fmtFecha(ciclo.fin)}`, cuerpo);
   }
 
-  mostrarToast(correo ? '✅ Liquidación registrada y correo enviado' : '✅ Liquidación registrada (sin correo: falta el email del propietario)');
+  mostrarToast(correo ? `✅ Liquidación ${esCorreccion ? 'corregida y reenviada' : 'guardada y enviada'}` : '✅ Liquidación guardada (sin correo: falta el email)');
+  cerrarModal('modal-detalle-liquidacion');
   await cargarMovimientosContables();
   await renderLiquidaciones();
 }
-
-async function liquidarAliado(vehiculoId, periodoInicio, periodoFin, dias) {
-  const v = vehiculos.find(x => x.id === vehiculoId);
-  if (!v) return;
-  const inputEl = document.getElementById(`liq-aliado-valor-${vehiculoId}`);
-  const monto = parseFloat(inputEl?.value) || 0;
-  if (!monto) { mostrarToast('⚠️ Ingresa el valor a pagar al aliado', '#E05252'); return; }
-
-  const correo = v.aliadoEmail;
-  const nombreDest = v.aliadoNombre || 'Aliado';
-  const periodoLabel = `${fmtFecha(periodoInicio)} al ${fmtFecha(periodoFin)}`;
-
-  try {
-    await sbInsert('movimientos_contables', {
-      tipo: 'egreso',
-      categoria: 'liquidacion',
-      concepto: `Liquidación a aliado ${nombreDest} · ${v.nombre}`,
-      valor: monto,
-      fecha: new Date().toISOString().split('T')[0],
-      vehiculo_id: vehiculoId,
-      notas: `Período ${periodoLabel} · ${dias} día(s) de uso`
-    });
-    await sbInsert('liquidaciones', {
-      vehiculo_id: vehiculoId,
-      tipo: 'aliado',
-      periodo_inicio: periodoInicio,
-      periodo_fin: periodoFin,
-      dias_utilizados: dias,
-      monto_liquidado: monto,
-      correo_enviado: !!correo,
-      correo_destino: correo || null
-    });
-  } catch(e) {
-    console.error('Error registrando liquidación de aliado:', e);
-    mostrarToast('⚠️ No se pudo registrar la liquidación', '#E05252');
-    return;
-  }
-
-  if (correo) {
-    const cuerpo = `Hola ${nombreDest},
-
-Aquí está la liquidación por el uso de su vehículo ${v.nombre}${v.placa ? ' (' + v.placa + ')' : ''} con Car Help:
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-PERÍODO: ${periodoLabel}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-Días de uso en el período:  ${dias}
-VALOR A PAGAR:              ${formatCOP(monto)}
-━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-En los próximos días le confirmaremos el pago correspondiente.
-
-Gracias por su alianza con Car Help.
-
-Equipo Car Help — Pereira, Colombia
-📱 WhatsApp: +57 310 743 6082`;
-    await enviarCorreoDirecto(correo, `Liquidación ${v.nombre} — Período ${fmtFecha(periodoInicio)} al ${fmtFecha(periodoFin)}`, cuerpo);
-  }
-
-  mostrarToast(correo ? '✅ Liquidación registrada y correo enviado' : '✅ Liquidación registrada (sin correo: falta el email del aliado)');
-  await cargarMovimientosContables();
-  await renderLiquidaciones();
-}
-
 
 function abrirModal(id) { document.getElementById(id).classList.add('visible'); }
 function cerrarModal(id) { document.getElementById(id).classList.remove('visible'); }
