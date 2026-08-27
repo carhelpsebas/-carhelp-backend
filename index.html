@@ -892,6 +892,16 @@
           </div>
         </div>
 
+        <div class="campo" style="display:flex;align-items:center;gap:8px;flex-direction:row">
+          <input type="checkbox" id="r_sale_ciudad" onchange="rToggleSaleCiudad()" style="width:auto">
+          <label style="margin:0">El cliente informó que va a salir de la ciudad</label>
+        </div>
+        <div class="campo" id="r-ciudad-destino-wrap" style="display:none">
+          <label>Ciudades que visitará (marca todas las que apliquen)</label>
+          <div id="r-ciudades-checklist" style="display:flex;flex-wrap:wrap;gap:8px;background:var(--gris-oscuro);border:1px solid var(--borde);border-radius:8px;padding:12px"></div>
+          <button type="button" class="btn-secundario" onclick="abrirModalPicoPlaca()" style="margin-top:8px">⚙️ Gestionar ciudades / pico y placa</button>
+        </div>
+
         <div class="info-banner" id="info-periodo">
           ⏱ Selecciona fecha y hora de entrega y devolución. El sistema calculará automáticamente los períodos de 24h y horas adicionales.
         </div>
@@ -2027,6 +2037,43 @@
   </div>
 </div>
 
+<!-- ═══════════════════ MODAL PICO Y PLACA POR CIUDAD ═══════════════════ -->
+<div class="modal-overlay" id="modal-pico-placa">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <div class="modal-titulo">🚦 Pico y placa por ciudad</div>
+      <button class="modal-cerrar" onclick="cerrarModal('modal-pico-placa')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="info-banner">Estas reglas cambian cada semestre y varían por ciudad — revísalas y actualízalas tú mismo periódicamente. El sistema las usa para avisar al cliente si su vehículo tiene restricción en la ciudad a la que va.</div>
+
+      <div id="pp-lista" style="margin-bottom:16px"></div>
+
+      <hr class="divider">
+      <div class="seccion-label">Agregar / editar ciudad</div>
+      <input type="hidden" id="pp_id">
+      <div class="fila-2">
+        <div class="campo"><label>Ciudad</label><input type="text" id="pp_ciudad" placeholder="Ej. Medellín"></div>
+        <div class="campo"><label>Horario de restricción</label><input type="text" id="pp_horario" placeholder="Ej. 5:00 a.m. – 8:00 p.m."></div>
+      </div>
+      <div class="campo"><label>Vigencia</label><input type="text" id="pp_vigencia" placeholder="Ej. 2do semestre 2026 (desde 3 ago 2026)"></div>
+      <div class="seccion-label" style="margin-top:10px">Dígitos restringidos por día (separados por coma)</div>
+      <div class="fila-3">
+        <div class="campo"><label>Lunes</label><input type="text" id="pp_lunes" placeholder="Ej. 5,8"></div>
+        <div class="campo"><label>Martes</label><input type="text" id="pp_martes" placeholder="Ej. 1,4"></div>
+        <div class="campo"><label>Miércoles</label><input type="text" id="pp_miercoles" placeholder="Ej. 0,2"></div>
+      </div>
+      <div class="fila-2">
+        <div class="campo"><label>Jueves</label><input type="text" id="pp_jueves" placeholder="Ej. 3,6"></div>
+        <div class="campo"><label>Viernes</label><input type="text" id="pp_viernes" placeholder="Ej. 7,9"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secundario" onclick="ppLimpiarForm()">Limpiar</button>
+      <button class="btn-primario" onclick="guardarCiudadPicoPlaca()">Guardar ciudad</button>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL ENTREGAS -->
 <div class="entrega-overlay" id="entrega-overlay">
@@ -2394,6 +2441,7 @@ let reservasTour = [];
 let solicitudesSeguridad = [];
 let solicitudesClientes = [];
 let usuarios = [];
+let picoPlacaCiudades = [];
 let correosReservaActual = [];
 let tabCorreoActual = 0;
 let cargandoDatos = false;
@@ -2477,6 +2525,11 @@ async function cargarDatos() {
   if (cargandoDatos) return;
   cargandoDatos = true;
 
+  // Pico y placa por ciudad
+  try {
+    picoPlacaCiudades = await sbSelect('pico_placa_ciudades', '&order=ciudad.asc');
+  } catch(e) { console.warn('Error cargando pico y placa:', e.message); picoPlacaCiudades = []; }
+
   // Usuarios (colaboradores)
   try {
     const data = await sbSelect('colaboradores');
@@ -2544,6 +2597,7 @@ async function cargarDatos() {
         abono: o.abono || 0,
         costoEntrega: o.costo_entrega || 0,
         costoRecibido: o.costo_recibido || 0,
+        ciudadesDestino: o.ciudad_destino ? o.ciudad_destino.split(',').map(s => s.trim()).filter(Boolean) : [],
         periodos: periodoCalc.periodosFacturables,
         total: totalCalc,
         saldoPendiente: Math.max(totalCalc - (o.abono || 0), 0),
@@ -3268,6 +3322,158 @@ function toggleNuevaReserva() {
 }
 
 /* ════════════════════════════════════════════
+   PICO Y PLACA POR CIUDAD
+   ════════════════════════════════════════════ */
+function rToggleSaleCiudad() {
+  const checked = document.getElementById('r_sale_ciudad').checked;
+  document.getElementById('r-ciudad-destino-wrap').style.display = checked ? 'block' : 'none';
+  if (checked) renderSelectorCiudadesDestino();
+}
+
+function renderSelectorCiudadesDestino() {
+  const cont = document.getElementById('r-ciudades-checklist');
+  if (!cont) return;
+  if (picoPlacaCiudades.length === 0) {
+    cont.innerHTML = '<div style="font-size:0.78rem;color:var(--blanco-suave)">No hay ciudades configuradas todavía. Usa el botón de abajo para agregar una.</div>';
+    return;
+  }
+  cont.innerHTML = picoPlacaCiudades.map(c => `
+    <label style="display:flex;align-items:center;gap:6px;background:var(--gris-medio);border:1px solid var(--borde);border-radius:20px;padding:6px 12px;cursor:pointer;font-size:0.8rem">
+      <input type="checkbox" class="r-ciudad-check" value="${c.ciudad.replace(/"/g,'&quot;')}" style="width:auto">
+      ${c.ciudad}
+    </label>
+  `).join('');
+}
+
+// Extrae el último dígito numérico de una placa (ej. "ABC123" -> "3")
+function obtenerUltimoDigitoPlaca(placa) {
+  if (!placa) return null;
+  const digitos = placa.replace(/\D/g, '');
+  return digitos ? digitos.slice(-1) : null;
+}
+
+const DIAS_SEMANA_PP = ['lunes','martes','miercoles','jueves','viernes'];
+const DIAS_SEMANA_PP_LABEL = { lunes:'Lunes', martes:'Martes', miercoles:'Miércoles', jueves:'Jueves', viernes:'Viernes' };
+
+// Busca si una placa tiene restricción de pico y placa en una ciudad configurada
+function buscarRestriccionPicoPlaca(ciudadNombre, placa) {
+  if (!ciudadNombre) return null;
+  const ciudad = picoPlacaCiudades.find(c => c.ciudad.toLowerCase().trim() === ciudadNombre.toLowerCase().trim());
+  if (!ciudad) return null;
+  const digito = obtenerUltimoDigitoPlaca(placa);
+  if (digito == null) return null;
+  const reglas = ciudad.reglas || {};
+  for (const dia of DIAS_SEMANA_PP) {
+    const lista = (reglas[dia] || []).map(String);
+    if (lista.includes(digito)) {
+      return { ciudad: ciudad.ciudad, dia: DIAS_SEMANA_PP_LABEL[dia], horario: ciudad.horario || '', vigencia: ciudad.vigencia || '' };
+    }
+  }
+  return null; // la placa no tiene restricción esa semana en esa ciudad
+}
+
+function abrirModalPicoPlaca() {
+  renderListaPicoPlaca();
+  ppLimpiarForm();
+  abrirModal('modal-pico-placa');
+}
+
+function renderListaPicoPlaca() {
+  const cont = document.getElementById('pp-lista');
+  if (picoPlacaCiudades.length === 0) {
+    cont.innerHTML = '<div style="font-size:0.8rem;color:var(--blanco-suave);text-align:center;padding:10px">Aún no has agregado ninguna ciudad.</div>';
+    return;
+  }
+  cont.innerHTML = picoPlacaCiudades.map(c => {
+    const resumen = DIAS_SEMANA_PP.map(d => `${DIAS_SEMANA_PP_LABEL[d]}: ${(c.reglas?.[d]||[]).join(',') || '—'}`).join(' · ');
+    return `
+    <div style="background:var(--gris-oscuro);border:1px solid var(--borde);border-radius:8px;padding:10px 12px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <strong style="color:var(--dorado-suave)">${c.ciudad}</strong>
+          <div style="font-size:0.72rem;color:var(--blanco-suave);margin-top:2px">${resumen}</div>
+          <div style="font-size:0.7rem;color:var(--blanco-suave);margin-top:2px">${c.horario || ''} ${c.vigencia ? '· ' + c.vigencia : ''}</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-secundario" style="font-size:0.7rem;padding:5px 10px" onclick="editarCiudadPicoPlaca('${c.id}')">Editar</button>
+          <button class="btn-peligro" style="font-size:0.7rem;padding:5px 10px" onclick="eliminarCiudadPicoPlaca('${c.id}')">Eliminar</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function ppLimpiarForm() {
+  document.getElementById('pp_id').value = '';
+  document.getElementById('pp_ciudad').value = '';
+  document.getElementById('pp_horario').value = '';
+  document.getElementById('pp_vigencia').value = '';
+  ['lunes','martes','miercoles','jueves','viernes'].forEach(d => document.getElementById('pp_' + d).value = '');
+}
+
+function editarCiudadPicoPlaca(id) {
+  const c = picoPlacaCiudades.find(x => x.id === id);
+  if (!c) return;
+  document.getElementById('pp_id').value = c.id;
+  document.getElementById('pp_ciudad').value = c.ciudad;
+  document.getElementById('pp_horario').value = c.horario || '';
+  document.getElementById('pp_vigencia').value = c.vigencia || '';
+  DIAS_SEMANA_PP.forEach(d => document.getElementById('pp_' + d).value = (c.reglas?.[d] || []).join(','));
+}
+
+async function eliminarCiudadPicoPlaca(id) {
+  try {
+    await sbDelete('pico_placa_ciudades', id);
+  } catch(e) {
+    console.error('Error eliminando ciudad:', e);
+    mostrarToast('⚠️ No se pudo eliminar: ' + e.message, 'var(--rojo-alerta)');
+    return;
+  }
+  picoPlacaCiudades = picoPlacaCiudades.filter(c => c.id !== id);
+  renderListaPicoPlaca();
+  mostrarToast('🗑️ Ciudad eliminada');
+}
+
+async function guardarCiudadPicoPlaca() {
+  const id = document.getElementById('pp_id').value;
+  const ciudad = document.getElementById('pp_ciudad').value.trim();
+  if (!ciudad) { mostrarToast('⚠️ Escribe el nombre de la ciudad', '#E05252'); return; }
+
+  const parseDigitos = (str) => str.split(',').map(s => s.trim()).filter(Boolean);
+  const reglas = {
+    lunes: parseDigitos(document.getElementById('pp_lunes').value),
+    martes: parseDigitos(document.getElementById('pp_martes').value),
+    miercoles: parseDigitos(document.getElementById('pp_miercoles').value),
+    jueves: parseDigitos(document.getElementById('pp_jueves').value),
+    viernes: parseDigitos(document.getElementById('pp_viernes').value),
+  };
+  const datos = {
+    ciudad,
+    horario: document.getElementById('pp_horario').value.trim(),
+    vigencia: document.getElementById('pp_vigencia').value.trim(),
+    reglas
+  };
+
+  try {
+    if (id) {
+      await sbUpdate('pico_placa_ciudades', id, datos);
+    } else {
+      await sbInsert('pico_placa_ciudades', datos);
+    }
+  } catch(e) {
+    console.error('Error guardando ciudad:', e);
+    mostrarToast('⚠️ No se pudo guardar: ' + e.message, 'var(--rojo-alerta)');
+    return;
+  }
+
+  picoPlacaCiudades = await sbSelect('pico_placa_ciudades', '&order=ciudad.asc');
+  renderListaPicoPlaca();
+  renderSelectorCiudadesDestino();
+  ppLimpiarForm();
+  mostrarToast('✅ Ciudad guardada');
+}
+
+/* ════════════════════════════════════════════
    RESERVAS — calculo de periodos 24h
    ════════════════════════════════════════════ */
 function calcularPeriodo() {
@@ -3369,6 +3575,10 @@ async function generarReserva() {
   const lugar_d = document.getElementById('r_lugar_devolucion').value.trim() || 'Por confirmar';
   const notas = document.getElementById('r_notas').value.trim() || 'Sin observaciones';
   const email_interno = document.getElementById('r_email_interno').value.trim() || 'reservascarhelp@gmail.com';
+  const saleCiudad = document.getElementById('r_sale_ciudad')?.checked;
+  const ciudadesDestino = saleCiudad
+    ? Array.from(document.querySelectorAll('.r-ciudad-check:checked')).map(c => c.value)
+    : [];
 
   const numReserva = generarNumReserva('CH');
   const saldoPendiente = Math.max(periodo.total - abono, 0);
@@ -3377,10 +3587,10 @@ async function generarReserva() {
     num_reserva: numReserva,
     nombre: valores.nombre, tipo_doc: valores.tipo_doc, num_doc: valores.num_doc,
     celular: valores.celular, email: valores.email, direccion: valores.direccion,
-    vehiculo: veh ? veh.nombre : '—', vehiculo_id: valores.vehiculo_id,
+    vehiculo: veh ? veh.nombre : '—', vehiculo_id: valores.vehiculo_id, placa: veh ? veh.placa : '',
     fecha_inicio: valores.fecha_inicio, hora_inicio: valores.hora_inicio,
     fecha_fin: valores.fecha_fin, hora_fin: valores.hora_fin,
-    lugar_entrega: lugar_e, lugar_devolucion: lugar_d,
+    lugar_entrega: lugar_e, lugar_devolucion: lugar_d, ciudadesDestino,
     tarifa, deposito, abono, costoEntrega, costoRecibido, saldoPendiente, periodos: periodo.periodosFacturables, horasExtra: periodo.horasExtra,
     cobroExtra: periodo.cobroExtra, total: periodo.total,
     notas, email_interno, estado: 'pendiente', creada: new Date().toISOString(),
@@ -3413,6 +3623,7 @@ async function generarReserva() {
       abono: abono,
       costo_entrega: costoEntrega,
       costo_recibido: costoRecibido,
+      ciudad_destino: ciudadesDestino.length ? ciudadesDestino.join(', ') : null,
       estado: 'pendiente',
       notas: notas
     });
@@ -3476,6 +3687,32 @@ function construirCorreosReserva(r) {
       (costoRecibido > 0 ? `Costo de recibido/devolución: ${formatCOP(costoRecibido)}\n` : '')
     : '';
 
+  // Aviso de pico y placa si el cliente informó ciudades a visitar
+  let bloquePicoPlaca = '';
+  if (r.ciudadesDestino && r.ciudadesDestino.length > 0) {
+    const bloquesCiudad = r.ciudadesDestino.map(ciudad => {
+      const restriccion = buscarRestriccionPicoPlaca(ciudad, r.placa);
+      if (restriccion) {
+        return `📍 ${restriccion.ciudad}: restricción los días ${restriccion.dia}${restriccion.horario ? `, en horario de ${restriccion.horario}` : ''}.${restriccion.vigencia ? ` (Vigencia: ${restriccion.vigencia})` : ''}`;
+      }
+      return `📍 ${ciudad}: verifique la restricción de pico y placa vigente antes de viajar.`;
+    }).join('\n');
+
+    bloquePicoPlaca = `\n━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚦 PICO Y PLACA EN SU RECORRIDO
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+Nos informó que visitará las siguientes ciudades con el vehículo (placa ${r.placa}):
+
+${bloquesCiudad}
+
+RECOMENDACIONES PARA EVITAR FOTOMULTAS:
+  • Revise la restricción del día antes de salir hacia cada ciudad.
+  • Use Waze o Google Maps: reportan cámaras de fotodetección y zonas de pico y placa en tiempo real.
+  • Evite circular en el horario restringido, incluso en vías principales.
+  • Ante cualquier duda, consulte la Secretaría de Movilidad de la ciudad que visitará.
+`;
+  }
+
   // Recordatorio: 1 día antes
   const fechaRec = (() => {
     const d = new Date(r.fecha_inicio); d.setDate(d.getDate()-1);
@@ -3514,7 +3751,7 @@ ${bloqueAbono}
 POLÍTICA DE RESERVA
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 Una vez confirmada la reserva, el vehículo queda bloqueado exclusivamente para usted, por lo cual el abono no es reembolsable. Solo se permite cambio de fecha de la reserva si se solicita con un mínimo de 24 horas de anticipación a la fecha de entrega.
-
+${bloquePicoPlaca}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Por favor tenga a la mano al momento de la entrega:
@@ -3623,6 +3860,7 @@ TOTAL                                ${totalFmt}
 ${abono > 0 ? `Abono / anticipo pagado              ${abonoFmt}\nSaldo pendiente (entrega)            ${saldoFmt}\n` : ''}━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Vigencia de esta cotización: 48 horas. El depósito es reembolsable al finalizar el servicio, sujeto a revisión del vehículo.
+${bloquePicoPlaca}
 
 Política de reserva: una vez confirmada la reserva, el vehículo queda bloqueado exclusivamente para usted y el abono no es reembolsable; solo se permite cambio de fecha si se solicita con mínimo 24 horas de anticipación a la entrega.
 
