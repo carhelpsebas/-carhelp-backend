@@ -4020,7 +4020,7 @@ async function generarReserva() {
     mostrarToast('✅ Reserva creada y guardada en Supabase: ' + numReserva);
   } catch(e) {
     console.error('Error guardando reserva en Supabase:', e);
-    mostrarToast('⚠️ Reserva creada solo localmente. Revisa la conexión a Supabase.', '#BA7517');
+    mostrarToast('⚠️ Reserva creada solo localmente — Supabase dijo: ' + e.message, 'var(--rojo-alerta)');
   }
 
   reservas.unshift(nuevaReserva);
@@ -4306,6 +4306,20 @@ function badgeVencimiento(r) {
   return '';
 }
 
+// Regenera el correo de una reserva (con los datos actuales) y lo muestra para verlo/reenviarlo
+function reenviarCorreoReserva(num) {
+  const r = reservas.find(x => x.num_reserva === num);
+  if (!r) return;
+  correosReservaActual = construirCorreosReserva(r);
+  tabCorreoActual = 0;
+  renderTabsCorreoReserva();
+  renderCorreoReserva(0);
+  document.getElementById('badge-num-reserva').textContent = r.num_reserva;
+  document.getElementById('panel-correos-reserva').style.display = 'block';
+  document.getElementById('panel-correos-reserva').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  mostrarToast('📧 Correo actualizado — listo para ver o reenviar');
+}
+
 function renderReservas() {
   const cont = document.getElementById('lista-reservas');
   document.getElementById('reservas-count').textContent = `${reservas.length} reserva(s)`;
@@ -4330,6 +4344,7 @@ function renderReservas() {
         ${r.estado === 'entregado' && r.celular ? `<a class="btn-secundario" style="text-decoration:none;color:#25D366;border-color:#25D366" target="_blank" href="${waLink(r.celular, `Hola ${r.nombre}, te recordamos que la devolución de tu ${r.vehiculo} (reserva ${r.num_reserva}) está programada para ${fmtFechaHora(r.fecha_fin, r.hora_fin)}. Cualquier novedad avísanos. — Car Help`)}">💬 Recordar por WhatsApp</a>` : ''}
         <button class="btn-secundario" onclick="abrirModalExtenderRenta('${r.num_reserva}')">📅 Extender</button>
         <button class="btn-secundario" onclick="abrirModalCambiarVehiculo('${r.num_reserva}')">🔄 Cambiar vehículo</button>
+        <button class="btn-secundario" onclick="reenviarCorreoReserva('${r.num_reserva}')">📧 Ver / reenviar correo</button>
         <button class="btn-peligro" onclick="eliminarReserva('${r.num_reserva}')">Eliminar</button>
       </div>
     </div>
@@ -4521,6 +4536,9 @@ Equipo Car Help — Pereira, Colombia
 
   cerrarModal('modal-extender');
   renderReservas(); renderStats(); renderProximas(); renderEnCurso();
+
+  // Mostrar en pantalla el correo actualizado con los nuevos datos, para verlo o reenviarlo cuando haga falta
+  reenviarCorreoReserva(r.num_reserva);
 }
 
 /* ════════════════════════════════════════════
@@ -6357,7 +6375,8 @@ function mostrarToast(msg, color) {
   document.getElementById('toast-msg').textContent = msg;
   t.style.background = color || 'var(--verde-ok)';
   t.classList.add('visible');
-  setTimeout(() => t.classList.remove('visible'), 3500);
+  const esError = color === 'var(--rojo-alerta)' || color === '#E05252';
+  setTimeout(() => t.classList.remove('visible'), esError ? 9000 : 3500);
 }
 
 /* ════════════════════════════════════════════
