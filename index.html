@@ -5636,11 +5636,22 @@ async function guardarMovimientoContable() {
 
 async function eliminarMovimientoContable(id) {
   try {
+    // Si este movimiento está vinculado a una liquidación (columna movimiento_id), lo desvinculamos
+    // primero para que Supabase no rechace el borrado por la relación entre tablas.
+    try {
+      const liqsVinculadas = await sbSelect('liquidaciones', `&movimiento_id=eq.${id}`);
+      for (const l of liqsVinculadas) {
+        await sbUpdate('liquidaciones', l.id, { movimiento_id: null });
+      }
+    } catch(e) {
+      console.warn('No se pudo desvincular la liquidación asociada:', e.message);
+    }
+
     await sbDelete('movimientos_contables', id);
     mostrarToast('🗑️ Movimiento eliminado');
   } catch(e) {
     console.error('Error eliminando movimiento:', e);
-    mostrarToast('⚠️ No se pudo eliminar', '#E05252');
+    mostrarToast('⚠️ No se pudo eliminar: ' + e.message, 'var(--rojo-alerta)');
     return;
   }
   await cargarMovimientosContables();
