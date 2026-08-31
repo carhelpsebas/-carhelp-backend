@@ -940,6 +940,14 @@
           <button type="button" class="btn-secundario" onclick="abrirModalPicoPlaca()" style="margin-top:8px">⚙️ Gestionar ciudades / pico y placa</button>
         </div>
 
+        <div class="info-banner" id="r-pico-placa-alerta" style="display:none;border-color:var(--dorado)"></div>
+        <div class="fila-2" id="r-descuento-pico-placa-wrap" style="display:none">
+          <div class="campo">
+            <label>Descuento por pico y placa (COP)</label>
+            <input type="number" id="r_descuento_pico_placa" placeholder="0" oninput="calcularPeriodo()">
+          </div>
+        </div>
+
         <div class="info-banner" id="info-periodo">
           ⏱ Selecciona fecha y hora de entrega y devolución. El sistema calculará automáticamente los períodos de 24h y horas adicionales.
         </div>
@@ -2087,6 +2095,7 @@
         </div>
       </div>
       <div class="info-banner" id="ext-resultado">Selecciona la nueva fecha y hora de devolución.</div>
+      <div class="info-banner" id="ext-pico-placa-alerta" style="display:none;border-color:var(--dorado)"></div>
       <div class="campo">
         <label>Valor adicional por los días extra (COP)</label>
         <input type="number" id="ext_valor_adicional" placeholder="Se calcula automático, pero puedes ajustarlo" oninput="actualizarNuevoTotalExtension()">
@@ -2103,6 +2112,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn-secundario" onclick="cerrarModal('modal-extender')">Cancelar</button>
+      <button class="btn-secundario" id="ext-btn-cambio-provisional" style="display:none" onclick="cerrarModal('modal-extender'); abrirModalTramosVehiculo(extReservaActual.num_reserva)">🚗 Cambio provisional de vehículo</button>
       <button class="btn-primario" onclick="confirmarExtensionRenta()">Confirmar extensión</button>
     </div>
   </div>
@@ -2800,7 +2810,7 @@ async function cargarDatos() {
       } catch(e2) {}
       const veh = vehiculos.find(v => v.id === o.vehiculo_id) || {};
       const periodoCalc = calcularPeriodosFacturables(o.fecha_salida, o.fecha_retorno);
-      const totalCalc = periodoCalc.periodosFacturables * (o.tarifa_diaria || 0) + (o.deposito || 0) + (o.costo_entrega || 0) + (o.costo_recibido || 0);
+      const totalCalc = Math.max(periodoCalc.periodosFacturables * (o.tarifa_diaria || 0) + (o.deposito || 0) + (o.costo_entrega || 0) + (o.costo_recibido || 0) - (o.descuento_pico_placa || 0), 0);
       return {
         id: o.id,
         num_reserva: o.numero,
@@ -2824,6 +2834,7 @@ async function cargarDatos() {
         abono: o.abono || 0,
         costoEntrega: o.costo_entrega || 0,
         costoRecibido: o.costo_recibido || 0,
+        descuentoPicoPlaca: o.descuento_pico_placa || 0,
         ciudadesDestino: o.ciudad_destino ? o.ciudad_destino.split(',').map(s => s.trim()).filter(Boolean) : [],
         periodos: periodoCalc.periodosFacturables,
         total: totalCalc,
@@ -3742,7 +3753,7 @@ function renderSelectorCiudadesDestino() {
   }
   cont.innerHTML = picoPlacaCiudades.map(c => `
     <label style="display:flex;align-items:center;gap:6px;background:var(--gris-medio);border:1px solid var(--borde);border-radius:20px;padding:6px 12px;cursor:pointer;font-size:0.8rem">
-      <input type="checkbox" class="r-ciudad-check" value="${c.ciudad.replace(/"/g,'&quot;')}" style="width:auto">
+      <input type="checkbox" class="r-ciudad-check" value="${c.ciudad.replace(/"/g,'&quot;')}" style="width:auto" onchange="calcularPeriodo()">
       ${c.ciudad}
     </label>
   `).join('');
@@ -3773,6 +3784,29 @@ function buscarRestriccionPicoPlaca(ciudadNombre, placa) {
     }
   }
   return null; // la placa no tiene restricción esa semana en esa ciudad
+}
+
+// Devuelve las fechas exactas (dentro de un rango) en las que la placa tiene pico y placa en alguna de las ciudades dadas
+const DIA_LABEL_A_INDICE = { 'Lunes':1, 'Martes':2, 'Miércoles':3, 'Jueves':4, 'Viernes':5 };
+function obtenerFechasRestringidasPicoPlaca(fechaInicio, fechaFin, ciudadesDestino, placa) {
+  if (!fechaInicio || !fechaFin || !placa || !ciudadesDestino || ciudadesDestino.length === 0) return [];
+  const restricciones = ciudadesDestino.map(c => buscarRestriccionPicoPlaca(c, placa)).filter(Boolean);
+  if (restricciones.length === 0) return [];
+
+  const fechas = [];
+  let cur = new Date(fechaInicio + 'T00:00:00');
+  const fin = new Date(fechaFin + 'T00:00:00');
+  while (cur <= fin) {
+    const diaSemana = cur.getDay();
+    for (const r of restricciones) {
+      if (DIA_LABEL_A_INDICE[r.dia] === diaSemana) {
+        fechas.push({ fecha: soloFecha(cur), ciudad: r.ciudad, horario: r.horario });
+        break;
+      }
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+  return fechas;
 }
 
 function abrirModalPicoPlaca() {
@@ -3910,16 +3944,40 @@ function calcularPeriodo() {
   }
 
   const total = periodosFacturables * tarifa + deposito + costoEntrega + costoRecibido;
-  const saldoPendiente = Math.max(total - abono, 0);
-  document.getElementById('r_total').value = total > 0 ? formatCOP(total) : '—';
-  if (saldoEl) saldoEl.value = total > 0 ? formatCOP(saldoPendiente) : '—';
+
+  // Pico y placa: mostrar aviso de fechas restringidas y permitir un descuento por esos días
+  const alertaPP = document.getElementById('r-pico-placa-alerta');
+  const wrapDescuento = document.getElementById('r-descuento-pico-placa-wrap');
+  let descuentoPicoPlaca = 0;
+  const ciudadesMarcadas = Array.from(document.querySelectorAll('.r-ciudad-check:checked')).map(c => c.value);
+  const vehiculoSeleccionado = vehiculos.find(v => v.id === document.getElementById('r_vehiculo').value);
+  const fechasRestringidas = (ciudadesMarcadas.length > 0 && vehiculoSeleccionado)
+    ? obtenerFechasRestringidasPicoPlaca(fi, ff, ciudadesMarcadas, vehiculoSeleccionado.placa)
+    : [];
+
+  if (fechasRestringidas.length > 0) {
+    alertaPP.style.display = 'block';
+    alertaPP.innerHTML = `🚦 Este vehículo tiene <strong>pico y placa</strong> los siguientes días dentro de la reserva: ` +
+      fechasRestringidas.map(f => `<strong>${fmtFecha(f.fecha)}</strong> (${f.ciudad})`).join(', ') +
+      `. Si el cliente no podrá usar el carro esos días, considera aplicar un descuento o hacerle un cambio de vehículo provisional para esas fechas (esto último se hace después de guardar la reserva, desde el botón "Vehículos por fecha").`;
+    wrapDescuento.style.display = 'grid';
+    descuentoPicoPlaca = parseFloat(document.getElementById('r_descuento_pico_placa')?.value) || 0;
+  } else {
+    alertaPP.style.display = 'none';
+    wrapDescuento.style.display = 'none';
+  }
+
+  const totalConDescuento = Math.max(total - descuentoPicoPlaca, 0);
+  const saldoPendiente = Math.max(totalConDescuento - abono, 0);
+  document.getElementById('r_total').value = totalConDescuento > 0 ? formatCOP(totalConDescuento) : '—';
+  if (saldoEl) saldoEl.value = totalConDescuento > 0 ? formatCOP(saldoPendiente) : '—';
 
   info.innerHTML = `⏱ Duración exacta: <strong>${periodos24h} período(s) de 24h</strong>` +
 
     (cobroExtra ? ` + <strong style="color:var(--rojo-alerta)">${horasExtra}h adicionales</strong> → se cobra <strong>1 período extra completo</strong> (cada renta es por 24h).` : ` (sin horas adicionales).`) +
     ` Total facturable: <strong style="color:var(--dorado)">${periodosFacturables} período(s) de 24h</strong>.`;
 
-  return { periodos24h, horasExtra, periodosFacturables, total, cobroExtra, abono, saldoPendiente, costoEntrega, costoRecibido };
+  return { periodos24h, horasExtra, periodosFacturables, total: totalConDescuento, cobroExtra, abono, saldoPendiente, costoEntrega, costoRecibido, descuentoPicoPlaca };
 }
 
 /* ════════════════════════════════════════════
@@ -3994,7 +4052,7 @@ async function generarReserva() {
     fecha_inicio: valores.fecha_inicio, hora_inicio: valores.hora_inicio,
     fecha_fin: valores.fecha_fin, hora_fin: valores.hora_fin,
     lugar_entrega: lugar_e, lugar_devolucion: lugar_d, ciudadesDestino,
-    tarifa, deposito, abono, costoEntrega, costoRecibido, saldoPendiente, periodos: periodo.periodosFacturables, horasExtra: periodo.horasExtra,
+    tarifa, deposito, abono, costoEntrega, costoRecibido, descuentoPicoPlaca: periodo.descuentoPicoPlaca || 0, saldoPendiente, periodos: periodo.periodosFacturables, horasExtra: periodo.horasExtra,
     cobroExtra: periodo.cobroExtra, total: periodo.total,
     notas, email_interno, estado: 'pendiente', creada: new Date().toISOString(),
   };
@@ -4027,6 +4085,7 @@ async function generarReserva() {
       costo_entrega: costoEntrega,
       costo_recibido: costoRecibido,
       ciudad_destino: ciudadesDestino.length ? ciudadesDestino.join(', ') : null,
+      descuento_pico_placa: periodo.descuentoPicoPlaca || 0,
       estado: 'pendiente',
       notas: notas
     });
@@ -4122,7 +4181,7 @@ RECOMENDACIONES PARA EVITAR FOTOMULTAS:
   • Use Waze o Google Maps: reportan cámaras de fotodetección y zonas de pico y placa en tiempo real.
   • Evite circular en el horario restringido, incluso en vías principales.
   • Ante cualquier duda, consulte la Secretaría de Movilidad de la ciudad que visitará.
-`;
+${r.descuentoPicoPlaca > 0 ? `\nSe aplicó un descuento de ${formatCOP(r.descuentoPicoPlaca)} por los días de pico y placa dentro de su reserva.\n` : ''}`;
   }
 
   // Recordatorio: 1 día antes
@@ -4541,6 +4600,8 @@ function abrirModalExtenderRenta(num) {
   document.getElementById('ext_notas').value = '';
   document.getElementById('ext_valor_adicional').value = '';
   document.getElementById('ext-nuevo-total').style.display = 'none';
+  document.getElementById('ext-pico-placa-alerta').style.display = 'none';
+  document.getElementById('ext-btn-cambio-provisional').style.display = 'none';
   document.getElementById('ext_enviar_correo').checked = true;
   document.getElementById('ext-resultado').innerHTML = 'Selecciona la nueva fecha y hora de devolución.';
   abrirModal('modal-extender');
@@ -4568,6 +4629,26 @@ function calcularExtension() {
   const nuevoTotal = r.total + valorExtra;
   info.innerHTML = `➕ Se agregan <strong style="color:var(--dorado)">${diasExtra} día(s)</strong> adicionales · Valor sugerido: <strong style="color:var(--dorado)">${formatCOP(valorExtra)}</strong> (puedes ajustarlo abajo)`;
   document.getElementById('ext_valor_adicional').value = valorExtra;
+
+  // Pico y placa: revisar si algún día del tramo extendido cae en restricción
+  const alertaPP = document.getElementById('ext-pico-placa-alerta');
+  const btnCambioProvisional = document.getElementById('ext-btn-cambio-provisional');
+  const diaSiguienteActual = new Date(r.fecha_fin + 'T00:00:00');
+  diaSiguienteActual.setDate(diaSiguienteActual.getDate() + 1);
+  const fechasRestringidas = (r.ciudadesDestino && r.ciudadesDestino.length > 0)
+    ? obtenerFechasRestringidasPicoPlaca(soloFecha(diaSiguienteActual), nff, r.ciudadesDestino, r.placa)
+    : [];
+  if (fechasRestringidas.length > 0) {
+    alertaPP.style.display = 'block';
+    alertaPP.innerHTML = `🚦 Dentro de estos días adicionales, el vehículo tiene <strong>pico y placa</strong> el ` +
+      fechasRestringidas.map(f => `<strong>${fmtFecha(f.fecha)}</strong> (${f.ciudad})`).join(', ') +
+      `. Considera ajustar el valor adicional de arriba con un descuento, o usa el botón "Cambio provisional de vehículo" para asignarle otro carro ese día.`;
+    btnCambioProvisional.style.display = 'inline-flex';
+  } else {
+    alertaPP.style.display = 'none';
+    btnCambioProvisional.style.display = 'none';
+  }
+
   return { diasExtra, valorExtra, nuevoTotal, nuevoFinISO, periodosFacturablesNuevo: nuevoCalc.periodosFacturables };
 }
 
