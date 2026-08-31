@@ -2088,6 +2088,11 @@
       </div>
       <div class="info-banner" id="ext-resultado">Selecciona la nueva fecha y hora de devolución.</div>
       <div class="campo">
+        <label>Valor adicional por los días extra (COP)</label>
+        <input type="number" id="ext_valor_adicional" placeholder="Se calcula automático, pero puedes ajustarlo" oninput="actualizarNuevoTotalExtension()">
+      </div>
+      <div class="info-banner" id="ext-nuevo-total" style="display:none"></div>
+      <div class="campo">
         <label>Notas (opcional)</label>
         <textarea id="ext_notas" placeholder="Ej. Cliente solicitó 2 días más por cambio de vuelo"></textarea>
       </div>
@@ -4534,6 +4539,8 @@ function abrirModalExtenderRenta(num) {
   document.getElementById('ext_fecha_fin').value = r.fecha_fin || '';
   document.getElementById('ext_hora_fin').value = r.hora_fin || '';
   document.getElementById('ext_notas').value = '';
+  document.getElementById('ext_valor_adicional').value = '';
+  document.getElementById('ext-nuevo-total').style.display = 'none';
   document.getElementById('ext_enviar_correo').checked = true;
   document.getElementById('ext-resultado').innerHTML = 'Selecciona la nueva fecha y hora de devolución.';
   abrirModal('modal-extender');
@@ -4559,8 +4566,19 @@ function calcularExtension() {
   const diasExtra = nuevoCalc.periodosFacturables - r.periodos;
   const valorExtra = diasExtra * r.tarifa;
   const nuevoTotal = r.total + valorExtra;
-  info.innerHTML = `➕ Se agregan <strong style="color:var(--dorado)">${diasExtra} día(s)</strong> adicionales · Valor adicional: <strong style="color:var(--dorado)">${formatCOP(valorExtra)}</strong><br>Nuevo total: <strong>${formatCOP(nuevoTotal)}</strong>`;
+  info.innerHTML = `➕ Se agregan <strong style="color:var(--dorado)">${diasExtra} día(s)</strong> adicionales · Valor sugerido: <strong style="color:var(--dorado)">${formatCOP(valorExtra)}</strong> (puedes ajustarlo abajo)`;
+  document.getElementById('ext_valor_adicional').value = valorExtra;
   return { diasExtra, valorExtra, nuevoTotal, nuevoFinISO, periodosFacturablesNuevo: nuevoCalc.periodosFacturables };
+}
+
+function actualizarNuevoTotalExtension() {
+  const r = extReservaActual;
+  const banner = document.getElementById('ext-nuevo-total');
+  if (!r) return;
+  const valor = parseFloat(document.getElementById('ext_valor_adicional').value);
+  if (isNaN(valor)) { banner.style.display = 'none'; return; }
+  banner.style.display = 'block';
+  banner.innerHTML = `Nuevo total con este valor: <strong>${formatCOP(r.total + valor)}</strong>`;
 }
 
 async function confirmarExtensionRenta() {
@@ -4576,6 +4594,14 @@ async function confirmarExtensionRenta() {
   const nff = document.getElementById('ext_fecha_fin').value;
   const nhf = document.getElementById('ext_hora_fin').value;
 
+  // Usa el valor que haya quedado en el campo (puede ser el sugerido o uno ajustado a mano)
+  const valorExtraFinal = parseFloat(document.getElementById('ext_valor_adicional').value);
+  if (isNaN(valorExtraFinal) || valorExtraFinal < 0) {
+    mostrarToast('⚠️ Ingresa un valor adicional válido', '#E05252');
+    return;
+  }
+  const nuevoTotalFinal = r.total + valorExtraFinal;
+
   // Actualizar en Supabase
   try {
     if (r.id) {
@@ -4590,7 +4616,7 @@ async function confirmarExtensionRenta() {
       tipo: 'ingreso',
       categoria: 'extension_renta',
       concepto: `Extensión renta: ${r.vehiculo} · ${r.nombre} · +${calc.diasExtra} día(s)`,
-      valor: calc.valorExtra,
+      valor: valorExtraFinal,
       notas: `Reserva ${r.num_reserva}`,
       vehiculo_id: r.vehiculo_id || null,
       orden_id: r.id || null,
@@ -4615,7 +4641,7 @@ async function confirmarExtensionRenta() {
   r.fecha_fin = nff;
   r.hora_fin = nhf;
   r.periodos = calc.periodosFacturablesNuevo;
-  r.total = calc.nuevoTotal;
+  r.total = nuevoTotalFinal;
   r.saldoPendiente = Math.max(r.total - (r.abono || 0), 0);
   await guardar('carhelp:reservas', reservas);
 
@@ -4632,7 +4658,7 @@ RESERVA N.° ${r.num_reserva}
 🚗 Vehículo:            ${r.vehiculo}
 📅 Nueva devolución:    ${fmtFechaHora(nff, nhf)}
 ➕ Días agregados:      ${calc.diasExtra} día(s)
-💰 Valor adicional:     ${formatCOP(calc.valorExtra)}
+💰 Valor adicional:     ${formatCOP(valorExtraFinal)}
 💰 Nuevo total:         ${formatCOP(r.total)}
 ${r.abono ? `💰 Abono ya pagado:     ${formatCOP(r.abono)}\n💰 Saldo pendiente:     ${formatCOP(r.saldoPendiente)}\n` : ''}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
