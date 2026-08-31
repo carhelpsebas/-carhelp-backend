@@ -6689,7 +6689,7 @@ async function buscarClienteAutocomplete(q) {
           style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--borde);font-size:0.85rem;transition:background 0.15s"
           onmouseover="this.style.background='var(--gris-medio)'" onmouseout="this.style.background=''">
           <div style="font-weight:600;color:var(--blanco)">${c.nombre}</div>
-          <div style="color:var(--blanco-suave);font-size:0.75rem">${c.num_doc || ''} · ${c.celular || ''}</div>
+          <div style="color:var(--blanco-suave);font-size:0.75rem">${c.num_doc || c.documento || ''} · ${c.celular || c.telefono || ''}</div>
         </div>
       `).join('');
       caja.style.display = 'block';
@@ -6698,10 +6698,11 @@ async function buscarClienteAutocomplete(q) {
 }
 
 function seleccionarClienteAutocomplete(c) {
+  const tipoDocMap = { CC:'Cédula de ciudadanía', CE:'Cédula de extranjería', PAS:'Pasaporte', PEP:'PEP', NIT:'NIT' };
   document.getElementById('r_nombre').value = c.nombre || '';
-  document.getElementById('r_tipo_doc').value = c.tipo_doc || '';
-  document.getElementById('r_num_doc').value = c.num_doc || '';
-  document.getElementById('r_celular').value = c.celular || '';
+  document.getElementById('r_tipo_doc').value = tipoDocMap[c.tipo_doc] || c.tipo_doc || '';
+  document.getElementById('r_num_doc').value = c.num_doc || c.documento || '';
+  document.getElementById('r_celular').value = c.celular || c.telefono || '';
   document.getElementById('r_email').value = c.email || '';
   if (document.getElementById('r_direccion')) document.getElementById('r_direccion').value = c.direccion || '';
   document.getElementById('r_nombre_sugerencias').style.display = 'none';
@@ -7020,25 +7021,30 @@ function buscarClienteAutocomplete(q, prefijo = 'r') {
           style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--borde);font-size:0.85rem"
           onmouseover="this.style.background='var(--gris-medio)'" onmouseout="this.style.background=''">
           <div style="font-weight:600;color:var(--blanco)">${c.nombre}</div>
-          <div style="color:var(--blanco-suave);font-size:0.75rem">${c.num_doc || ''} · ${c.celular || ''}</div>
+          <div style="color:var(--blanco-suave);font-size:0.75rem">${c.num_doc || c.documento || ''} · ${c.celular || c.telefono || ''}</div>
         </div>`).join('');
       caja.style.display = 'block';
     } catch(e) { caja.style.display = 'none'; }
   }, 300);
 }
 
+const TIPO_DOC_CODIGO_A_TEXTO = { CC:'Cédula de ciudadanía', CE:'Cédula de extranjería', PAS:'Pasaporte', PEP:'PEP', NIT:'NIT' };
 function seleccionarClienteAutocomplete(c, prefijo = 'r') {
+  const numDoc = c.num_doc || c.documento || '';
+  const celular = c.celular || c.telefono || '';
+  const tipoDoc = TIPO_DOC_CODIGO_A_TEXTO[c.tipo_doc] || c.tipo_doc || '';
   if (prefijo === 'cot') {
     document.getElementById('cot-nombre').value = c.nombre || '';
     document.getElementById('cot-email').value = c.email || '';
-    document.getElementById('cot-telefono').value = c.celular || '';
+    document.getElementById('cot-telefono').value = celular;
     document.getElementById('cot-nombre_sugerencias').style.display = 'none';
   } else {
     document.getElementById('r_nombre').value = c.nombre || '';
-    if (document.getElementById('r_tipo_doc')) document.getElementById('r_tipo_doc').value = c.tipo_doc || '';
-    if (document.getElementById('r_num_doc')) document.getElementById('r_num_doc').value = c.num_doc || '';
-    if (document.getElementById('r_celular')) document.getElementById('r_celular').value = c.celular || '';
+    if (document.getElementById('r_tipo_doc')) document.getElementById('r_tipo_doc').value = tipoDoc;
+    if (document.getElementById('r_num_doc')) document.getElementById('r_num_doc').value = numDoc;
+    if (document.getElementById('r_celular')) document.getElementById('r_celular').value = celular;
     if (document.getElementById('r_email')) document.getElementById('r_email').value = c.email || '';
+    if (document.getElementById('r_direccion')) document.getElementById('r_direccion').value = c.direccion || '';
     document.getElementById('r_nombre_sugerencias').style.display = 'none';
   }
 }
@@ -8032,18 +8038,21 @@ async function guardarCliente() {
 
 // Autocomplete mejorado — llena TODOS los campos
 function seleccionarClienteAutocomplete(c, prefijo = 'r') {
+  const numDoc = c.num_doc || c.documento || '';
+  const celular = c.celular || c.telefono || '';
+  const tipoDoc = TIPO_DOC_CODIGO_A_TEXTO[c.tipo_doc] || c.tipo_doc || '';
   if (prefijo === 'cot') {
     document.getElementById('cot-nombre').value = c.nombre || '';
     document.getElementById('cot-email').value = c.email || '';
-    document.getElementById('cot-telefono').value = c.celular || '';
+    document.getElementById('cot-telefono').value = celular;
     document.getElementById('cot-nombre_sugerencias').style.display = 'none';
   } else {
     // Reservas — llenar TODOS los campos disponibles
     const set = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
     set('r_nombre', c.nombre);
-    set('r_tipo_doc', c.tipo_doc);
-    set('r_num_doc', c.num_doc);
-    set('r_celular', c.celular);
+    set('r_tipo_doc', tipoDoc);
+    set('r_num_doc', numDoc);
+    set('r_celular', celular);
     set('r_email', c.email);
     set('r_direccion', c.direccion);
     set('r_licencia_num', c.licencia_num);
