@@ -4352,6 +4352,85 @@ function reenviarCorreoReserva(num) {
   mostrarToast('📧 Correo actualizado — listo para ver o reenviar');
 }
 
+// Reintenta guardar en Supabase una reserva que quedó solo local (sin ID), sin perder nada de lo ya escrito
+async function reintentarGuardarReserva(num) {
+  const r = reservas.find(x => x.num_reserva === num);
+  if (!r) return;
+  if (r.id) { mostrarToast('Esta reserva ya está guardada en Supabase', 'var(--verde-ok)'); return; }
+
+  mostrarToast('🔄 Reintentando guardar en Supabase...', 'var(--azul-info)');
+
+  try {
+    // 1. Buscar el cliente por documento, o crearlo si no existe
+    let clienteId = null;
+    try {
+      const existentes = await sbSelect('clientes', `&documento=eq.${encodeURIComponent(r.num_doc)}`);
+      if (existentes && existentes[0]) clienteId = existentes[0].id;
+    } catch(e) {}
+
+    if (!clienteId) {
+      const clienteSB = await sbInsert('clientes', {
+        nombre: r.nombre,
+        documento: r.num_doc,
+        num_doc: r.num_doc,
+        tipo_doc: { 'Cédula de ciudadanía':'CC', 'Cédula de extranjería':'CE', 'Pasaporte':'PAS', 'PEP':'PEP', 'NIT':'NIT' }[r.tipo_doc] || 'CC',
+        telefono: r.celular,
+        email: r.email,
+        direccion: r.direccion,
+      });
+      clienteId = clienteSB[0]?.id;
+    }
+    if (!clienteId) throw new Error('No se pudo crear ni encontrar el cliente');
+
+    // 2. Crear la orden con el mismo número que ya tenía localmente
+    const ordenSB = await sbInsert('ordenes', {
+      numero: r.num_reserva,
+      cliente_id: clienteId,
+      vehiculo_id: r.vehiculo_id,
+      fecha_salida: `${r.fecha_inicio}T${r.hora_inicio}:00`,
+      fecha_retorno: `${r.fecha_fin}T${r.hora_fin}:00`,
+      tarifa_diaria: r.tarifa,
+      deposito: r.deposito,
+      abono: r.abono || 0,
+      costo_entrega: r.costoEntrega || 0,
+      costo_recibido: r.costoRecibido || 0,
+      ciudad_destino: (r.ciudadesDestino && r.ciudadesDestino.length) ? r.ciudadesDestino.join(', ') : null,
+      estado: r.estado || 'pendiente',
+      notas: r.notas
+    });
+    const nuevoId = ordenSB[0]?.id;
+    if (!nuevoId) throw new Error('La orden no devolvió un ID válido desde Supabase');
+    r.id = nuevoId;
+
+    // 3. Tramo inicial de ocupación de vehículo (no crítico si falla)
+    try {
+      const segNuevo = await sbInsert('historial_vehiculo_orden', {
+        orden_id: r.id, vehiculo_id: r.vehiculo_id, fecha_inicio: r.fecha_inicio, fecha_fin: r.fecha_fin
+      });
+      if (segNuevo?.[0]) historialVehiculos.push(segNuevo[0]);
+    } catch(e) { console.warn('No se pudo registrar el tramo de vehículo:', e.message); }
+
+    // 4. Movimiento contable del ingreso (no crítico si falla)
+    try {
+      await sbInsert('movimientos_contables', {
+        fecha: r.fecha_inicio || new Date().toISOString().split('T')[0],
+        tipo: 'ingreso', categoria: 'renta',
+        concepto: `Renta: ${r.vehiculo} · ${r.nombre} · ${r.periodos || ''} día(s)`,
+        valor: r.total,
+        notas: `Reserva ${r.num_reserva}` + (r.abono > 0 ? ` · Abono recibido: ${formatCOP(r.abono)}` : ''),
+        vehiculo_id: r.vehiculo_id || null,
+      });
+    } catch(e) { console.warn('No se pudo registrar el movimiento contable:', e.message); }
+
+    await guardar('carhelp:reservas', reservas);
+    renderReservas(); renderStats();
+    mostrarToast('✅ ¡Listo! La reserva ' + r.num_reserva + ' ya quedó guardada en Supabase.');
+  } catch(e) {
+    console.error('Error reintentando guardar la reserva:', e);
+    mostrarToast('⚠️ Sigue sin poder guardar: ' + e.message, 'var(--rojo-alerta)');
+  }
+}
+
 function renderReservas() {
   const cont = document.getElementById('lista-reservas');
   document.getElementById('reservas-count').textContent = `${reservas.length} reserva(s)`;
@@ -4374,6 +4453,7 @@ function renderReservas() {
           <option value="finalizada" ${r.estado==='finalizada'?'selected':''}>Finalizada</option>
         </select>
         ${r.estado === 'entregado' && r.celular ? `<a class="btn-secundario" style="text-decoration:none;color:#25D366;border-color:#25D366" target="_blank" href="${waLink(r.celular, `Hola ${r.nombre}, te recordamos que la devolución de tu ${r.vehiculo} (reserva ${r.num_reserva}) está programada para ${fmtFechaHora(r.fecha_fin, r.hora_fin)}. Cualquier novedad avísanos. — Car Help`)}">💬 Recordar por WhatsApp</a>` : ''}
+        ${!r.id ? `<button class="btn-primario" style="background:var(--azul-info)" onclick="reintentarGuardarReserva('${r.num_reserva}')">🔄 Reintentar guardar en Supabase</button>` : ''}
         <button class="btn-secundario" onclick="abrirModalExtenderRenta('${r.num_reserva}')">📅 Extender</button>
         <button class="btn-secundario" onclick="abrirModalCambiarVehiculo('${r.num_reserva}')">🔄 Cambiar vehículo</button>
         <button class="btn-secundario" onclick="abrirModalTramosVehiculo('${r.num_reserva}')">🚗 Vehículos por fecha</button>
