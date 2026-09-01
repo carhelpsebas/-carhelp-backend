@@ -392,10 +392,11 @@
   /* ACCESOS DIRECTOS — ENTREGAS / DEVOLUCIONES */
   .accion-directa-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, 1fr);
     gap: 16px;
     margin-bottom: 24px;
   }
+  @media (max-width: 900px) { .accion-directa-grid { grid-template-columns: 1fr 1fr; } }
   @media (max-width: 640px) { .accion-directa-grid { grid-template-columns: 1fr; } }
   .accion-directa-card {
     background: linear-gradient(155deg, var(--carbon) 0%, #101010 100%);
@@ -740,6 +741,13 @@
         <div>
           <div class="accion-directa-texto-titulo">Devoluciones</div>
           <div class="accion-directa-texto-sub">Registrar el regreso de un vehículo</div>
+        </div>
+      </div>
+      <div class="accion-directa-card" onclick="cambiarVistaPorId('contabilidad')">
+        <div class="accion-directa-icono">$</div>
+        <div>
+          <div class="accion-directa-texto-titulo">Contabilidad</div>
+          <div class="accion-directa-texto-sub">Movimientos, liquidaciones e informes</div>
         </div>
       </div>
     </div>
