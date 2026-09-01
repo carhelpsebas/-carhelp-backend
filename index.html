@@ -2102,6 +2102,10 @@
       </div>
       <div class="info-banner" id="ext-nuevo-total" style="display:none"></div>
       <div class="campo">
+        <label>Abono recibido en esta extensión (COP)</label>
+        <input type="number" id="ext_abono" placeholder="0" oninput="actualizarNuevoTotalExtension()">
+      </div>
+      <div class="campo">
         <label>Notas (opcional)</label>
         <textarea id="ext_notas" placeholder="Ej. Cliente solicitó 2 días más por cambio de vuelo"></textarea>
       </div>
@@ -2138,6 +2142,10 @@
       <div class="campo">
         <label>Motivo del cambio (opcional)</label>
         <textarea id="cv_notas" placeholder="Ej. Vehículo original en mantenimiento"></textarea>
+      </div>
+      <div class="campo">
+        <label>Cobro adicional por alguna novedad (COP, opcional)</label>
+        <input type="number" id="cv_cobro_adicional" placeholder="0">
       </div>
     </div>
     <div class="modal-footer">
@@ -2810,7 +2818,7 @@ async function cargarDatos() {
       } catch(e2) {}
       const veh = vehiculos.find(v => v.id === o.vehiculo_id) || {};
       const periodoCalc = calcularPeriodosFacturables(o.fecha_salida, o.fecha_retorno);
-      const totalCalc = Math.max(periodoCalc.periodosFacturables * (o.tarifa_diaria || 0) + (o.deposito || 0) + (o.costo_entrega || 0) + (o.costo_recibido || 0) - (o.descuento_pico_placa || 0), 0);
+      const totalCalc = Math.max(periodoCalc.periodosFacturables * (o.tarifa_diaria || 0) + (o.deposito || 0) + (o.costo_entrega || 0) + (o.costo_recibido || 0) + (o.cobro_adicional || 0) - (o.descuento_pico_placa || 0), 0);
       return {
         id: o.id,
         num_reserva: o.numero,
@@ -2835,6 +2843,7 @@ async function cargarDatos() {
         costoEntrega: o.costo_entrega || 0,
         costoRecibido: o.costo_recibido || 0,
         descuentoPicoPlaca: o.descuento_pico_placa || 0,
+        cobroAdicional: o.cobro_adicional || 0,
         ciudadesDestino: o.ciudad_destino ? o.ciudad_destino.split(',').map(s => s.trim()).filter(Boolean) : [],
         periodos: periodoCalc.periodosFacturables,
         total: totalCalc,
@@ -4599,6 +4608,7 @@ function abrirModalExtenderRenta(num) {
   document.getElementById('ext_hora_fin').value = r.hora_fin || '';
   document.getElementById('ext_notas').value = '';
   document.getElementById('ext_valor_adicional').value = '';
+  document.getElementById('ext_abono').value = '';
   document.getElementById('ext-nuevo-total').style.display = 'none';
   document.getElementById('ext-pico-placa-alerta').style.display = 'none';
   document.getElementById('ext-btn-cambio-provisional').style.display = 'none';
@@ -4658,8 +4668,12 @@ function actualizarNuevoTotalExtension() {
   if (!r) return;
   const valor = parseFloat(document.getElementById('ext_valor_adicional').value);
   if (isNaN(valor)) { banner.style.display = 'none'; return; }
+  const abonoExt = parseFloat(document.getElementById('ext_abono')?.value) || 0;
+  const nuevoTotal = r.total + valor;
+  const saldoPendienteTotal = Math.max(nuevoTotal - (r.abono || 0) - abonoExt, 0);
   banner.style.display = 'block';
-  banner.innerHTML = `Nuevo total con este valor: <strong>${formatCOP(r.total + valor)}</strong>`;
+  banner.innerHTML = `Nuevo total: <strong>${formatCOP(nuevoTotal)}</strong>` +
+    (abonoExt > 0 ? ` · Abono de esta extensión: <strong>${formatCOP(abonoExt)}</strong> · Saldo pendiente total: <strong style="color:var(--dorado)">${formatCOP(saldoPendienteTotal)}</strong>` : '');
 }
 
 async function confirmarExtensionRenta() {
@@ -4681,15 +4695,19 @@ async function confirmarExtensionRenta() {
     mostrarToast('⚠️ Ingresa un valor adicional válido', '#E05252');
     return;
   }
+  const abonoExtension = parseFloat(document.getElementById('ext_abono').value) || 0;
   const nuevoTotalFinal = r.total + valorExtraFinal;
+  const nuevoAbonoAcumulado = (r.abono || 0) + abonoExtension;
+  const saldoPendienteFinal = Math.max(nuevoTotalFinal - nuevoAbonoAcumulado, 0);
 
   // Actualizar en Supabase
   try {
     if (r.id) {
       await sbUpdate('ordenes', r.id, {
         fecha_retorno: calc.nuevoFinISO + ':00',
+        abono: nuevoAbonoAcumulado,
         alerta_enviada: false,
-        notas: (r.notas || '') + (notasExt ? ` · Extensión (+${calc.diasExtra} día(s)): ${notasExt}` : ` · Extensión: +${calc.diasExtra} día(s)`)
+        notas: (r.notas || '') + (notasExt ? ` · Extensión (+${calc.diasExtra} día(s)): ${notasExt}` : ` · Extensión: +${calc.diasExtra} día(s)`) + (abonoExtension > 0 ? ` · Abono recibido en extensión: ${formatCOP(abonoExtension)}` : '')
       });
     }
     await sbInsert('movimientos_contables', {
@@ -4698,7 +4716,7 @@ async function confirmarExtensionRenta() {
       categoria: 'extension_renta',
       concepto: `Extensión renta: ${r.vehiculo} · ${r.nombre} · +${calc.diasExtra} día(s)`,
       valor: valorExtraFinal,
-      notas: `Reserva ${r.num_reserva}`,
+      notas: `Reserva ${r.num_reserva}` + (abonoExtension > 0 ? ` · Abono recibido: ${formatCOP(abonoExtension)}` : ''),
       vehiculo_id: r.vehiculo_id || null,
       orden_id: r.id || null,
     });
@@ -4723,7 +4741,8 @@ async function confirmarExtensionRenta() {
   r.hora_fin = nhf;
   r.periodos = calc.periodosFacturablesNuevo;
   r.total = nuevoTotalFinal;
-  r.saldoPendiente = Math.max(r.total - (r.abono || 0), 0);
+  r.abono = nuevoAbonoAcumulado;
+  r.saldoPendiente = saldoPendienteFinal;
   await guardar('carhelp:reservas', reservas);
 
   // Enviar correo automático con el resumen actualizado
@@ -4741,7 +4760,7 @@ RESERVA N.° ${r.num_reserva}
 ➕ Días agregados:      ${calc.diasExtra} día(s)
 💰 Valor adicional:     ${formatCOP(valorExtraFinal)}
 💰 Nuevo total:         ${formatCOP(r.total)}
-${r.abono ? `💰 Abono ya pagado:     ${formatCOP(r.abono)}\n💰 Saldo pendiente:     ${formatCOP(r.saldoPendiente)}\n` : ''}
+${abonoExtension > 0 ? `💰 Abono recibido hoy:  ${formatCOP(abonoExtension)}\n` : ''}${nuevoAbonoAcumulado > 0 ? `💰 Total abonado:       ${formatCOP(nuevoAbonoAcumulado)}\n` : ''}💰 Saldo pendiente:     ${formatCOP(r.saldoPendiente)}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Gracias por confiar en Car Help.
@@ -4920,6 +4939,7 @@ function abrirModalCambiarVehiculo(num) {
     `<option value="${v.id}" ${v.id === r.vehiculo_id ? 'selected' : ''}>${v.nombre}${v.placa ? ' — ' + v.placa : ''}</option>`
   ).join('');
   document.getElementById('cv_notas').value = '';
+  document.getElementById('cv_cobro_adicional').value = '';
   document.getElementById('cv_fecha_cambio').value = new Date().toISOString().split('T')[0];
   abrirModal('modal-cambiar-vehiculo');
 }
@@ -4936,6 +4956,7 @@ async function confirmarCambioVehiculo() {
   const vehiculoAnterior = r.vehiculo;
   const vehiculoAnteriorId = r.vehiculo_id;
   const notasCambio = document.getElementById('cv_notas').value.trim();
+  const cobroAdicional = parseFloat(document.getElementById('cv_cobro_adicional').value) || 0;
 
   if (nuevoId === r.vehiculo_id) {
     mostrarToast('Selecciona un vehículo distinto al actual', '#BA7517');
@@ -4946,12 +4967,14 @@ async function confirmarCambioVehiculo() {
   // del vehículo anterior al nuevo, para que la liquidación de cada propietario/aliado sea correcta.
   const diasRestantes = Math.max(diasEntre(fechaCambio, r.fecha_fin) + 1, 0);
   const valorTraspaso = diasRestantes * (r.tarifa || 0);
+  const nuevoCobroAcumulado = (r.cobroAdicional || 0) + cobroAdicional;
 
   try {
     if (r.id) {
       await sbUpdate('ordenes', r.id, {
         vehiculo_id: nuevoId,
-        notas: (r.notas || '') + ` · Cambio de vehículo desde ${fmtFecha(fechaCambio)}: ${vehiculoAnterior} → ${nuevoVeh.nombre}` + (notasCambio ? ` (${notasCambio})` : '')
+        cobro_adicional: nuevoCobroAcumulado,
+        notas: (r.notas || '') + ` · Cambio de vehículo desde ${fmtFecha(fechaCambio)}: ${vehiculoAnterior} → ${nuevoVeh.nombre}` + (notasCambio ? ` (${notasCambio})` : '') + (cobroAdicional > 0 ? ` · Cobro adicional: ${formatCOP(cobroAdicional)}` : '')
       });
 
       // Cerrar el tramo de ocupación del vehículo anterior en la fecha del cambio,
@@ -4994,6 +5017,15 @@ async function confirmarCambioVehiculo() {
           notas: `Reserva ${r.num_reserva}`
         });
       }
+
+      if (cobroAdicional > 0) {
+        await sbInsert('movimientos_contables', {
+          tipo: 'ingreso', categoria: 'cobro_cambio_vehiculo',
+          concepto: `Cobro por novedad en cambio de vehículo: ${r.nombre} · ${vehiculoAnterior} → ${nuevoVeh.nombre}`,
+          valor: cobroAdicional, fecha: fechaCambio, vehiculo_id: nuevoId, orden_id: r.id,
+          notas: `Reserva ${r.num_reserva}` + (notasCambio ? ` · ${notasCambio}` : '')
+        });
+      }
     }
   } catch(e) {
     console.error('Error guardando cambio de vehículo en Supabase:', e);
@@ -5004,11 +5036,42 @@ async function confirmarCambioVehiculo() {
   r.vehiculo_id = nuevoId;
   r.vehiculo = nuevoVeh.nombre;
   r.placa = nuevoVeh.placa || '';
+  if (cobroAdicional > 0) {
+    r.cobroAdicional = nuevoCobroAcumulado;
+    r.total = r.total + cobroAdicional;
+    r.saldoPendiente = Math.max(r.total - (r.abono || 0), 0);
+  }
   await guardar('carhelp:reservas', reservas);
 
   cerrarModal('modal-cambiar-vehiculo');
   renderReservas(); renderStats(); renderProximas(); renderEnCurso();
-  mostrarToast(`✅ Vehículo actualizado desde ${fmtFecha(fechaCambio)}: ${vehiculoAnterior} → ${nuevoVeh.nombre}`);
+
+  if (cobroAdicional > 0 && r.email) {
+    const asunto = `🔄 Cambio de vehículo en su reserva ${r.num_reserva} — Car Help`;
+    const cuerpo = `Estimado/a ${r.nombre},
+
+Le informamos que se realizó un cambio de vehículo en su reserva con Car Help:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+RESERVA N.° ${r.num_reserva}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚗 Vehículo anterior:   ${vehiculoAnterior}
+🚗 Vehículo nuevo:      ${nuevoVeh.nombre}
+📅 Desde:               ${fmtFecha(fechaCambio)}
+${notasCambio ? `📝 Motivo:              ${notasCambio}\n` : ''}💰 Cobro adicional:     ${formatCOP(cobroAdicional)}
+💰 Nuevo total:         ${formatCOP(r.total)}
+💰 Saldo pendiente:     ${formatCOP(r.saldoPendiente)}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Cualquier duda, contáctenos.
+
+Equipo Car Help — Pereira, Colombia
+📱 WhatsApp: +57 310 743 6082`;
+    const enviado = await enviarCorreoDirecto(r.email, asunto, cuerpo);
+    mostrarToast(enviado ? `✅ Vehículo actualizado y correo enviado a ${r.email}` : `✅ Vehículo actualizado (no se pudo enviar el correo)`);
+  } else {
+    mostrarToast(`✅ Vehículo actualizado desde ${fmtFecha(fechaCambio)}: ${vehiculoAnterior} → ${nuevoVeh.nombre}`);
+  }
 }
 
 /* ════════════════════════════════════════════
