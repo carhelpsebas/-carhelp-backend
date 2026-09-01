@@ -1951,6 +1951,10 @@
           <div class="campo"><label>Nombre del aliado</label><input type="text" id="v_aliado_nombre" placeholder="Nombre completo"></div>
           <div class="campo"><label>Correo del aliado</label><input type="email" id="v_aliado_email" placeholder="correo@ejemplo.com"></div>
         </div>
+        <div class="campo">
+          <label>Tarifa establecida a pagar por día de uso (COP)</label>
+          <input type="number" id="v_aliado_tarifa_dia" placeholder="Ej: 80000">
+        </div>
       </div>
 
       <hr class="divider">
@@ -2742,6 +2746,7 @@ function adaptarVehiculoDesdeSB(v) {
     propietarioValorFijo: v.propietario_valor_fijo || 0,
     aliadoNombre: v.aliado_nombre || '',
     aliadoEmail: v.aliado_email || '',
+    aliadoTarifaDia: v.aliado_tarifa_dia || 0,
     fotos: v.fotos || [],
     activo: v.activo
   };
@@ -2768,6 +2773,7 @@ function adaptarVehiculoHaciaSB(v) {
     propietario_valor_fijo: v.propietarioValorFijo ? parseFloat(v.propietarioValorFijo) : null,
     aliado_nombre: v.aliadoNombre || null,
     aliado_email: v.aliadoEmail || null,
+    aliado_tarifa_dia: v.aliadoTarifaDia ? parseFloat(v.aliadoTarifaDia) : null,
     fotos: v.fotos || []
   };
 }
@@ -3505,6 +3511,7 @@ function abrirModalVehiculo() {
   document.getElementById('v-propietario-fijo-wrap').style.display = 'none';
   document.getElementById('v_aliado_nombre').value = '';
   document.getElementById('v_aliado_email').value = '';
+  document.getElementById('v_aliado_tarifa_dia').value = '';
   document.getElementById('v-fecha-ingreso-wrap').style.display = 'none';
   document.getElementById('v-propietario-fields').style.display = 'none';
   document.getElementById('v-aliado-fields').style.display = 'none';
@@ -3540,6 +3547,7 @@ function editarVehiculo(id) {
   document.getElementById('v-propietario-fijo-wrap').style.display = v.propietarioTipoLiq === 'fijo' ? 'block' : 'none';
   document.getElementById('v_aliado_nombre').value = v.aliadoNombre || '';
   document.getElementById('v_aliado_email').value = v.aliadoEmail || '';
+  document.getElementById('v_aliado_tarifa_dia').value = v.aliadoTarifaDia || '';
   document.getElementById('v-fecha-ingreso-wrap').style.display = procedencia === 'propio' ? 'none' : 'block';
   document.getElementById('v-propietario-fields').style.display = procedencia === 'propietario' ? 'block' : 'none';
   document.getElementById('v-aliado-fields').style.display = procedencia === 'aliado' ? 'block' : 'none';
@@ -3575,6 +3583,7 @@ async function guardarVehiculo() {
     propietarioValorFijo: parseFloat(document.getElementById('v_propietario_valor_fijo').value) || 0,
     aliadoNombre: document.getElementById('v_aliado_nombre').value.trim(),
     aliadoEmail: document.getElementById('v_aliado_email').value.trim(),
+    aliadoTarifaDia: parseFloat(document.getElementById('v_aliado_tarifa_dia').value) || 0,
     fotos: fotosLimpias,
   };
 
@@ -6387,6 +6396,8 @@ async function renderLiquidaciones() {
       montoBase = esFijo
         ? Math.max(valorFijo - gastosPropietario, 0)
         : Math.max(ingresos * (pct / 100) - gastosPropietario, 0);
+    } else if (v.procedencia === 'aliado') {
+      montoBase = dias * (v.aliadoTarifaDia || 0);
     }
 
     // Cachear todo el contexto para poder abrir el detalle sin volver a consultar
@@ -6416,18 +6427,19 @@ async function renderLiquidaciones() {
     }
 
     // Aliado
-    const montoMostradoAliado = yaLiquidado ? parseFloat(yaLiquidado.monto_final ?? yaLiquidado.monto_liquidado) : null;
+    const montoMostradoAliado = yaLiquidado ? parseFloat(yaLiquidado.monto_final ?? yaLiquidado.monto_liquidado) : montoBase;
+    if (!yaLiquidado) totalPendienteGlobal += montoBase;
     return `
     <div class="item-card" style="cursor:pointer" onclick="abrirDetalleLiquidacion('${v.id}')">
       <div class="item-info">
         <div class="item-titulo">${v.nombre} ${v.placa ? '('+v.placa+')' : ''} <span class="num-reserva">Aliado</span></div>
         <div class="item-detalle">Aliado: <strong>${v.aliadoNombre || 'Sin definir'}</strong> · Período: <strong>${periodoLabel}</strong></div>
-        <div class="item-detalle">Días de uso en el período: <strong>${dias}</strong></div>
-        ${yaLiquidado ? `<div class="item-detalle" style="color:var(--verde-ok)">✅ Liquidado: ${formatCOP(montoMostradoAliado)}</div>` : ''}
+        <div class="item-detalle">Días de uso en el período: <strong>${dias}</strong> · Tarifa por día: <strong>${formatCOP(v.aliadoTarifaDia || 0)}</strong></div>
         <div style="font-size:0.7rem;color:var(--azul-info);margin-top:4px">Toca la tarjeta para ver el detalle, hacer cuadres o editar →</div>
       </div>
       <div style="text-align:right">
-        <div style="font-size:0.7rem;color:${yaLiquidado ? 'var(--verde-ok)' : 'var(--blanco-suave)'}">${yaLiquidado ? 'Período cerrado' : 'por liquidar'}</div>
+        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:${yaLiquidado ? 'var(--verde-ok)' : 'var(--dorado-suave)'}">${formatCOP(montoMostradoAliado)}</div>
+        <div style="font-size:0.7rem;color:var(--blanco-suave);margin-bottom:6px">${yaLiquidado ? '✅ liquidado' : 'por liquidar'}</div>
       </div>
     </div>`;
   }));
@@ -6514,7 +6526,8 @@ async function abrirDetalleLiquidacion(vehiculoId) {
        Ingresos del período: <strong>${formatCOP(ingresos)}</strong> · Gastos a su cargo: <strong>${formatCOP(gastosPropietario)}</strong>${gastosEmpresa > 0 ? ` · Gastos de Car Help: ${formatCOP(gastosEmpresa)}` : ''}<br>
        Valor base calculado: <strong>${formatCOP(montoBase)}</strong>${listaGastosHtml}`
     : `Aliado: <strong>${v.aliadoNombre || 'Sin definir'}</strong> · Período: <strong>${periodoLabel}</strong><br>
-       Días de uso en el período: <strong>${dias}</strong>`;
+       Días de uso en el período: <strong>${dias}</strong> · Tarifa por día: <strong>${formatCOP(v.aliadoTarifaDia || 0)}</strong><br>
+       Valor base calculado: <strong>${formatCOP(montoBase)}</strong>`;
 
   liqAjustesTrabajo = registro?.ajustes ? JSON.parse(JSON.stringify(registro.ajustes)) : [];
   const montoInicial = registro ? parseFloat(registro.monto_final ?? registro.monto_liquidado) : montoBase;
@@ -7768,10 +7781,10 @@ async function abrirDetalleLiquidacionPeriodo(vehiculoId, periodoInicio, periodo
   const esFijo = v.propietarioTipoLiq === 'fijo';
   const pct = v.propietarioPorcentaje || 0;
   const valorFijo = v.propietarioValorFijo || 0;
-  const montoBase = esFijo
-    ? Math.max(valorFijo - gastosPropietario, 0)
-    : Math.max(ingresos * (pct / 100) - gastosPropietario, 0);
   const dias = v.procedencia === 'aliado' ? diasUsoAliadoEnRango(vehiculoId, periodoInicio, periodoFin) : 0;
+  const montoBase = v.procedencia === 'aliado'
+    ? dias * (v.aliadoTarifaDia || 0)
+    : (esFijo ? Math.max(valorFijo - gastosPropietario, 0) : Math.max(ingresos * (pct / 100) - gastosPropietario, 0));
   const periodoLabel = `${fmtFecha(periodoInicio)} → ${fmtFecha(periodoFin)}`;
 
   liqDatosPeriodo[vehiculoId] = { vehiculo: v, ciclo: { inicio: periodoInicio, fin: periodoFin }, periodoLabel, ingresos, gastosPropietario, gastosEmpresa, dias, montoBase, registro, gastosListaPropietario };
