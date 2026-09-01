@@ -3042,7 +3042,7 @@ function renderTodo() {
 }
 
 function formatCOP(n) {
-  if (!n || isNaN(n)) return '—';
+  if (n === null || n === undefined || n === '' || isNaN(n)) return '—';
   return '$ ' + Number(n).toLocaleString('es-CO') + ' COP';
 }
 function fmtFecha(val) {
@@ -6339,6 +6339,29 @@ function diasUsoAliadoEnRango(vehiculoId, inicioStr, finStr) {
   return dias;
 }
 
+// Rentas finalizadas de un aliado que aún no se han incluido en ninguna liquidación (sin importar el mes calendario)
+async function obtenerPendientesAliado(vehiculoId) {
+  let liquidacionesPrevias = [];
+  try {
+    liquidacionesPrevias = await sbSelect('liquidaciones', `&vehiculo_id=eq.${vehiculoId}&tipo=eq.aliado`);
+  } catch(e) {}
+  const idsYaLiquidados = new Set();
+  liquidacionesPrevias.forEach(l => (l.ordenes_incluidas || []).forEach(id => idsYaLiquidados.add(id)));
+
+  const pendientes = reservas.filter(r =>
+    r.vehiculo_id === vehiculoId && r.estado === 'finalizada' && r.id && !idsYaLiquidados.has(r.id) && r.fecha_inicio && r.fecha_fin
+  );
+
+  const detalle = pendientes.map(r => ({
+    id: r.id, num_reserva: r.num_reserva, nombre: r.nombre,
+    fecha_inicio: r.fecha_inicio, fecha_fin: r.fecha_fin,
+    dias: diasEntre(r.fecha_inicio, r.fecha_fin) + 1
+  })).sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio));
+
+  const totalDias = detalle.reduce((s, d) => s + d.dias, 0);
+  return { detalle, totalDias, idsIncluidos: pendientes.map(r => r.id) };
+}
+
 async function renderLiquidaciones() {
   const cont = document.getElementById('ct-liquidaciones');
   const relevantes = vehiculos.filter(v => v.procedencia === 'propietario' || v.procedencia === 'aliado');
@@ -6353,6 +6376,42 @@ async function renderLiquidaciones() {
   liqDatosPeriodo = {};
 
   const filas = await Promise.all(relevantes.map(async (v) => {
+
+    // ═══ ALIADOS: se basan en rentas finalizadas reales, no en ciclos de calendario ═══
+    if (v.procedencia === 'aliado') {
+      const pend = await obtenerPendientesAliado(v.id);
+      const montoBase = pend.totalDias * (v.aliadoTarifaDia || 0);
+      liqDatosPeriodo[v.id] = { vehiculo: v, esAliadoPorRentas: true, pendientesDetalle: pend.detalle, dias: pend.totalDias, montoBase, idsIncluidos: pend.idsIncluidos, registro: null, gastosListaPropietario: [] };
+      if (montoBase > 0) totalPendienteGlobal += montoBase;
+
+      if (pend.detalle.length === 0) {
+        return `
+        <div class="item-card">
+          <div class="item-info">
+            <div class="item-titulo">${v.nombre} ${v.placa ? '('+v.placa+')' : ''} <span class="num-reserva">Aliado</span></div>
+            <div class="item-detalle">Aliado: <strong>${v.aliadoNombre || 'Sin definir'}</strong> · Tarifa por día: <strong>${formatCOP(v.aliadoTarifaDia || 0)}</strong></div>
+            <div class="item-detalle" style="color:var(--verde-ok)">✅ No hay rentas finalizadas pendientes por liquidar</div>
+          </div>
+        </div>`;
+      }
+
+      const rangoLabel = `${fmtFecha(pend.detalle[0].fecha_inicio)} → ${fmtFecha(pend.detalle[pend.detalle.length-1].fecha_fin)}`;
+      return `
+      <div class="item-card" style="cursor:pointer" onclick="abrirDetalleLiquidacion('${v.id}')">
+        <div class="item-info">
+          <div class="item-titulo">${v.nombre} ${v.placa ? '('+v.placa+')' : ''} <span class="num-reserva">Aliado</span></div>
+          <div class="item-detalle">Aliado: <strong>${v.aliadoNombre || 'Sin definir'}</strong> · ${pend.detalle.length} renta(s) sin liquidar (${rangoLabel})</div>
+          <div class="item-detalle">Total días de uso: <strong>${pend.totalDias}</strong> · Tarifa por día: <strong>${formatCOP(v.aliadoTarifaDia || 0)}</strong></div>
+          <div style="font-size:0.7rem;color:var(--azul-info);margin-top:4px">Toca la tarjeta para ver el detalle, hacer cuadres o liquidar →</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:var(--dorado-suave)">${formatCOP(montoBase)}</div>
+          <div style="font-size:0.7rem;color:var(--blanco-suave);margin-bottom:6px">por liquidar</div>
+        </div>
+      </div>`;
+    }
+
+    // ═══ PROPIETARIOS: se basan en ciclos de calendario desde su fecha de ingreso ═══
     const ciclo = calcularCicloVehiculo(v.fechaIngreso, liqModoPeriodo, liqOffsetCiclos);
 
     let ingresos = 0, gastosPropietario = 0, gastosEmpresa = 0;
@@ -6394,59 +6453,31 @@ async function renderLiquidaciones() {
     } catch(e) {}
 
     const periodoLabel = `${fmtFecha(ciclo.inicio)} → ${fmtFecha(ciclo.fin)}`;
-    const dias = v.procedencia === 'aliado' ? diasUsoAliadoEnRango(v.id, ciclo.inicio, ciclo.fin) : 0;
 
-    let montoBase = 0;
-    if (v.procedencia === 'propietario') {
-      const esFijo = v.propietarioTipoLiq === 'fijo';
-      const pct = v.propietarioPorcentaje || 0;
-      const valorFijo = v.propietarioValorFijo || 0;
-      montoBase = esFijo
-        ? Math.max(valorFijo - gastosPropietario, 0)
-        : Math.max(ingresos * (pct / 100) - gastosPropietario, 0);
-    } else if (v.procedencia === 'aliado') {
-      montoBase = dias * (v.aliadoTarifaDia || 0);
-    }
+    const esFijo = v.propietarioTipoLiq === 'fijo';
+    const pct = v.propietarioPorcentaje || 0;
+    const valorFijo = v.propietarioValorFijo || 0;
+    const montoBase = esFijo
+      ? Math.max(valorFijo - gastosPropietario, 0)
+      : Math.max(ingresos * (pct / 100) - gastosPropietario, 0);
 
     // Cachear todo el contexto para poder abrir el detalle sin volver a consultar
-    liqDatosPeriodo[v.id] = { vehiculo: v, ciclo, periodoLabel, ingresos, gastosPropietario, gastosEmpresa, dias, montoBase, registro: yaLiquidado, gastosListaPropietario };
+    liqDatosPeriodo[v.id] = { vehiculo: v, ciclo, periodoLabel, ingresos, gastosPropietario, gastosEmpresa, dias: 0, montoBase, registro: yaLiquidado, gastosListaPropietario };
 
-    if (v.procedencia === 'propietario') {
-      const esFijo = v.propietarioTipoLiq === 'fijo';
-      const pct = v.propietarioPorcentaje || 0;
-      const valorFijo = v.propietarioValorFijo || 0;
-      const montoMostrado = yaLiquidado ? parseFloat(yaLiquidado.monto_final ?? yaLiquidado.monto_liquidado) : montoBase;
-      if (!yaLiquidado) totalPendienteGlobal += montoBase;
-
-      return `
-      <div class="item-card" style="cursor:pointer" onclick="abrirDetalleLiquidacion('${v.id}')">
-        <div class="item-info">
-          <div class="item-titulo">${v.nombre} ${v.placa ? '('+v.placa+')' : ''} <span class="num-reserva">Propietario</span></div>
-          <div class="item-detalle">Propietario: <strong>${v.propietarioNombre || 'Sin definir'}</strong> · Período: <strong>${periodoLabel}</strong></div>
-          <div class="item-detalle">Ingresos del período: <strong>${formatCOP(ingresos)}</strong> · ${esFijo ? `Valor fijo pactado: <strong>${formatCOP(valorFijo)}</strong>` : `% propietario: <strong>${pct}%</strong>`} · Gastos que asumió: <strong>${formatCOP(gastosPropietario)}</strong></div>
-          ${gastosEmpresa > 0 ? `<div class="item-detalle">Gastos que asumió Car Help en el período: ${formatCOP(gastosEmpresa)}</div>` : ''}
-          <div style="font-size:0.7rem;color:var(--azul-info);margin-top:4px">Toca la tarjeta para ver el detalle, hacer cuadres o editar →</div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:${yaLiquidado ? 'var(--verde-ok)' : 'var(--dorado-suave)'}">${formatCOP(montoMostrado)}</div>
-          <div style="font-size:0.7rem;color:var(--blanco-suave);margin-bottom:6px">${yaLiquidado ? '✅ liquidado' : 'por liquidar'}</div>
-        </div>
-      </div>`;
-    }
-
-    // Aliado
-    const montoMostradoAliado = yaLiquidado ? parseFloat(yaLiquidado.monto_final ?? yaLiquidado.monto_liquidado) : montoBase;
+    const montoMostrado = yaLiquidado ? parseFloat(yaLiquidado.monto_final ?? yaLiquidado.monto_liquidado) : montoBase;
     if (!yaLiquidado) totalPendienteGlobal += montoBase;
+
     return `
     <div class="item-card" style="cursor:pointer" onclick="abrirDetalleLiquidacion('${v.id}')">
       <div class="item-info">
-        <div class="item-titulo">${v.nombre} ${v.placa ? '('+v.placa+')' : ''} <span class="num-reserva">Aliado</span></div>
-        <div class="item-detalle">Aliado: <strong>${v.aliadoNombre || 'Sin definir'}</strong> · Período: <strong>${periodoLabel}</strong></div>
-        <div class="item-detalle">Días de uso en el período: <strong>${dias}</strong> · Tarifa por día: <strong>${formatCOP(v.aliadoTarifaDia || 0)}</strong></div>
+        <div class="item-titulo">${v.nombre} ${v.placa ? '('+v.placa+')' : ''} <span class="num-reserva">Propietario</span></div>
+        <div class="item-detalle">Propietario: <strong>${v.propietarioNombre || 'Sin definir'}</strong> · Período: <strong>${periodoLabel}</strong></div>
+        <div class="item-detalle">Ingresos del período: <strong>${formatCOP(ingresos)}</strong> · ${esFijo ? `Valor fijo pactado: <strong>${formatCOP(valorFijo)}</strong>` : `% propietario: <strong>${pct}%</strong>`} · Gastos que asumió: <strong>${formatCOP(gastosPropietario)}</strong></div>
+        ${gastosEmpresa > 0 ? `<div class="item-detalle">Gastos que asumió Car Help en el período: ${formatCOP(gastosEmpresa)}</div>` : ''}
         <div style="font-size:0.7rem;color:var(--azul-info);margin-top:4px">Toca la tarjeta para ver el detalle, hacer cuadres o editar →</div>
       </div>
       <div style="text-align:right">
-        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:${yaLiquidado ? 'var(--verde-ok)' : 'var(--dorado-suave)'}">${formatCOP(montoMostradoAliado)}</div>
+        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:${yaLiquidado ? 'var(--verde-ok)' : 'var(--dorado-suave)'}">${formatCOP(montoMostrado)}</div>
         <div style="font-size:0.7rem;color:var(--blanco-suave);margin-bottom:6px">${yaLiquidado ? '✅ liquidado' : 'por liquidar'}</div>
       </div>
     </div>`;
@@ -6519,7 +6550,7 @@ async function abrirDetalleLiquidacion(vehiculoId) {
   const ctx = liqDatosPeriodo[vehiculoId];
   if (!ctx) return;
   liqVehiculoModalActual = vehiculoId;
-  const { vehiculo: v, periodoLabel, ingresos, gastosPropietario, gastosEmpresa, dias, montoBase, registro, gastosListaPropietario } = ctx;
+  const { vehiculo: v, periodoLabel, ingresos, gastosPropietario, gastosEmpresa, dias, montoBase, registro, gastosListaPropietario, esAliadoPorRentas, pendientesDetalle } = ctx;
 
   document.getElementById('dl-vehiculo-nombre').textContent = `${v.nombre} ${v.placa ? '('+v.placa+')' : ''}`;
 
@@ -6529,13 +6560,21 @@ async function abrirDetalleLiquidacion(vehiculoId) {
       ).join('') + '</div>'
     : '';
 
-  document.getElementById('dl-resumen').innerHTML = v.procedencia === 'propietario'
-    ? `Propietario: <strong>${v.propietarioNombre || 'Sin definir'}</strong> · Período: <strong>${periodoLabel}</strong><br>
+  if (esAliadoPorRentas) {
+    const listaRentasHtml = (pendientesDetalle && pendientesDetalle.length > 0)
+      ? '<div style="margin-top:8px">' + pendientesDetalle.map(p =>
+          `<div style="font-size:0.75rem;color:var(--blanco-suave);margin-top:2px">• ${p.num_reserva} — ${p.nombre}: ${fmtFecha(p.fecha_inicio)} → ${fmtFecha(p.fecha_fin)} (${p.dias} día(s))</div>`
+        ).join('') + '</div>'
+      : '<div style="margin-top:8px;font-size:0.75rem;color:var(--blanco-suave)">No hay rentas finalizadas pendientes por liquidar.</div>';
+    document.getElementById('dl-resumen').innerHTML =
+      `Aliado: <strong>${v.aliadoNombre || 'Sin definir'}</strong> · Tarifa por día: <strong>${formatCOP(v.aliadoTarifaDia || 0)}</strong><br>
+       Rentas finalizadas sin liquidar (${dias} día(s) en total):${listaRentasHtml}
+       <div style="margin-top:8px">Valor base calculado: <strong>${formatCOP(montoBase)}</strong></div>`;
+  } else {
+    document.getElementById('dl-resumen').innerHTML = `Propietario: <strong>${v.propietarioNombre || 'Sin definir'}</strong> · Período: <strong>${periodoLabel}</strong><br>
        Ingresos del período: <strong>${formatCOP(ingresos)}</strong> · Gastos a su cargo: <strong>${formatCOP(gastosPropietario)}</strong>${gastosEmpresa > 0 ? ` · Gastos de Car Help: ${formatCOP(gastosEmpresa)}` : ''}<br>
-       Valor base calculado: <strong>${formatCOP(montoBase)}</strong>${listaGastosHtml}`
-    : `Aliado: <strong>${v.aliadoNombre || 'Sin definir'}</strong> · Período: <strong>${periodoLabel}</strong><br>
-       Días de uso en el período: <strong>${dias}</strong> · Tarifa por día: <strong>${formatCOP(v.aliadoTarifaDia || 0)}</strong><br>
-       Valor base calculado: <strong>${formatCOP(montoBase)}</strong>`;
+       Valor base calculado: <strong>${formatCOP(montoBase)}</strong>${listaGastosHtml}`;
+  }
 
   liqAjustesTrabajo = registro?.ajustes ? JSON.parse(JSON.stringify(registro.ajustes)) : [];
   const montoInicial = registro ? parseFloat(registro.monto_final ?? registro.monto_liquidado) : montoBase;
@@ -6673,14 +6712,18 @@ async function guardarDetalleLiquidacion() {
   const vehiculoId = liqVehiculoModalActual;
   const ctx = liqDatosPeriodo[vehiculoId];
   if (!ctx) return;
-  const { vehiculo: v, ciclo, ingresos, gastosPropietario, dias, registro, gastosListaPropietario } = ctx;
+  const { vehiculo: v, ingresos, gastosPropietario, dias, registro, gastosListaPropietario, esAliadoPorRentas, pendientesDetalle, idsIncluidos } = ctx;
   const montoFinal = parseFloat(document.getElementById('dl_monto_final').value) || 0;
   if (!montoFinal) { mostrarToast('⚠️ Ingresa el valor final a liquidar', '#E05252'); return; }
+
+  // Para aliados por rentas reales no hay un "ciclo" de calendario: se usa el rango real de las rentas incluidas
+  const periodoInicio = esAliadoPorRentas ? (pendientesDetalle[0]?.fecha_inicio || soloFecha(new Date())) : ctx.ciclo.inicio;
+  const periodoFin = esAliadoPorRentas ? (pendientesDetalle[pendientesDetalle.length-1]?.fecha_fin || soloFecha(new Date())) : ctx.ciclo.fin;
 
   const esCorreccion = !!registro;
   const correo = v.procedencia === 'propietario' ? v.propietarioEmail : v.aliadoEmail;
   const nombreDest = v.procedencia === 'propietario' ? (v.propietarioNombre || 'Propietario') : (v.aliadoNombre || 'Aliado');
-  const periodoLabel = `${fmtFecha(ciclo.inicio)} al ${fmtFecha(ciclo.fin)}`;
+  const periodoLabel = `${fmtFecha(periodoInicio)} al ${fmtFecha(periodoFin)}`;
 
   try {
     // Movimiento contable: actualizar el existente si ya había uno, o crear uno nuevo
@@ -6702,8 +6745,8 @@ async function guardarDetalleLiquidacion() {
     const datosLiquidacion = {
       vehiculo_id: vehiculoId,
       tipo: v.procedencia,
-      periodo_inicio: ciclo.inicio,
-      periodo_fin: ciclo.fin,
+      periodo_inicio: periodoInicio,
+      periodo_fin: periodoFin,
       ingresos,
       gastos_deducidos: gastosPropietario,
       dias_utilizados: dias,
@@ -6712,7 +6755,8 @@ async function guardarDetalleLiquidacion() {
       ajustes: liqAjustesTrabajo,
       correo_enviado: !!correo,
       correo_destino: correo || null,
-      movimiento_id: registro?.movimiento_id || nuevoMovimientoId || null
+      movimiento_id: registro?.movimiento_id || nuevoMovimientoId || null,
+      ordenes_incluidas: esAliadoPorRentas ? (idsIncluidos || []) : []
     };
 
     if (registro?.id) {
@@ -6735,6 +6779,9 @@ async function guardarDetalleLiquidacion() {
     const bloqueFacturas = (gastosListaPropietario && gastosListaPropietario.length > 0)
       ? '\nGastos descontados en este período:\n' + gastosListaPropietario.map(g => `  • ${g.descripcion || g.tipo}: ${formatCOP(g.valor)}${g.factura_url ? ` — Ver factura: ${g.factura_url}` : ''}`).join('\n') + '\n'
       : '';
+    const bloqueRentas = esAliadoPorRentas && pendientesDetalle && pendientesDetalle.length > 0
+      ? '\nRentas incluidas en esta liquidación:\n' + pendientesDetalle.map(p => `  • ${p.num_reserva}: ${fmtFecha(p.fecha_inicio)} al ${fmtFecha(p.fecha_fin)} (${p.dias} día(s))`).join('\n') + '\n'
+      : '';
     const cuerpo = `Hola ${nombreDest},
 
 ${esCorreccion ? 'Le enviamos la liquidación corregida' : 'Aquí está el resumen de la liquidación'} de su vehículo ${v.nombre}${v.placa ? ' (' + v.placa + ')' : ''} con Car Help:
@@ -6742,7 +6789,7 @@ ${esCorreccion ? 'Le enviamos la liquidación corregida' : 'Aquí está el resum
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 PERÍODO: ${periodoLabel}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-${v.procedencia === 'propietario' ? `Valor correspondiente (antes de descuentos): ${formatCOP(brutoPropietario)}\nGastos/mantenimientos descontados:           ${formatCOP(gastosPropietario)}\n` : `Días de uso en el período:  ${dias}\n`}${bloqueFacturas}${bloqueAjustes}──────────────────────────────────
+${v.procedencia === 'propietario' ? `Valor correspondiente (antes de descuentos): ${formatCOP(brutoPropietario)}\nGastos/mantenimientos descontados:           ${formatCOP(gastosPropietario)}\n` : `Días de uso total:  ${dias}\n`}${bloqueRentas}${bloqueFacturas}${bloqueAjustes}──────────────────────────────────
 VALOR ${esCorreccion ? 'CORREGIDO' : ''} A CONSIGNAR:      ${formatCOP(montoFinal)}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -6753,7 +6800,7 @@ Gracias por confiar su vehículo a Car Help.
 Equipo Car Help — Pereira, Colombia
 📱 WhatsApp: +57 310 743 6082`;
 
-    const asuntoCorreo = `${esCorreccion ? 'Liquidación corregida' : 'Liquidación'} ${v.nombre} — Período ${fmtFecha(ciclo.inicio)} al ${fmtFecha(ciclo.fin)}`;
+    const asuntoCorreo = `${esCorreccion ? 'Liquidación corregida' : 'Liquidación'} ${v.nombre} — Período ${fmtFecha(periodoInicio)} al ${fmtFecha(periodoFin)}`;
 
     if (correo) await enviarCorreoDirecto(correo, asuntoCorreo, cuerpo);
     // Copia siempre a contabilidad interna
