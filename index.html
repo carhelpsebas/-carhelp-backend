@@ -6544,7 +6544,9 @@ async function obtenerPendientesAliado(vehiculoId) {
   const detalle = pendientes.map(r => ({
     id: r.id, num_reserva: r.num_reserva, nombre: r.nombre,
     fecha_inicio: r.fecha_inicio, fecha_fin: r.fecha_fin,
-    dias: diasEntre(r.fecha_inicio, r.fecha_fin) + 1
+    // Se usan los períodos de 24h realmente facturados al cliente (r.periodos), no los días de calendario
+    // completos entre las fechas, ya que eso puede sumar un día de más si la renta terminó antes de esa hora.
+    dias: r.periodos || (diasEntre(r.fecha_inicio, r.fecha_fin) + 1)
   })).sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio));
 
   const totalDias = detalle.reduce((s, d) => s + d.dias, 0);
