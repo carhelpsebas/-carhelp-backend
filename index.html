@@ -970,6 +970,13 @@
         <div class="info-banner" id="info-periodo">
           ⏱ Selecciona fecha y hora de entrega y devolución. El sistema calculará automáticamente los períodos de 24h y horas adicionales.
         </div>
+        <div class="campo" id="r-cobro-horas-extra-wrap" style="display:none">
+          <label>¿Cómo cobrar las horas de más?</label>
+          <select id="r_cobro_horas_extra" onchange="calcularPeriodo()">
+            <option value="dia_completo">Cobrar el día completo adicional</option>
+            <option value="por_hora">Cobrar solo las horas de más (según tarifa por hora del vehículo)</option>
+          </select>
+        </div>
 
         <hr class="divider">
         <div class="seccion-label">Tarifas</div>
@@ -1912,6 +1919,10 @@
       </div>
       <div class="campo"><label>Tarifa por período de 24h (COP)</label><input type="text" id="v_tarifa" placeholder="Ej: 320000 o 320.000"></div>
       <div class="campo">
+        <label>Valor por hora adicional (COP, opcional)</label>
+        <input type="number" id="v_valor_hora_adicional" placeholder="Ej: 15000 — déjalo vacío si siempre cobras el día completo">
+      </div>
+      <div class="campo">
         <label>Estado</label>
         <select id="v_estado">
           <option value="disponible">Disponible</option>
@@ -2743,6 +2754,7 @@ function adaptarVehiculoDesdeSB(v) {
     anio: v.anio || '',
     combustible_tipo: v.combustible_tipo || 'gasolina',
     tarifa: v.tarifa_24h || 0,
+    valorHoraAdicional: v.valor_hora_adicional || 0,
     estado: v.estado_operativo || 'disponible',
     procedencia: v.procedencia || (v.es_subalquiler ? 'propietario' : 'propio'),
     fechaIngreso: v.fecha_ingreso_flota || null,
@@ -2770,6 +2782,7 @@ function adaptarVehiculoHaciaSB(v) {
     anio: v.anio ? parseInt(v.anio) : null,
     combustible_tipo: v.combustible_tipo || 'gasolina',
     tarifa_24h: parseFloat(v.tarifa) || 0,
+    valor_hora_adicional: v.valorHoraAdicional ? parseFloat(v.valorHoraAdicional) : null,
     estado_operativo: v.estado || 'disponible',
     procedencia: v.procedencia || 'propio',
     fecha_ingreso_flota: v.fechaIngreso || null,
@@ -2843,7 +2856,7 @@ async function cargarDatos() {
       } catch(e2) {}
       const veh = vehiculos.find(v => v.id === o.vehiculo_id) || {};
       const periodoCalc = calcularPeriodosFacturables(o.fecha_salida, o.fecha_retorno);
-      const totalCalc = Math.max(periodoCalc.periodosFacturables * (o.tarifa_diaria || 0) + (o.deposito || 0) + (o.costo_entrega || 0) + (o.costo_recibido || 0) + (o.cobro_adicional || 0) - (o.descuento_pico_placa || 0), 0);
+      const totalCalc = Math.max(periodoCalc.periodosFacturables * (o.tarifa_diaria || 0) + (o.deposito || 0) + (o.costo_entrega || 0) + (o.costo_recibido || 0) + (o.cobro_adicional || 0) - (o.descuento_pico_placa || 0) - (o.descuento_horas_extra || 0), 0);
       return {
         id: o.id,
         num_reserva: o.numero,
@@ -2868,6 +2881,8 @@ async function cargarDatos() {
         costoEntrega: o.costo_entrega || 0,
         costoRecibido: o.costo_recibido || 0,
         descuentoPicoPlaca: o.descuento_pico_placa || 0,
+        descuentoHorasExtra: o.descuento_horas_extra || 0,
+        cobroHorasModo: o.cobro_horas_extra_modo || 'dia_completo',
         cobroAdicional: o.cobro_adicional || 0,
         ciudadesDestino: o.ciudad_destino ? o.ciudad_destino.split(',').map(s => s.trim()).filter(Boolean) : [],
         periodos: periodoCalc.periodosFacturables,
@@ -3507,6 +3522,7 @@ function abrirModalVehiculo() {
   document.getElementById('v_color').value = '';
   document.getElementById('v_combustible').value = 'gasolina';
   document.getElementById('v_tarifa').value = '';
+  document.getElementById('v_valor_hora_adicional').value = '';
   document.getElementById('v_estado').value = 'disponible';
   document.getElementById('v_procedencia').value = 'propio';
   document.getElementById('v_fecha_ingreso').value = '';
@@ -3542,6 +3558,7 @@ function editarVehiculo(id) {
   document.getElementById('v_color').value = v.color || '';
   document.getElementById('v_combustible').value = v.combustible_tipo || 'gasolina';
   document.getElementById('v_tarifa').value = v.tarifa || '';
+  document.getElementById('v_valor_hora_adicional').value = v.valorHoraAdicional || '';
   document.getElementById('v_estado').value = v.estado;
   const procedencia = v.procedencia || (v.esSubalquiler ? 'propietario' : 'propio');
   document.getElementById('v_procedencia').value = procedencia;
@@ -3580,6 +3597,7 @@ async function guardarVehiculo() {
     color: document.getElementById('v_color').value.trim(),
     combustible_tipo: document.getElementById('v_combustible').value,
     tarifa: parseFloat(document.getElementById('v_tarifa').value.replace(/\./g, '').replace(',', '.')) || 0,
+    valorHoraAdicional: parseFloat(document.getElementById('v_valor_hora_adicional').value) || 0,
     estado: document.getElementById('v_estado').value,
     procedencia: document.getElementById('v_procedencia').value,
     fechaIngreso: document.getElementById('v_fecha_ingreso').value || null,
@@ -3982,6 +4000,34 @@ function calcularPeriodo() {
 
   const total = periodosFacturables * tarifa + deposito + costoEntrega + costoRecibido;
 
+  // Horas de más: mostrar la opción de cobrar el día completo o solo las horas, según la tarifa del vehículo
+  const wrapCobroHoras = document.getElementById('r-cobro-horas-extra-wrap');
+  const selCobroHoras = document.getElementById('r_cobro_horas_extra');
+  let totalAjustadoHoras = total;
+  let cobroHorasModo = 'dia_completo';
+  let valorHorasExtra = 0;
+  let descuentoHorasExtra = 0;
+
+  if (cobroExtra) {
+    wrapCobroHoras.style.display = 'block';
+    const vehSel = vehiculos.find(v => v.id === document.getElementById('r_vehiculo').value);
+    const tieneValorHora = vehSel && vehSel.valorHoraAdicional > 0;
+    // Si el vehículo no tiene tarifa por hora configurada, solo se puede cobrar el día completo
+    selCobroHoras.querySelector('option[value="por_hora"]').disabled = !tieneValorHora;
+    if (!tieneValorHora && selCobroHoras.value === 'por_hora') selCobroHoras.value = 'dia_completo';
+    cobroHorasModo = selCobroHoras.value;
+
+    if (cobroHorasModo === 'por_hora' && tieneValorHora) {
+      const horasRedondeadas = Math.ceil(horasExtra);
+      valorHorasExtra = horasRedondeadas * vehSel.valorHoraAdicional;
+      // Se cobra el período completo de 24h ya incluido + solo las horas de más, en vez de un día entero adicional
+      descuentoHorasExtra = Math.max(tarifa - valorHorasExtra, 0);
+      totalAjustadoHoras = total - descuentoHorasExtra;
+    }
+  } else {
+    wrapCobroHoras.style.display = 'none';
+  }
+
   // Pico y placa: mostrar aviso de fechas restringidas y permitir un descuento por esos días
   const alertaPP = document.getElementById('r-pico-placa-alerta');
   const wrapDescuento = document.getElementById('r-descuento-pico-placa-wrap');
@@ -4004,17 +4050,20 @@ function calcularPeriodo() {
     wrapDescuento.style.display = 'none';
   }
 
-  const totalConDescuento = Math.max(total - descuentoPicoPlaca, 0);
+  const totalConDescuento = Math.max(totalAjustadoHoras - descuentoPicoPlaca, 0);
   const saldoPendiente = Math.max(totalConDescuento - abono, 0);
   document.getElementById('r_total').value = totalConDescuento > 0 ? formatCOP(totalConDescuento) : '—';
   if (saldoEl) saldoEl.value = totalConDescuento > 0 ? formatCOP(saldoPendiente) : '—';
 
   info.innerHTML = `⏱ Duración exacta: <strong>${periodos24h} período(s) de 24h</strong>` +
-
-    (cobroExtra ? ` + <strong style="color:var(--rojo-alerta)">${horasExtra}h adicionales</strong> → se cobra <strong>1 período extra completo</strong> (cada renta es por 24h).` : ` (sin horas adicionales).`) +
+    (cobroExtra
+      ? (cobroHorasModo === 'por_hora'
+          ? ` + <strong style="color:var(--dorado)">${horasExtra}h adicionales</strong> → se cobran por hora: <strong>${formatCOP(valorHorasExtra)}</strong> (en vez de un día completo).`
+          : ` + <strong style="color:var(--rojo-alerta)">${horasExtra}h adicionales</strong> → se cobra <strong>1 período extra completo</strong>.`)
+      : ` (sin horas adicionales).`) +
     ` Total facturable: <strong style="color:var(--dorado)">${periodosFacturables} período(s) de 24h</strong>.`;
 
-  return { periodos24h, horasExtra, periodosFacturables, total: totalConDescuento, cobroExtra, abono, saldoPendiente, costoEntrega, costoRecibido, descuentoPicoPlaca };
+  return { periodos24h, horasExtra, periodosFacturables, total: totalConDescuento, cobroExtra, cobroHorasModo, valorHorasExtra, descuentoHorasExtra, abono, saldoPendiente, costoEntrega, costoRecibido, descuentoPicoPlaca };
 }
 
 /* ════════════════════════════════════════════
@@ -4090,7 +4139,7 @@ async function generarReserva() {
     fecha_fin: valores.fecha_fin, hora_fin: valores.hora_fin,
     lugar_entrega: lugar_e, lugar_devolucion: lugar_d, ciudadesDestino,
     tarifa, deposito, abono, costoEntrega, costoRecibido, descuentoPicoPlaca: periodo.descuentoPicoPlaca || 0, saldoPendiente, periodos: periodo.periodosFacturables, horasExtra: periodo.horasExtra,
-    cobroExtra: periodo.cobroExtra, total: periodo.total,
+    cobroExtra: periodo.cobroExtra, cobroHorasModo: periodo.cobroHorasModo, valorHorasExtra: periodo.valorHorasExtra, total: periodo.total,
     notas, email_interno, estado: 'pendiente', creada: new Date().toISOString(),
   };
 
@@ -4123,6 +4172,8 @@ async function generarReserva() {
       costo_recibido: costoRecibido,
       ciudad_destino: ciudadesDestino.length ? ciudadesDestino.join(', ') : null,
       descuento_pico_placa: periodo.descuentoPicoPlaca || 0,
+      descuento_horas_extra: periodo.descuentoHorasExtra || 0,
+      cobro_horas_extra_modo: periodo.cobroHorasModo || 'dia_completo',
       estado: 'pendiente',
       notas: notas
     });
@@ -4228,7 +4279,9 @@ ${r.descuentoPicoPlaca > 0 ? `\nSe aplicó un descuento de ${formatCOP(r.descuen
   })();
 
   const extraTxt = r.cobroExtra
-    ? `\n⚠ Nota: el período incluye ${r.horasExtra}h adicionales sobre el último ciclo de 24h, por lo cual se factura un período extra completo (la renta se calcula por períodos de 24 horas).`
+    ? (r.cobroHorasModo === 'por_hora'
+        ? `\n⚠ Nota: el período incluye ${r.horasExtra}h adicionales, cobradas por hora (${formatCOP(r.valorHorasExtra)}) en vez de un día completo adicional.`
+        : `\n⚠ Nota: el período incluye ${r.horasExtra}h adicionales sobre el último ciclo de 24h, por lo cual se factura un período extra completo (la renta se calcula por períodos de 24 horas).`)
     : '';
 
   const c1 = {
