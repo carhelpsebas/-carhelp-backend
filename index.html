@@ -2331,12 +2331,20 @@
         <label>Valor final a liquidar (COP)</label>
         <input type="number" id="dl_monto_final" style="font-weight:700;color:var(--dorado)">
       </div>
-      <div class="campo">
-        <label>Comprobante de pago al aliado/inversionista (opcional)</label>
-        <input type="file" id="dl_comprobante_file" accept="image/*,application/pdf" onchange="dlPreviewComprobante(event)">
-        <img id="dl_comprobante_preview" style="display:none;max-width:100%;max-height:160px;border-radius:8px;margin-top:8px;border:1px solid var(--borde)">
-        <div id="dl_comprobante_actual" style="display:none;margin-top:8px;font-size:0.8rem"></div>
+
+      <div class="seccion-label">Comprobantes de pago (puede haber varios, ej. pagos en abonos)</div>
+      <div id="dl-comprobantes-lista" style="margin-bottom:10px"></div>
+      <div class="fila-2">
+        <div class="campo"><label>Valor de este pago (COP, opcional)</label><input type="number" id="dl_comprobante_valor" placeholder="Ej. 500000"></div>
+        <div class="campo"><label>Fecha del pago</label><input type="date" id="dl_comprobante_fecha"></div>
       </div>
+      <div class="campo">
+        <label>Foto o PDF del comprobante</label>
+        <input type="file" id="dl_comprobante_file" accept="image/*,application/pdf" onchange="dlPreviewComprobante(event)">
+        <img id="dl_comprobante_preview" style="display:none;max-width:100%;max-height:140px;border-radius:8px;margin-top:8px;border:1px solid var(--borde)">
+      </div>
+      <button type="button" class="btn-agregar-cuadre" onclick="agregarComprobantePago()">+ Agregar comprobante de pago</button>
+
       <div class="info-banner" id="dl-estado-envio"></div>
     </div>
     <div class="modal-footer">
@@ -6718,6 +6726,61 @@ function dlPreviewComprobante(event) {
   }
 }
 
+let liqComprobantesTrabajo = [];
+
+function renderComprobantesPago() {
+  const cont = document.getElementById('dl-comprobantes-lista');
+  if (!cont) return;
+  if (liqComprobantesTrabajo.length === 0) {
+    cont.innerHTML = '<div style="font-size:0.78rem;color:var(--blanco-suave);padding:6px 0">Sin comprobantes de pago registrados todavía.</div>';
+    return;
+  }
+  cont.innerHTML = liqComprobantesTrabajo.map((c, i) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;background:var(--gris-oscuro);border:1px solid var(--borde);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:0.78rem">
+      <span>${fmtFecha(c.fecha)}${c.valor ? ` — ${formatCOP(c.valor)}` : ''} — <a href="${c.url}" target="_blank" style="color:var(--dorado-suave)">📎 ver comprobante</a></span>
+      <button class="btn-peligro" style="font-size:0.68rem;padding:3px 8px" onclick="quitarComprobantePago(${i})">✕</button>
+    </div>
+  `).join('');
+}
+
+async function agregarComprobantePago() {
+  if (!dlComprobanteArchivo) { mostrarToast('⚠️ Selecciona el archivo del comprobante', '#E05252'); return; }
+  const valor = parseFloat(document.getElementById('dl_comprobante_valor').value) || 0;
+  const fecha = document.getElementById('dl_comprobante_fecha').value || soloFecha(new Date());
+
+  let url = null;
+  try {
+    const ext = dlComprobanteArchivo.name.split('.').pop() || 'jpg';
+    const path = `comprobantes-pago/${liqVehiculoModalActual}-${Date.now()}.${ext}`;
+    const res = await fetch(`${SB_URL}/storage/v1/object/entregas-fotos/${path}`, {
+      method: 'POST',
+      headers: {
+        'apikey': SB_KEY,
+        'Authorization': `Bearer ${SB_KEY}`,
+        'Content-Type': dlComprobanteArchivo.type || 'application/octet-stream',
+        'x-upsert': 'true'
+      },
+      body: dlComprobanteArchivo
+    });
+    if (res.ok) url = `${SB_URL}/storage/v1/object/public/entregas-fotos/${path}`;
+  } catch(e) { console.warn('Error subiendo el comprobante:', e.message); }
+
+  if (!url) { mostrarToast('⚠️ No se pudo subir el comprobante', '#E05252'); return; }
+
+  liqComprobantesTrabajo.push({ url, valor, fecha });
+  document.getElementById('dl_comprobante_valor').value = '';
+  document.getElementById('dl_comprobante_file').value = '';
+  document.getElementById('dl_comprobante_preview').style.display = 'none';
+  dlComprobanteArchivo = null;
+  renderComprobantesPago();
+  mostrarToast('✅ Comprobante agregado');
+}
+
+function quitarComprobantePago(idx) {
+  liqComprobantesTrabajo.splice(idx, 1);
+  renderComprobantesPago();
+}
+
 async function abrirHistorialLiquidaciones() {
   const vehiculoId = liqVehiculoModalActual;
   const ctx = liqDatosPeriodo[vehiculoId];
@@ -6749,7 +6812,7 @@ async function abrirHistorialLiquidaciones() {
         <div>
           <strong style="color:var(--dorado-suave)">${fmtFecha(h.periodo_inicio)} → ${fmtFecha(h.periodo_fin)}</strong>
           <div style="font-size:0.72rem;color:var(--blanco-suave);margin-top:2px">
-            ${h.correo_enviado ? `📧 Enviado a ${h.correo_destino || '—'}` : '⚠️ No se envió correo'}${ajustesCount > 0 ? ` · ${ajustesCount} cuadre(s)` : ''}${h.comprobante_pago_url ? ` · <a href="${h.comprobante_pago_url}" target="_blank" style="color:var(--dorado-suave)">📎 Ver comprobante</a>` : ''}
+            ${h.correo_enviado ? `📧 Enviado a ${h.correo_destino || '—'}` : '⚠️ No se envió correo'}${ajustesCount > 0 ? ` · ${ajustesCount} cuadre(s)` : ''}${(h.comprobantes_pago || []).length > 0 ? ` · ${(h.comprobantes_pago || []).length} comprobante(s) de pago` : ''}
           </div>
         </div>
         <div style="font-family:'Syne',sans-serif;font-weight:800;color:var(--verde-ok)">${formatCOP(monto)}</div>
@@ -6798,13 +6861,10 @@ async function abrirDetalleLiquidacion(vehiculoId) {
   dlComprobanteArchivo = null;
   document.getElementById('dl_comprobante_file').value = '';
   document.getElementById('dl_comprobante_preview').style.display = 'none';
-  const comprobanteActualEl = document.getElementById('dl_comprobante_actual');
-  if (registro?.comprobante_pago_url) {
-    comprobanteActualEl.style.display = 'block';
-    comprobanteActualEl.innerHTML = `<a href="${registro.comprobante_pago_url}" target="_blank" style="color:var(--dorado-suave)">📎 Ver comprobante ya subido</a> — sube uno nuevo arriba para reemplazarlo`;
-  } else {
-    comprobanteActualEl.style.display = 'none';
-  }
+  document.getElementById('dl_comprobante_valor').value = '';
+  document.getElementById('dl_comprobante_fecha').value = soloFecha(new Date());
+  liqComprobantesTrabajo = registro?.comprobantes_pago ? JSON.parse(JSON.stringify(registro.comprobantes_pago)) : [];
+  renderComprobantesPago();
 
   document.getElementById('dl-estado-envio').innerHTML = registro
     ? `📧 Ya se ${registro.correo_enviado ? 'envió' : 'registró'} esta liquidación${registro.correo_destino ? ' a ' + registro.correo_destino : ''}. Guardar aquí actualizará el registro y reenviará el correo con el valor corregido.`
@@ -6948,28 +7008,6 @@ async function guardarDetalleLiquidacion() {
   const nombreDest = v.procedencia === 'propietario' ? (v.propietarioNombre || 'Propietario') : (v.aliadoNombre || 'Aliado');
   const periodoLabel = `${fmtFecha(periodoInicio)} al ${fmtFecha(periodoFin)}`;
 
-  // Subir el comprobante de pago si se seleccionó uno nuevo
-  let comprobantePagoUrl = registro?.comprobante_pago_url || null;
-  if (dlComprobanteArchivo) {
-    try {
-      const ext = dlComprobanteArchivo.name.split('.').pop() || 'jpg';
-      const path = `comprobantes-pago/${vehiculoId}-${Date.now()}.${ext}`;
-      const res = await fetch(`${SB_URL}/storage/v1/object/entregas-fotos/${path}`, {
-        method: 'POST',
-        headers: {
-          'apikey': SB_KEY,
-          'Authorization': `Bearer ${SB_KEY}`,
-          'Content-Type': dlComprobanteArchivo.type || 'application/octet-stream',
-          'x-upsert': 'true'
-        },
-        body: dlComprobanteArchivo
-      });
-      if (res.ok) comprobantePagoUrl = `${SB_URL}/storage/v1/object/public/entregas-fotos/${path}`;
-    } catch(e) {
-      console.warn('Error subiendo el comprobante de pago:', e.message);
-    }
-  }
-
   try {
     // Movimiento contable: actualizar el existente si ya había uno, o crear uno nuevo
     if (registro?.movimiento_id) {
@@ -7002,7 +7040,7 @@ async function guardarDetalleLiquidacion() {
       correo_destino: correo || null,
       movimiento_id: registro?.movimiento_id || nuevoMovimientoId || null,
       ordenes_incluidas: esAliadoPorRentas ? (idsIncluidos || []) : [],
-      comprobante_pago_url: comprobantePagoUrl
+      comprobantes_pago: liqComprobantesTrabajo
     };
 
     if (registro?.id) {
