@@ -6585,9 +6585,6 @@ async function renderLiquidaciones() {
     // ═══ ALIADOS: se basan en rentas finalizadas reales, no en ciclos de calendario ═══
     if (v.procedencia === 'aliado') {
       const pend = await obtenerPendientesAliado(v.id);
-      const montoBase = pend.totalDias * (v.aliadoTarifaDia || 0);
-      liqDatosPeriodo[v.id] = { vehiculo: v, esAliadoPorRentas: true, pendientesDetalle: pend.detalle, dias: pend.totalDias, montoBase, idsIncluidos: pend.idsIncluidos, registro: null, gastosListaPropietario: [] };
-      if (montoBase > 0) totalPendienteGlobal += montoBase;
 
       if (pend.detalle.length === 0) {
         return `
@@ -6600,20 +6597,30 @@ async function renderLiquidaciones() {
         </div>`;
       }
 
-      const rangoLabel = `${fmtFecha(pend.detalle[0].fecha_inicio)} → ${fmtFecha(pend.detalle[pend.detalle.length-1].fecha_fin)}`;
-      return `
-      <div class="item-card" style="cursor:pointer" onclick="abrirDetalleLiquidacion('${v.id}')">
-        <div class="item-info">
-          <div class="item-titulo">${v.nombre} ${v.placa ? '('+v.placa+')' : ''} <span class="num-reserva">Aliado</span></div>
-          <div class="item-detalle">Aliado: <strong>${v.aliadoNombre || 'Sin definir'}</strong> · ${pend.detalle.length} renta(s) sin liquidar (${rangoLabel})</div>
-          <div class="item-detalle">Total días de uso: <strong>${pend.totalDias}</strong> · Tarifa por día: <strong>${formatCOP(v.aliadoTarifaDia || 0)}</strong></div>
-          <div style="font-size:0.7rem;color:var(--azul-info);margin-top:4px">Toca la tarjeta para ver el detalle, hacer cuadres o liquidar →</div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:var(--dorado-suave)">${formatCOP(montoBase)}</div>
-          <div style="font-size:0.7rem;color:var(--blanco-suave);margin-bottom:6px">por liquidar</div>
-        </div>
-      </div>`;
+      // Una tarjeta independiente por cada renta pendiente, para poder liquidarlas por separado
+      return pend.detalle.map(p => {
+        const montoRenta = p.dias * (v.aliadoTarifaDia || 0);
+        liqDatosPeriodo[p.id] = {
+          vehiculo: v, esAliadoPorRentas: true,
+          pendientesDetalle: [p], dias: p.dias, montoBase: montoRenta,
+          idsIncluidos: [p.id], registro: null, gastosListaPropietario: []
+        };
+        totalPendienteGlobal += montoRenta;
+
+        return `
+        <div class="item-card" style="cursor:pointer" onclick="abrirDetalleLiquidacion('${p.id}')">
+          <div class="item-info">
+            <div class="item-titulo">${v.nombre} ${v.placa ? '('+v.placa+')' : ''} <span class="num-reserva">${p.num_reserva}</span></div>
+            <div class="item-detalle">Aliado: <strong>${v.aliadoNombre || 'Sin definir'}</strong> · Cliente: <strong>${p.nombre}</strong></div>
+            <div class="item-detalle">${fmtFecha(p.fecha_inicio)} → ${fmtFecha(p.fecha_fin)} · <strong>${p.dias}</strong> día(s) · Tarifa por día: <strong>${formatCOP(v.aliadoTarifaDia || 0)}</strong></div>
+            <div style="font-size:0.7rem;color:var(--azul-info);margin-top:4px">Toca la tarjeta para liquidar esta renta →</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:var(--dorado-suave)">${formatCOP(montoRenta)}</div>
+            <div style="font-size:0.7rem;color:var(--blanco-suave);margin-bottom:6px">por liquidar</div>
+          </div>
+        </div>`;
+      }).join('');
     }
 
     // ═══ PROPIETARIOS: se basan en ciclos de calendario desde su fecha de ingreso ═══
@@ -6792,7 +6799,7 @@ async function abrirHistorialLiquidaciones() {
 
   let historial = [];
   try {
-    historial = await sbSelect('liquidaciones', `&vehiculo_id=eq.${vehiculoId}&order=periodo_inicio.desc`);
+    historial = await sbSelect('liquidaciones', `&vehiculo_id=eq.${v.id}&order=periodo_inicio.desc`);
   } catch(e) {
     document.getElementById('hl-lista').innerHTML = '<div class="estado-vacio"><p>No se pudo cargar el historial.</p></div>';
     return;
@@ -6821,11 +6828,33 @@ async function abrirHistorialLiquidaciones() {
   }).join('');
 }
 
+function recalcularMontoAliadoSeleccion() {
+  const ctx = liqDatosPeriodo[liqVehiculoModalActual];
+  if (!ctx || !ctx.esAliadoPorRentas) return;
+  const tarifaDia = ctx.vehiculo.aliadoTarifaDia || 0;
+  const checks = document.querySelectorAll('.dl-renta-check');
+  let diasSeleccionados = 0;
+  const idsSeleccionados = [];
+  checks.forEach(chk => {
+    if (chk.checked) {
+      diasSeleccionados += parseFloat(chk.dataset.dias) || 0;
+      idsSeleccionados.push(chk.dataset.id);
+    }
+  });
+  const montoSeleccionado = diasSeleccionados * tarifaDia;
+  ctx.idsIncluidosSeleccionados = idsSeleccionados;
+  ctx.diasSeleccionados = diasSeleccionados;
+  document.getElementById('dl-valor-base-aliado').innerHTML = `Valor base calculado: <strong>${formatCOP(montoSeleccionado)}</strong> (${diasSeleccionados} día(s) seleccionados)`;
+  document.getElementById('dl_monto_final').value = montoSeleccionado;
+}
+
 async function abrirDetalleLiquidacion(vehiculoId) {
   const ctx = liqDatosPeriodo[vehiculoId];
   if (!ctx) return;
   liqVehiculoModalActual = vehiculoId;
   const { vehiculo: v, periodoLabel, ingresos, gastosPropietario, gastosEmpresa, dias, montoBase, registro, gastosListaPropietario, esAliadoPorRentas, pendientesDetalle } = ctx;
+  ctx.idsIncluidosSeleccionados = ctx.idsIncluidos ? [...ctx.idsIncluidos] : [];
+  ctx.diasSeleccionados = dias;
 
   document.getElementById('dl-vehiculo-nombre').textContent = `${v.nombre} ${v.placa ? '('+v.placa+')' : ''}`;
 
@@ -6836,15 +6865,19 @@ async function abrirDetalleLiquidacion(vehiculoId) {
     : '';
 
   if (esAliadoPorRentas) {
+    const tarifaDia = v.aliadoTarifaDia || 0;
     const listaRentasHtml = (pendientesDetalle && pendientesDetalle.length > 0)
-      ? '<div style="margin-top:8px">' + pendientesDetalle.map(p =>
-          `<div style="font-size:0.75rem;color:var(--blanco-suave);margin-top:2px">• ${p.num_reserva} — ${p.nombre}: ${fmtFecha(p.fecha_inicio)} → ${fmtFecha(p.fecha_fin)} (${p.dias} día(s))</div>`
-        ).join('') + '</div>'
-      : '<div style="margin-top:8px;font-size:0.75rem;color:var(--blanco-suave)">No hay rentas finalizadas pendientes por liquidar.</div>';
+      ? pendientesDetalle.map(p => `
+        <label style="display:flex;align-items:center;gap:8px;background:var(--gris-oscuro);border:1px solid var(--borde);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:0.78rem;cursor:pointer">
+          <input type="checkbox" class="dl-renta-check" data-id="${p.id}" data-dias="${p.dias}" checked onchange="recalcularMontoAliadoSeleccion()" style="width:auto">
+          <span>${p.num_reserva} — ${p.nombre}: ${fmtFecha(p.fecha_inicio)} → ${fmtFecha(p.fecha_fin)} (${p.dias} día(s))</span>
+        </label>`).join('')
+      : '<div style="font-size:0.75rem;color:var(--blanco-suave)">No hay rentas finalizadas pendientes por liquidar.</div>';
     document.getElementById('dl-resumen').innerHTML =
-      `Aliado: <strong>${v.aliadoNombre || 'Sin definir'}</strong> · Tarifa por día: <strong>${formatCOP(v.aliadoTarifaDia || 0)}</strong><br>
-       Rentas finalizadas sin liquidar (${dias} día(s) en total):${listaRentasHtml}
-       <div style="margin-top:8px">Valor base calculado: <strong>${formatCOP(montoBase)}</strong></div>`;
+      `Aliado: <strong>${v.aliadoNombre || 'Sin definir'}</strong> · Tarifa por día: <strong>${formatCOP(tarifaDia)}</strong><br>
+       <div style="margin:8px 0 4px;font-size:0.72rem;color:var(--azul-info)">Desmarca las rentas que NO quieras incluir en esta liquidación:</div>
+       <div id="dl-rentas-checklist">${listaRentasHtml}</div>
+       <div style="margin-top:8px" id="dl-valor-base-aliado">Valor base calculado: <strong>${formatCOP(montoBase)}</strong></div>`;
   } else {
     document.getElementById('dl-resumen').innerHTML = `Propietario: <strong>${v.propietarioNombre || 'Sin definir'}</strong> · Período: <strong>${periodoLabel}</strong><br>
        Ingresos del período: <strong>${formatCOP(ingresos)}</strong> · Gastos a su cargo: <strong>${formatCOP(gastosPropietario)}</strong>${gastosEmpresa > 0 ? ` · Gastos de Car Help: ${formatCOP(gastosEmpresa)}` : ''}<br>
@@ -6995,13 +7028,25 @@ async function guardarDetalleLiquidacion() {
   const vehiculoId = liqVehiculoModalActual;
   const ctx = liqDatosPeriodo[vehiculoId];
   if (!ctx) return;
-  const { vehiculo: v, ingresos, gastosPropietario, dias, registro, gastosListaPropietario, esAliadoPorRentas, pendientesDetalle, idsIncluidos } = ctx;
+  const { vehiculo: v, ingresos, gastosPropietario, registro, gastosListaPropietario, esAliadoPorRentas, pendientesDetalle } = ctx;
   const montoFinal = parseFloat(document.getElementById('dl_monto_final').value) || 0;
   if (!montoFinal) { mostrarToast('⚠️ Ingresa el valor final a liquidar', '#E05252'); return; }
 
-  // Para aliados por rentas reales no hay un "ciclo" de calendario: se usa el rango real de las rentas incluidas
-  const periodoInicio = esAliadoPorRentas ? (pendientesDetalle[0]?.fecha_inicio || soloFecha(new Date())) : ctx.ciclo.inicio;
-  const periodoFin = esAliadoPorRentas ? (pendientesDetalle[pendientesDetalle.length-1]?.fecha_fin || soloFecha(new Date())) : ctx.ciclo.fin;
+  // Para aliados: solo se incluyen las rentas que quedaron marcadas con el checkbox
+  const rentasSeleccionadas = esAliadoPorRentas
+    ? pendientesDetalle.filter(p => (ctx.idsIncluidosSeleccionados || []).includes(p.id))
+    : [];
+  const idsIncluidos = esAliadoPorRentas ? rentasSeleccionadas.map(p => p.id) : [];
+  const dias = esAliadoPorRentas ? (ctx.diasSeleccionados ?? ctx.dias) : ctx.dias;
+
+  if (esAliadoPorRentas && rentasSeleccionadas.length === 0) {
+    mostrarToast('⚠️ Selecciona al menos una renta para liquidar', '#E05252');
+    return;
+  }
+
+  // Para aliados por rentas reales no hay un "ciclo" de calendario: se usa el rango real de las rentas seleccionadas
+  const periodoInicio = esAliadoPorRentas ? (rentasSeleccionadas[0]?.fecha_inicio || soloFecha(new Date())) : ctx.ciclo.inicio;
+  const periodoFin = esAliadoPorRentas ? (rentasSeleccionadas[rentasSeleccionadas.length-1]?.fecha_fin || soloFecha(new Date())) : ctx.ciclo.fin;
 
   const esCorreccion = !!registro;
   const correo = v.procedencia === 'propietario' ? v.propietarioEmail : v.aliadoEmail;
@@ -7019,14 +7064,15 @@ async function guardarDetalleLiquidacion() {
         concepto: `Liquidación a ${nombreDest} · ${v.nombre}`,
         valor: montoFinal,
         fecha: new Date().toISOString().split('T')[0],
-        vehiculo_id: vehiculoId,
+        vehiculo_id: v.id,
+        orden_id: esAliadoPorRentas ? (rentasSeleccionadas[0]?.id || null) : null,
         notas: `Período ${periodoLabel}`
       });
       var nuevoMovimientoId = mov[0]?.id;
     }
 
     const datosLiquidacion = {
-      vehiculo_id: vehiculoId,
+      vehiculo_id: v.id,
       tipo: v.procedencia,
       periodo_inicio: periodoInicio,
       periodo_fin: periodoFin,
