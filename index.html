@@ -975,6 +975,7 @@
           <select id="r_cobro_horas_extra" onchange="calcularPeriodo()">
             <option value="dia_completo">Cobrar el día completo adicional</option>
             <option value="por_hora">Cobrar solo las horas de más (según tarifa por hora del vehículo)</option>
+            <option value="cortesia">No cobrar las horas de más (cortesía)</option>
           </select>
         </div>
 
@@ -2216,6 +2217,37 @@
     <div class="modal-footer">
       <button class="btn-secundario" onclick="tvLimpiarForm()">Limpiar</button>
       <button class="btn-primario" onclick="guardarTramoVehiculo()">Guardar tramo</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ MODAL EDITAR VALORES DE RESERVA ═══════════════════ -->
+<div class="modal-overlay" id="modal-editar-valores">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <div class="modal-titulo">✏️ Editar valores <span id="ev-num-reserva" style="color:var(--dorado)"></span></div>
+      <button class="modal-cerrar" onclick="cerrarModal('modal-editar-valores')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="info-banner">Esto corrige el valor de la reserva y también actualiza el movimiento contable asociado, para que la liquidación al propietario/aliado quede correcta.</div>
+      <div class="fila-2">
+        <div class="campo"><label>Tarifa por período de 24h (COP)</label><input type="number" id="ev_tarifa" oninput="actualizarTotalEditarValores()"></div>
+        <div class="campo"><label>Depósito de garantía (COP)</label><input type="number" id="ev_deposito" oninput="actualizarTotalEditarValores()"></div>
+      </div>
+      <div class="fila-2">
+        <div class="campo"><label>Costo de entrega (COP)</label><input type="number" id="ev_costo_entrega" oninput="actualizarTotalEditarValores()"></div>
+        <div class="campo"><label>Costo de recibido (COP)</label><input type="number" id="ev_costo_recibido" oninput="actualizarTotalEditarValores()"></div>
+      </div>
+      <div class="fila-2">
+        <div class="campo"><label>Descuento por pico y placa (COP)</label><input type="number" id="ev_descuento_pico_placa" oninput="actualizarTotalEditarValores()"></div>
+        <div class="campo"><label>Descuento por horas de más (COP)</label><input type="number" id="ev_descuento_horas_extra" oninput="actualizarTotalEditarValores()"></div>
+      </div>
+      <div class="campo"><label>Abono / anticipo (COP)</label><input type="number" id="ev_abono" oninput="actualizarTotalEditarValores()"></div>
+      <div class="info-banner" id="ev-total-preview" style="border-color:var(--dorado)"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secundario" onclick="cerrarModal('modal-editar-valores')">Cancelar</button>
+      <button class="btn-primario" onclick="guardarValoresReserva()">Guardar cambios</button>
     </div>
   </div>
 </div>
@@ -4023,6 +4055,11 @@ function calcularPeriodo() {
       // Se cobra el período completo de 24h ya incluido + solo las horas de más, en vez de un día entero adicional
       descuentoHorasExtra = Math.max(tarifa - valorHorasExtra, 0);
       totalAjustadoHoras = total - descuentoHorasExtra;
+    } else if (cobroHorasModo === 'cortesia') {
+      // No se cobra nada por las horas de más: se descuenta el período extra completo
+      valorHorasExtra = 0;
+      descuentoHorasExtra = tarifa;
+      totalAjustadoHoras = total - descuentoHorasExtra;
     }
   } else {
     wrapCobroHoras.style.display = 'none';
@@ -4059,6 +4096,8 @@ function calcularPeriodo() {
     (cobroExtra
       ? (cobroHorasModo === 'por_hora'
           ? ` + <strong style="color:var(--dorado)">${horasExtra}h adicionales</strong> → se cobran por hora: <strong>${formatCOP(valorHorasExtra)}</strong> (en vez de un día completo).`
+          : cobroHorasModo === 'cortesia'
+          ? ` + <strong style="color:var(--verde-ok)">${horasExtra}h adicionales</strong> → cortesía, no se cobran.`
           : ` + <strong style="color:var(--rojo-alerta)">${horasExtra}h adicionales</strong> → se cobra <strong>1 período extra completo</strong>.`)
       : ` (sin horas adicionales).`) +
     ` Total facturable: <strong style="color:var(--dorado)">${periodosFacturables} período(s) de 24h</strong>.`;
@@ -4281,6 +4320,8 @@ ${r.descuentoPicoPlaca > 0 ? `\nSe aplicó un descuento de ${formatCOP(r.descuen
   const extraTxt = r.cobroExtra
     ? (r.cobroHorasModo === 'por_hora'
         ? `\n⚠ Nota: el período incluye ${r.horasExtra}h adicionales, cobradas por hora (${formatCOP(r.valorHorasExtra)}) en vez de un día completo adicional.`
+        : r.cobroHorasModo === 'cortesia'
+        ? `\nNota: el período incluye ${r.horasExtra}h adicionales, las cuales no se cobran (cortesía).`
         : `\n⚠ Nota: el período incluye ${r.horasExtra}h adicionales sobre el último ciclo de 24h, por lo cual se factura un período extra completo (la renta se calcula por períodos de 24 horas).`)
     : '';
 
@@ -4585,6 +4626,100 @@ async function reintentarGuardarReserva(num) {
   }
 }
 
+/* ════════════════════════════════════════════
+   EDITAR VALORES DE RESERVA (corrige también el movimiento contable)
+   ════════════════════════════════════════════ */
+let evReservaActual = null;
+
+function abrirModalEditarValores(num) {
+  const r = reservas.find(x => x.num_reserva === num);
+  if (!r) return;
+  if (!r.id) {
+    mostrarToast('⚠️ Esta reserva nunca se guardó en Supabase (quedó solo local). Elimínala y créala de nuevo para poder editarla.', 'var(--rojo-alerta)');
+    return;
+  }
+  evReservaActual = r;
+  document.getElementById('ev-num-reserva').textContent = num;
+  document.getElementById('ev_tarifa').value = r.tarifa || 0;
+  document.getElementById('ev_deposito').value = r.deposito || 0;
+  document.getElementById('ev_costo_entrega').value = r.costoEntrega || 0;
+  document.getElementById('ev_costo_recibido').value = r.costoRecibido || 0;
+  document.getElementById('ev_descuento_pico_placa').value = r.descuentoPicoPlaca || 0;
+  document.getElementById('ev_descuento_horas_extra').value = r.descuentoHorasExtra || 0;
+  document.getElementById('ev_abono').value = r.abono || 0;
+  actualizarTotalEditarValores();
+  abrirModal('modal-editar-valores');
+}
+
+function actualizarTotalEditarValores() {
+  const r = evReservaActual;
+  if (!r) return;
+  const tarifa = parseFloat(document.getElementById('ev_tarifa').value) || 0;
+  const deposito = parseFloat(document.getElementById('ev_deposito').value) || 0;
+  const costoEntrega = parseFloat(document.getElementById('ev_costo_entrega').value) || 0;
+  const costoRecibido = parseFloat(document.getElementById('ev_costo_recibido').value) || 0;
+  const descPP = parseFloat(document.getElementById('ev_descuento_pico_placa').value) || 0;
+  const descHoras = parseFloat(document.getElementById('ev_descuento_horas_extra').value) || 0;
+  const abono = parseFloat(document.getElementById('ev_abono').value) || 0;
+
+  const total = Math.max((r.periodos || 0) * tarifa + deposito + costoEntrega + costoRecibido - descPP - descHoras, 0);
+  const saldo = Math.max(total - abono, 0);
+  document.getElementById('ev-total-preview').innerHTML = `Nuevo total: <strong>${formatCOP(total)}</strong> · Saldo pendiente: <strong>${formatCOP(saldo)}</strong> (${r.periodos || 0} período(s) × tarifa)`;
+}
+
+async function guardarValoresReserva() {
+  const r = evReservaActual;
+  if (!r) return;
+  const tarifa = parseFloat(document.getElementById('ev_tarifa').value) || 0;
+  const deposito = parseFloat(document.getElementById('ev_deposito').value) || 0;
+  const costoEntrega = parseFloat(document.getElementById('ev_costo_entrega').value) || 0;
+  const costoRecibido = parseFloat(document.getElementById('ev_costo_recibido').value) || 0;
+  const descPP = parseFloat(document.getElementById('ev_descuento_pico_placa').value) || 0;
+  const descHoras = parseFloat(document.getElementById('ev_descuento_horas_extra').value) || 0;
+  const abono = parseFloat(document.getElementById('ev_abono').value) || 0;
+
+  const nuevoTotal = Math.max((r.periodos || 0) * tarifa + deposito + costoEntrega + costoRecibido - descPP - descHoras, 0);
+
+  try {
+    await sbUpdate('ordenes', r.id, {
+      tarifa_diaria: tarifa,
+      deposito: deposito,
+      costo_entrega: costoEntrega,
+      costo_recibido: costoRecibido,
+      descuento_pico_placa: descPP,
+      descuento_horas_extra: descHoras,
+      abono: abono,
+    });
+
+    // Corregir también el movimiento contable de la renta, para que la liquidación del propietario/aliado quede bien
+    try {
+      const movs = await sbSelect('movimientos_contables', `&orden_id=eq.${r.id}&categoria=eq.renta&limit=1`);
+      if (movs && movs[0]) {
+        await sbUpdate('movimientos_contables', movs[0].id, { valor: nuevoTotal, notas: `Reserva ${r.num_reserva} · valores corregidos` });
+      }
+    } catch(e) { console.warn('No se pudo corregir el movimiento contable de la renta:', e.message); }
+  } catch(e) {
+    console.error('Error guardando los valores de la reserva:', e);
+    mostrarToast('⚠️ No se pudo guardar: ' + e.message, 'var(--rojo-alerta)');
+    return;
+  }
+
+  r.tarifa = tarifa;
+  r.deposito = deposito;
+  r.costoEntrega = costoEntrega;
+  r.costoRecibido = costoRecibido;
+  r.descuentoPicoPlaca = descPP;
+  r.descuentoHorasExtra = descHoras;
+  r.abono = abono;
+  r.total = nuevoTotal;
+  r.saldoPendiente = Math.max(nuevoTotal - abono, 0);
+  await guardar('carhelp:reservas', reservas);
+
+  cerrarModal('modal-editar-valores');
+  renderReservas(); renderStats(); renderProximas(); renderEnCurso();
+  mostrarToast('✅ Valores actualizados: ' + r.num_reserva);
+}
+
 function renderReservas() {
   const cont = document.getElementById('lista-reservas');
   document.getElementById('reservas-count').textContent = `${reservas.length} reserva(s)`;
@@ -4612,6 +4747,7 @@ function renderReservas() {
         <button class="btn-secundario" onclick="abrirModalCambiarVehiculo('${r.num_reserva}')">🔄 Cambiar vehículo</button>
         <button class="btn-secundario" onclick="abrirModalTramosVehiculo('${r.num_reserva}')">🚗 Vehículos por fecha</button>
         <button class="btn-secundario" onclick="reenviarCorreoReserva('${r.num_reserva}')">📧 Ver / reenviar correo</button>
+        <button class="btn-secundario" onclick="abrirModalEditarValores('${r.num_reserva}')">✏️ Editar valores</button>
         <button class="btn-peligro" onclick="eliminarReserva('${r.num_reserva}')">Eliminar</button>
       </div>
     </div>
