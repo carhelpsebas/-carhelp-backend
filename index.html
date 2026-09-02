@@ -6822,10 +6822,65 @@ async function abrirHistorialLiquidaciones() {
             ${h.correo_enviado ? `📧 Enviado a ${h.correo_destino || '—'}` : '⚠️ No se envió correo'}${ajustesCount > 0 ? ` · ${ajustesCount} cuadre(s)` : ''}${(h.comprobantes_pago || []).length > 0 ? ` · ${(h.comprobantes_pago || []).length} comprobante(s) de pago` : ''}
           </div>
         </div>
-        <div style="font-family:'Syne',sans-serif;font-weight:800;color:var(--verde-ok)">${formatCOP(monto)}</div>
+        <div style="text-align:right">
+          <div style="font-family:'Syne',sans-serif;font-weight:800;color:var(--verde-ok)">${formatCOP(monto)}</div>
+          ${h.correo_destino ? `<button class="btn-secundario" style="font-size:0.68rem;padding:4px 9px;margin-top:4px" onclick="reenviarCorreoDesdeHistorial('${h.id}')">📧 Reenviar</button>` : ''}
+        </div>
       </div>
     </div>`;
   }).join('');
+}
+
+// Reenvía el correo de una liquidación ya guardada, reconstruyéndolo desde el historial
+// (incluye los comprobantes de pago, útil si se agregaron después del primer envío)
+async function reenviarCorreoDesdeHistorial(liquidacionId) {
+  let registro = null;
+  try {
+    const regs = await sbSelect('liquidaciones', `&id=eq.${liquidacionId}`);
+    registro = regs[0] || null;
+  } catch(e) {}
+  if (!registro) { mostrarToast('⚠️ No se pudo cargar esa liquidación', '#E05252'); return; }
+
+  const v = vehiculos.find(x => x.id === registro.vehiculo_id);
+  if (!v) { mostrarToast('⚠️ Vehículo no encontrado', '#E05252'); return; }
+
+  const nombreDest = v.procedencia === 'propietario' ? (v.propietarioNombre || 'Propietario') : (v.aliadoNombre || 'Aliado');
+  const periodoLabel = `${fmtFecha(registro.periodo_inicio)} al ${fmtFecha(registro.periodo_fin)}`;
+  const monto = parseFloat(registro.monto_final ?? registro.monto_liquidado) || 0;
+  const ajustes = registro.ajustes || [];
+  const comprobantes = registro.comprobantes_pago || [];
+
+  const bloqueAjustes = ajustes.length > 0
+    ? '\nCuadres / gastos de cambio en este período:\n' + ajustes.map(a => `  • ${a.descripcion}: ${a.valor < 0 ? '-' : '+'}${formatCOP(Math.abs(a.valor))}${a.factura_url ? ` — Ver factura: ${a.factura_url}` : ''}`).join('\n') + '\n'
+    : '';
+  const bloqueComprobantes = comprobantes.length > 0
+    ? '\nComprobante(s) de pago:\n' + comprobantes.map(c => `  • ${fmtFecha(c.fecha)}${c.valor ? ` — ${formatCOP(c.valor)}` : ''} — Ver comprobante: ${c.url}`).join('\n') + '\n'
+    : '';
+
+  const cuerpo = `Hola ${nombreDest},
+
+Le reenviamos la liquidación de su vehículo ${v.nombre}${v.placa ? ' (' + v.placa + ')' : ''} con Car Help:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+PERÍODO: ${periodoLabel}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+${bloqueComprobantes}${bloqueAjustes}──────────────────────────────────
+VALOR A CONSIGNAR:      ${formatCOP(monto)}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+${comprobantes.length > 0 ? 'El pago ya fue realizado; puede ver el/los comprobante(s) en los enlaces de arriba.' : 'En los próximos días le confirmaremos el pago correspondiente.'}
+
+Gracias por confiar su vehículo a Car Help.
+
+Equipo Car Help — Pereira, Colombia
+📱 WhatsApp: +57 310 743 6082`;
+
+  const asuntoCorreo = `Liquidación ${v.nombre} — Período ${fmtFecha(registro.periodo_inicio)} al ${fmtFecha(registro.periodo_fin)}`;
+  const correoDestino = registro.correo_destino;
+  if (correoDestino) await enviarCorreoDirecto(correoDestino, asuntoCorreo, cuerpo);
+  await enviarCorreoDirecto('rdacarhelp@gmail.com', asuntoCorreo, cuerpo);
+
+  mostrarToast('📧 Correo reenviado con la información más reciente (incluyendo comprobantes)');
 }
 
 function recalcularMontoAliadoSeleccion() {
@@ -6998,6 +7053,9 @@ async function reenviarUltimoCorreoLiquidacion() {
   const bloqueFacturas = (gastosListaPropietario && gastosListaPropietario.length > 0)
     ? '\nGastos descontados en este período:\n' + gastosListaPropietario.map(g => `  • ${g.descripcion || g.tipo}: ${formatCOP(g.valor)}${g.factura_url ? ` — Ver factura: ${g.factura_url}` : ''}`).join('\n') + '\n'
     : '';
+  const bloqueComprobantes = (registro.comprobantes_pago || []).length > 0
+    ? '\nComprobante(s) de pago:\n' + registro.comprobantes_pago.map(c => `  • ${fmtFecha(c.fecha)}${c.valor ? ` — ${formatCOP(c.valor)}` : ''} — Ver comprobante: ${c.url}`).join('\n') + '\n'
+    : '';
 
   const cuerpo = `Hola ${nombreDest},
 
@@ -7006,11 +7064,11 @@ Le reenviamos la liquidación de su vehículo ${v.nombre}${v.placa ? ' (' + v.pl
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 PERÍODO: ${periodoLabel}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-${v.procedencia === 'propietario' ? `Valor correspondiente (antes de descuentos): ${formatCOP(brutoPropietario)}\nGastos/mantenimientos descontados:           ${formatCOP(gastosPropietario)}\n` : `Días de uso en el período:  ${dias}\n`}${bloqueFacturas}${bloqueAjustes}──────────────────────────────────
+${v.procedencia === 'propietario' ? `Valor correspondiente (antes de descuentos): ${formatCOP(brutoPropietario)}\nGastos/mantenimientos descontados:           ${formatCOP(gastosPropietario)}\n` : `Días de uso en el período:  ${dias}\n`}${bloqueFacturas}${bloqueAjustes}${bloqueComprobantes}──────────────────────────────────
 VALOR A CONSIGNAR:      ${formatCOP(montoFinal)}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-En los próximos días le confirmaremos el pago correspondiente.
+${(registro.comprobantes_pago || []).length > 0 ? 'El pago ya fue realizado; puede ver el/los comprobante(s) en los enlaces de arriba.' : 'En los próximos días le confirmaremos el pago correspondiente.'}
 
 Gracias por confiar su vehículo a Car Help.
 
@@ -7112,6 +7170,9 @@ async function guardarDetalleLiquidacion() {
     const bloqueRentas = esAliadoPorRentas && pendientesDetalle && pendientesDetalle.length > 0
       ? '\nRentas incluidas en esta liquidación:\n' + pendientesDetalle.map(p => `  • ${p.num_reserva}: ${fmtFecha(p.fecha_inicio)} al ${fmtFecha(p.fecha_fin)} (${p.dias} día(s))`).join('\n') + '\n'
       : '';
+    const bloqueComprobantes = liqComprobantesTrabajo.length > 0
+      ? '\nComprobante(s) de pago:\n' + liqComprobantesTrabajo.map(c => `  • ${fmtFecha(c.fecha)}${c.valor ? ` — ${formatCOP(c.valor)}` : ''} — Ver comprobante: ${c.url}`).join('\n') + '\n'
+      : '';
     const cuerpo = `Hola ${nombreDest},
 
 ${esCorreccion ? 'Le enviamos la liquidación corregida' : 'Aquí está el resumen de la liquidación'} de su vehículo ${v.nombre}${v.placa ? ' (' + v.placa + ')' : ''} con Car Help:
@@ -7119,11 +7180,11 @@ ${esCorreccion ? 'Le enviamos la liquidación corregida' : 'Aquí está el resum
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 PERÍODO: ${periodoLabel}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-${v.procedencia === 'propietario' ? `Valor correspondiente (antes de descuentos): ${formatCOP(brutoPropietario)}\nGastos/mantenimientos descontados:           ${formatCOP(gastosPropietario)}\n` : `Días de uso total:  ${dias}\n`}${bloqueRentas}${bloqueFacturas}${bloqueAjustes}──────────────────────────────────
+${v.procedencia === 'propietario' ? `Valor correspondiente (antes de descuentos): ${formatCOP(brutoPropietario)}\nGastos/mantenimientos descontados:           ${formatCOP(gastosPropietario)}\n` : `Días de uso total:  ${dias}\n`}${bloqueRentas}${bloqueFacturas}${bloqueAjustes}${bloqueComprobantes}──────────────────────────────────
 VALOR ${esCorreccion ? 'CORREGIDO' : ''} A CONSIGNAR:      ${formatCOP(montoFinal)}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-En los próximos días le confirmaremos el pago correspondiente.
+${liqComprobantesTrabajo.length > 0 ? 'El pago ya fue realizado; puede ver el/los comprobante(s) en los enlaces de arriba.' : 'En los próximos días le confirmaremos el pago correspondiente.'}
 
 Gracias por confiar su vehículo a Car Help.
 
