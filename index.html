@@ -1908,7 +1908,7 @@
             <option>Van / Microbús</option><option>Blindado</option><option>Pickup</option><option>Otro</option>
           </select>
         </div>
-        <div class="campo"><label>Placa</label><input type="text" id="v_placa" placeholder="ABC-123"></div>
+        <div class="campo"><label>Placa <span class="req">*</span></label><input type="text" id="v_placa" placeholder="ABC-123"></div>
         <div class="campo"><label>Año</label><input type="number" id="v_anio" placeholder="2022" min="1990" max="2030"></div>
       </div>
       <div class="fila-2">
@@ -3638,13 +3638,15 @@ function editarVehiculo(id) {
 async function guardarVehiculo() {
   const nombre = document.getElementById('v_nombre').value.trim();
   if (!nombre) { mostrarToast('⚠️ El nombre del vehículo es obligatorio', '#C9A84C'); return; }
+  const placaValor = document.getElementById('v_placa').value.trim();
+  if (!placaValor) { mostrarToast('⚠️ La placa es obligatoria para guardar el vehículo', '#E05252'); return; }
   const id = document.getElementById('v_id').value;
   const fotosLimpias = vFotosActuales.filter(f => f);
   const datosLocal = {
     id: id || null,
     nombre,
     categoria: document.getElementById('v_categoria').value,
-    placa: document.getElementById('v_placa').value.trim(),
+    placa: placaValor,
     anio: document.getElementById('v_anio').value.trim(),
     color: document.getElementById('v_color').value.trim(),
     combustible_tipo: document.getElementById('v_combustible').value,
