@@ -1378,6 +1378,14 @@
               <div class="campo"><label>Hora entrega</label><input type="time" id="cot-hora-inicio" value="12:00"></div>
               <div class="campo"><label>Hora devolución</label><input type="time" id="cot-hora-fin" value="12:00"></div>
             </div>
+            <div class="campo">
+              <label>¿Cómo cobrar si hay horas de más sobre el último período de 24h?</label>
+              <select id="cot-cobro-horas-extra">
+                <option value="dia_completo">Cobrar el día completo adicional</option>
+                <option value="por_hora">Cobrar solo las horas de más (según tarifa por hora de cada vehículo)</option>
+                <option value="cortesia">No cobrar las horas de más (cortesía)</option>
+              </select>
+            </div>
             <div class="campo"><label>Lugar de entrega</label><input type="text" id="cot-lugar-entrega" placeholder="Ej: Aeropuerto, hotel, dirección"></div>
           </div>
 
@@ -7460,8 +7468,18 @@ async function generarCotizacion(silencioso = false) {
     const horaInicio = cotValor('cot-hora-inicio');
     const horaFin = cotValor('cot-hora-fin');
     const lugar = cotValor('cot-lugar-entrega');
-    const dias = cotDias(fechaInicio, fechaFin);
+    const modoCobroHoras = cotValor('cot-cobro-horas-extra') || 'dia_completo';
+    const calcPeriodo = (fechaInicio && fechaFin)
+      ? calcularPeriodosFacturables(`${fechaInicio}T${horaInicio || '00:00'}`, `${fechaFin}T${horaFin || '00:00'}`)
+      : { periodos24h: 0, horasExtra: 0, periodosFacturables: 0, cobroExtra: false };
     subtitulo = 'Renta de vehículo' + (cotVehiculosFilas.length > 1 ? 's' : '');
+
+    let notaHorasExtra = '';
+    if (calcPeriodo.cobroExtra) {
+      if (modoCobroHoras === 'por_hora') notaHorasExtra = `Incluye ${calcPeriodo.horasExtra}h adicionales sobre el último período, cobradas por hora según la tarifa de cada vehículo.`;
+      else if (modoCobroHoras === 'cortesia') notaHorasExtra = `Incluye ${calcPeriodo.horasExtra}h adicionales de cortesía, sin cobro extra.`;
+      else notaHorasExtra = `Incluye ${calcPeriodo.horasExtra}h adicionales sobre el último período de 24h, por lo cual se factura un período completo adicional.`;
+    }
 
     // Determinar la foto a usar: la que se subió manualmente, o si no, la ya guardada del primer vehículo
     const primerVehId = cotVehiculosFilas[0]?.vehiculoId;
@@ -7488,23 +7506,45 @@ async function generarCotizacion(silencioso = false) {
     }
     cotFotoVehiculoUrlActual = fotoVehiculoUrl;
 
-    // Una fila de tabla por cada vehículo, sumando el total general
+    // Una fila de tabla por cada vehículo, respetando el modo de cobro de horas extra elegido
     let filasVehiculosHtml = '';
     let filasVehiculosTxt = [];
+    let diasParaMostrar = calcPeriodo.periodosFacturables;
     cotVehiculosFilas.forEach((f, i) => {
       const veh = vehiculos.find(v => v.id === f.vehiculoId);
       const vehNombre = veh ? `${veh.nombre}${veh.placa ? ' — ' + veh.placa : ''}` : 'Vehículo a confirmar';
-      const subtotal = (f.tarifa || 0) * dias;
+      const tarifa = f.tarifa || 0;
+
+      let dias = calcPeriodo.periodosFacturables;
+      let subtotal = tarifa * dias;
+      let lineaExtra = '';
+      if (calcPeriodo.cobroExtra && modoCobroHoras !== 'dia_completo') {
+        dias = calcPeriodo.periodos24h; // no se cobra el período extra completo
+        subtotal = tarifa * dias;
+        if (modoCobroHoras === 'por_hora') {
+          const valorHora = veh?.valorHoraAdicional || 0;
+          const horasRedondeadas = Math.ceil(calcPeriodo.horasExtra);
+          const valorExtra = horasRedondeadas * valorHora;
+          subtotal += valorExtra;
+          lineaExtra = `<tr><td>+${calcPeriodo.horasExtra}h adicionales (por hora)</td><td>${formatCOP(valorExtra)}</td></tr>`;
+        } else {
+          lineaExtra = `<tr><td>+${calcPeriodo.horasExtra}h adicionales</td><td>Cortesía, sin cobro</td></tr>`;
+        }
+        diasParaMostrar = dias;
+      }
+
       const totalFila = subtotal + (f.deposito || 0);
       total += totalFila;
       filasVehiculosHtml += `
         <tr><td colspan="2" style="padding-top:${i > 0 ? '10px' : '0'};font-weight:600">${vehNombre}</td></tr>
-        <tr><td>Tarifa por 24h</td><td>${formatCOP(f.tarifa || 0)}</td></tr>
-        <tr><td>Subtotal (${dias} día${dias !== 1 ? 's' : ''})</td><td>${formatCOP(subtotal)}</td></tr>
+        <tr><td>Tarifa por 24h</td><td>${formatCOP(tarifa)}</td></tr>
+        <tr><td>Subtotal (${dias} día${dias !== 1 ? 's' : ''})</td><td>${formatCOP(tarifa * dias)}</td></tr>
+        ${lineaExtra}
         <tr><td>Depósito / garantía</td><td>${formatCOP(f.deposito || 0)}</td></tr>`;
-      filasVehiculosTxt.push(`${vehNombre}: ${formatCOP(f.tarifa || 0)}/día × ${dias} día(s) + depósito ${formatCOP(f.deposito || 0)} = ${formatCOP(totalFila)}`);
+      filasVehiculosTxt.push(`${vehNombre}: ${formatCOP(tarifa)}/día × ${dias} día(s)${lineaExtra ? ' + horas adicionales' : ''} + depósito ${formatCOP(f.deposito || 0)} = ${formatCOP(totalFila)}`);
     });
-    cotVehiculosResumenTxt = filasVehiculosTxt.join('\n');
+    const dias = diasParaMostrar;
+    cotVehiculosResumenTxt = filasVehiculosTxt.join('\n') + (notaHorasExtra ? '\n\n' + notaHorasExtra : '');
 
     detalle = `
       <h3>Vehículo${cotVehiculosFilas.length > 1 ? 's' : ''}</h3>
@@ -7515,6 +7555,7 @@ async function generarCotizacion(silencioso = false) {
         <tr><td>Devolución</td><td>${fechaFin ? new Date(fechaFin + 'T12:00').toLocaleDateString('es-CO') : '—'} a las ${horaFin}</td></tr>
         <tr><td>Lugar de entrega</td><td>${lugar || '—'}</td></tr>
         <tr><td>Número de días</td><td>${dias} día${dias !== 1 ? 's' : ''}</td></tr>
+        ${notaHorasExtra ? `<tr><td colspan="2" style="font-size:12px;color:#888">${notaHorasExtra}</td></tr>` : ''}
       </table>
       <h3>Valores</h3>
       <table>
@@ -7704,6 +7745,8 @@ function limpiarCotizacion() {
     if (el) el.value = '';
   });
   document.getElementById('cot-preview-body').innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--blanco-suave)"><div style="font-size:2rem;margin-bottom:12px">📄</div><div style="font-size:0.85rem">Completa el formulario y haz clic en<br><strong>"Generar cotización"</strong></div></div>';
+  const cobroHorasEl = document.getElementById('cot-cobro-horas-extra');
+  if (cobroHorasEl) cobroHorasEl.value = 'dia_completo';
   document.getElementById('cot-btn-enviar').disabled = true;
   document.getElementById('cot-btn-copiar').disabled = true;
   cotTextoActual = '';
