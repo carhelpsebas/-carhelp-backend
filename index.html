@@ -1360,9 +1360,15 @@
           <div id="cot-campos-renta">
             <div class="seccion-label">Detalles del servicio</div>
             <div class="campo"><label>Vehículo</label>
-              <select id="cot-vehiculo">
+              <select id="cot-vehiculo" onchange="cotVehiculoSeleccionado()">
                 <option value="">Seleccionar vehículo...</option>
               </select>
+            </div>
+            <div class="campo">
+              <label>Foto del vehículo para la cotización (opcional)</label>
+              <input type="file" id="cot-foto-vehiculo-file" accept="image/*" onchange="cotPreviewFotoVehiculo(event)">
+              <img id="cot-foto-vehiculo-preview" style="display:none;max-width:100%;max-height:160px;border-radius:8px;margin-top:8px;border:1px solid var(--borde)">
+              <div style="font-size:0.7rem;color:var(--blanco-suave);margin-top:4px">Si no subes una, se usa automáticamente la foto guardada del vehículo (si tiene).</div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
               <div class="campo"><label>Fecha de entrega</label><input type="date" id="cot-fecha-inicio"></div>
@@ -7318,7 +7324,37 @@ function cotDias(inicio, fin) {
   return diff > 0 ? diff : 0;
 }
 
-function generarCotizacion(silencioso = false) {
+let cotFotoVehiculoArchivo = null;
+let cotFotoVehiculoUrlActual = null;
+
+function cotPreviewFotoVehiculo(event) {
+  const file = event.target.files[0];
+  if (!file) { cotFotoVehiculoArchivo = null; return; }
+  cotFotoVehiculoArchivo = file;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = document.getElementById('cot-foto-vehiculo-preview');
+    img.src = e.target.result;
+    img.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+// Al elegir un vehículo, si no se ha subido una foto manual, muestra la foto ya guardada del vehículo como referencia
+function cotVehiculoSeleccionado() {
+  if (cotFotoVehiculoArchivo) return; // ya hay una foto manual elegida, no la reemplaces
+  const id = document.getElementById('cot-vehiculo').value;
+  const veh = vehiculos.find(v => v.id === id);
+  const img = document.getElementById('cot-foto-vehiculo-preview');
+  if (veh && veh.fotos && veh.fotos.length > 0) {
+    img.src = veh.fotos[0];
+    img.style.display = 'block';
+  } else {
+    img.style.display = 'none';
+  }
+}
+
+async function generarCotizacion(silencioso = false) {
   const nombre = cotValor('cot-nombre') || 'Cliente';
   const email = cotValor('cot-email');
   const telefono = cotValor('cot-telefono');
@@ -7332,6 +7368,7 @@ function generarCotizacion(silencioso = false) {
 
   if (cotTipo === 'renta') {
     const vehSel = document.getElementById('cot-vehiculo');
+    const vehId = vehSel?.value;
     const vehNombre = vehSel?.options[vehSel?.selectedIndex]?.text || 'Vehículo a confirmar';
     const fechaInicio = cotValor('cot-fecha-inicio');
     const fechaFin = cotValor('cot-fecha-fin');
@@ -7345,8 +7382,33 @@ function generarCotizacion(silencioso = false) {
     total = subtotal + deposito;
     subtitulo = 'Renta de vehículo';
 
+    // Determinar la foto a usar: la que se subió manualmente, o si no, la ya guardada del vehículo
+    let fotoVehiculoUrl = null;
+    if (cotFotoVehiculoArchivo) {
+      try {
+        const ext = cotFotoVehiculoArchivo.name.split('.').pop() || 'jpg';
+        const path = `cotizaciones/${vehId || 'general'}-${Date.now()}.${ext}`;
+        const res = await fetch(`${SB_URL}/storage/v1/object/entregas-fotos/${path}`, {
+          method: 'POST',
+          headers: {
+            'apikey': SB_KEY,
+            'Authorization': `Bearer ${SB_KEY}`,
+            'Content-Type': cotFotoVehiculoArchivo.type || 'image/jpeg',
+            'x-upsert': 'true'
+          },
+          body: cotFotoVehiculoArchivo
+        });
+        if (res.ok) fotoVehiculoUrl = `${SB_URL}/storage/v1/object/public/entregas-fotos/${path}`;
+      } catch(e) { console.warn('Error subiendo la foto del vehículo:', e.message); }
+    } else {
+      const veh = vehiculos.find(v => v.id === vehId);
+      if (veh && veh.fotos && veh.fotos.length > 0) fotoVehiculoUrl = veh.fotos[0];
+    }
+    cotFotoVehiculoUrlActual = fotoVehiculoUrl;
+
     detalle = `
       <h3>Vehículo</h3>
+      ${fotoVehiculoUrl ? `<img src="${fotoVehiculoUrl}" style="width:100%;max-height:220px;object-fit:cover;border-radius:8px;margin-bottom:10px">` : ''}
       <table><tr><td>Vehículo</td><td>${vehNombre}</td></tr></table>
       <h3>Fechas y lugar</h3>
       <table>
@@ -7456,7 +7518,7 @@ function generarCotizacion(silencioso = false) {
   document.getElementById('cot-btn-copiar').disabled = false;
 
   // Generar texto plano para el correo
-  cotTextoActual = `COTIZACIÓN CAR HELP - ${subtitulo.toUpperCase()}\n${numCot} · ${fechaHoy}\n\nCliente: ${nombre}${email ? '\nCorreo: ' + email : ''}${telefono ? '\nTeléfono: ' + telefono : ''}\n\nTOTAL ESTIMADO: ${formatCOP(total)}\n\n${notas ? 'Notas: ' + notas + '\n\n' : ''}Esta cotización tiene validez de 5 días hábiles.\n\nCar Help S.A.S · 310 743 6082 · reservascarhelp@gmail.com`;
+  cotTextoActual = `COTIZACIÓN CAR HELP - ${subtitulo.toUpperCase()}\n${numCot} · ${fechaHoy}\n\nCliente: ${nombre}${email ? '\nCorreo: ' + email : ''}${telefono ? '\nTeléfono: ' + telefono : ''}\n\nTOTAL ESTIMADO: ${formatCOP(total)}\n\n${notas ? 'Notas: ' + notas + '\n\n' : ''}${cotFotoVehiculoUrlActual ? 'Foto del vehículo: ' + cotFotoVehiculoUrlActual + '\n\n' : ''}Esta cotización tiene validez de 5 días hábiles.\n\nCar Help S.A.S · 310 743 6082 · reservascarhelp@gmail.com`;
 
   if (!silencioso) {
     // Guardar en historial
@@ -7537,6 +7599,12 @@ function limpiarCotizacion() {
   document.getElementById('cot-btn-enviar').disabled = true;
   document.getElementById('cot-btn-copiar').disabled = true;
   cotTextoActual = '';
+  cotFotoVehiculoArchivo = null;
+  cotFotoVehiculoUrlActual = null;
+  const fotoFileEl = document.getElementById('cot-foto-vehiculo-file');
+  if (fotoFileEl) fotoFileEl.value = '';
+  const fotoPreviewEl = document.getElementById('cot-foto-vehiculo-preview');
+  if (fotoPreviewEl) fotoPreviewEl.style.display = 'none';
 }
 
 function buscarClienteAutocomplete(q, prefijo = 'r') {
