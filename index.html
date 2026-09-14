@@ -7510,6 +7510,9 @@ async function generarCotizacion(silencioso = false) {
           });
           if (res.ok) fotoUrl = `${SB_URL}/storage/v1/object/public/entregas-fotos/${path}`;
         } catch(e) { console.warn('Error subiendo la foto del vehículo:', e.message); }
+      } else if (f.fotoPreviewUrl) {
+        // Ya tenía una foto asignada (de una edición anterior o de la foto guardada del vehículo)
+        fotoUrl = f.fotoPreviewUrl;
       } else if (veh && veh.fotos && veh.fotos.length > 0) {
         fotoUrl = veh.fotos[0];
       }
