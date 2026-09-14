@@ -7336,6 +7336,7 @@ function cotDias(inicio, fin) {
 
 let cotVehiculosResumenTxt = '';
 let cotSegResumenTxt = '';
+let cotEditandoId = null;
 
 /* ── Renta: lista dinámica de vehículos solicitados, cada uno con su propia foto ── */
 let cotVehiculosFilas = [{ vehiculoId: '', tarifa: 0, deposito: 0, fotoArchivo: null, fotoPreviewUrl: null }];
@@ -7447,6 +7448,7 @@ async function generarCotizacion(silencioso = false) {
   let detalle = '';
   let total = 0;
   let subtitulo = '';
+  let snapshotDatos = {};
 
   if (cotTipo === 'renta') {
     const fechaInicio = cotValor('cot-fecha-inicio');
@@ -7459,6 +7461,7 @@ async function generarCotizacion(silencioso = false) {
       ? calcularPeriodosFacturables(`${fechaInicio}T${horaInicio || '00:00'}`, `${fechaFin}T${horaFin || '00:00'}`)
       : { periodos24h: 0, horasExtra: 0, periodosFacturables: 0, cobroExtra: false };
     subtitulo = 'Renta de vehículo' + (cotVehiculosFilas.length > 1 ? 's' : '');
+    snapshotDatos = { ...snapshotDatos, tipo: 'renta', fechaInicio, fechaFin, horaInicio, horaFin, lugar, modoCobroHoras };
 
     let notaHorasExtra = '';
     if (calcPeriodo.cobroExtra) {
@@ -7472,6 +7475,7 @@ async function generarCotizacion(silencioso = false) {
     let filasVehiculosTxt = [];
     let diasParaMostrar = calcPeriodo.periodosFacturables;
     let primeraFotoUrl = null;
+    let vehiculosSnapshot = [];
 
     for (let i = 0; i < cotVehiculosFilas.length; i++) {
       const f = cotVehiculosFilas[i];
@@ -7501,6 +7505,7 @@ async function generarCotizacion(silencioso = false) {
         fotoUrl = veh.fotos[0];
       }
       if (!primeraFotoUrl) primeraFotoUrl = fotoUrl;
+      vehiculosSnapshot.push({ vehiculoId: f.vehiculoId, tarifa: f.tarifa || 0, deposito: f.deposito || 0, fotoUrl });
 
       let dias = calcPeriodo.periodosFacturables;
       let subtotal = tarifa * dias;
@@ -7533,6 +7538,7 @@ async function generarCotizacion(silencioso = false) {
     }
     const dias = diasParaMostrar;
     cotFotoVehiculoUrlActual = primeraFotoUrl;
+    snapshotDatos.vehiculosFilas = vehiculosSnapshot;
     cotVehiculosResumenTxt = filasVehiculosTxt.join('\n') + (notaHorasExtra ? '\n\n' + notaHorasExtra : '');
 
     detalle = `
@@ -7562,6 +7568,7 @@ async function generarCotizacion(silencioso = false) {
     const valor = cotParseCOP(cotValor('cot-seg-valor'));
     total = valor;
     subtitulo = 'Seguridad y transporte';
+    snapshotDatos = { ...snapshotDatos, tipo: 'seguridad', tipoSeguridad: tipoSeg?.value, origen, destino, fecha, hora, personas, valor: cotValor('cot-seg-valor'), segVehiculos: [...cotSegVehiculos], segConductores: [...cotSegConductores] };
 
     const vehiculosAsignados = cotSegVehiculos.map(v => v.trim()).filter(Boolean);
     const conductoresAsignados = cotSegConductores.map(c => c.trim()).filter(Boolean);
@@ -7597,6 +7604,7 @@ async function generarCotizacion(silencioso = false) {
     const incluye = cotValor('cot-tour-incluye');
     total = precioPP * personas;
     subtitulo = 'Turismo VIP';
+    snapshotDatos = { ...snapshotDatos, tipo: 'turismo', tourDestino: destSel?.value, desc, fechaIni, fechaFin2, personas: cotValor('cot-tour-personas'), precioPP: cotValor('cot-tour-precio'), incluye };
     const dias = cotDias(fechaIni, fechaFin2);
 
     detalle = `
@@ -7658,12 +7666,24 @@ async function generarCotizacion(silencioso = false) {
   cotTextoActual = `COTIZACIÓN CAR HELP - ${subtitulo.toUpperCase()}\n${numCot} · ${fechaHoy}\n\nCliente: ${nombre}${email ? '\nCorreo: ' + email : ''}${telefono ? '\nTeléfono: ' + telefono : ''}\n\n${bloqueVehiculosTxt}${bloqueSegTxt}TOTAL ESTIMADO: ${formatCOP(total)}\n\n${notas ? 'Notas: ' + notas + '\n\n' : ''}${cotFotoVehiculoUrlActual ? 'Foto del vehículo: ' + cotFotoVehiculoUrlActual + '\n\n' : ''}Esta cotización tiene validez de 5 días hábiles.\n\nCar Help S.A.S · 310 743 6082 · reservascarhelp@gmail.com`;
 
   if (!silencioso) {
-    // Guardar en historial
-    cotizaciones.unshift({ id: numCot, tipo: cotTipo, nombre, total, fecha: new Date().toISOString(), subtitulo });
+    // Guardar en historial (con snapshot completo para poder editarla después)
+    snapshotDatos = { ...snapshotDatos, nombre, email, telefono, notas };
+    const idFinal = cotEditandoId || numCot;
+    const nuevoRegistro = { id: idFinal, tipo: cotTipo, nombre, total, fecha: new Date().toISOString(), subtitulo, datos: snapshotDatos };
+
+    if (cotEditandoId) {
+      const idx = cotizaciones.findIndex(c => c.id === cotEditandoId);
+      if (idx >= 0) cotizaciones[idx] = nuevoRegistro;
+      else cotizaciones.unshift(nuevoRegistro);
+      cotEditandoId = null;
+      mostrarToast('✅ Cotización actualizada: ' + idFinal);
+    } else {
+      cotizaciones.unshift(nuevoRegistro);
+      mostrarToast('✅ Cotización generada: ' + idFinal);
+    }
     cotizaciones = cotizaciones.slice(0, 50);
     localStorage.setItem('carhelp:cotizaciones', JSON.stringify(cotizaciones));
     renderCotizaciones();
-    mostrarToast('✅ Cotización generada: ' + numCot);
   }
 }
 
@@ -7680,8 +7700,76 @@ function renderCotizaciones() {
         <div class="item-titulo">${c.nombre} <span class="num-reserva">${c.id}</span></div>
         <div class="item-detalle"><strong>${c.subtitulo}</strong> · ${new Date(c.fecha).toLocaleDateString('es-CO')} · <strong>${formatCOP(c.total)}</strong></div>
       </div>
-      <span class="estado-pill" style="background:rgba(201,168,76,0.15);color:var(--dorado)">${c.tipo}</span>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span class="estado-pill" style="background:rgba(201,168,76,0.15);color:var(--dorado)">${c.tipo}</span>
+        ${c.datos ? `<button class="btn-secundario" style="font-size:0.7rem;padding:5px 10px" onclick="editarCotizacion('${c.id}')">✏️ Editar</button>` : ''}
+        <button class="btn-peligro" style="font-size:0.7rem;padding:5px 10px" onclick="eliminarCotizacion('${c.id}')">🗑️ Eliminar</button>
+      </div>
     </div>`).join('');
+}
+
+function eliminarCotizacion(id) {
+  cotizaciones = cotizaciones.filter(c => c.id !== id);
+  localStorage.setItem('carhelp:cotizaciones', JSON.stringify(cotizaciones));
+  renderCotizaciones();
+  mostrarToast('🗑️ Cotización eliminada');
+}
+
+function cotIrATab(tipo) {
+  const orden = ['renta', 'seguridad', 'turismo'];
+  const btns = document.querySelectorAll('.cot-tab');
+  const idx = orden.indexOf(tipo);
+  cambiarTipoCotizacion(tipo, btns[idx] || null);
+}
+
+function editarCotizacion(id) {
+  const c = cotizaciones.find(x => x.id === id);
+  if (!c || !c.datos) { mostrarToast('⚠️ Esta cotización no tiene datos guardados para editar (es de antes de esta función)', '#E05252'); return; }
+  const d = c.datos;
+
+  cotIrATab(d.tipo);
+  cotEditandoId = c.id;
+
+  document.getElementById('cot-nombre').value = d.nombre || '';
+  document.getElementById('cot-email').value = d.email || '';
+  document.getElementById('cot-telefono').value = d.telefono || '';
+  document.getElementById('cot-notas').value = d.notas || '';
+
+  if (d.tipo === 'renta') {
+    document.getElementById('cot-fecha-inicio').value = d.fechaInicio || '';
+    document.getElementById('cot-fecha-fin').value = d.fechaFin || '';
+    document.getElementById('cot-hora-inicio').value = d.horaInicio || '12:00';
+    document.getElementById('cot-hora-fin').value = d.horaFin || '12:00';
+    document.getElementById('cot-lugar-entrega').value = d.lugar || '';
+    document.getElementById('cot-cobro-horas-extra').value = d.modoCobroHoras || 'dia_completo';
+    cotVehiculosFilas = (d.vehiculosFilas && d.vehiculosFilas.length > 0)
+      ? d.vehiculosFilas.map(f => ({ vehiculoId: f.vehiculoId, tarifa: f.tarifa, deposito: f.deposito, fotoArchivo: null, fotoPreviewUrl: f.fotoUrl || null }))
+      : [{ vehiculoId: '', tarifa: 0, deposito: 0, fotoArchivo: null, fotoPreviewUrl: null }];
+    renderCotVehiculosFilas();
+  } else if (d.tipo === 'seguridad') {
+    document.getElementById('cot-tipo-seguridad').value = d.tipoSeguridad || 'escolta';
+    document.getElementById('cot-seg-origen').value = d.origen || '';
+    document.getElementById('cot-seg-destino').value = d.destino || '';
+    document.getElementById('cot-seg-fecha').value = d.fecha || '';
+    document.getElementById('cot-seg-hora').value = d.hora || '08:00';
+    document.getElementById('cot-seg-personas').value = d.personas || '1';
+    document.getElementById('cot-seg-valor').value = d.valor || '';
+    cotSegVehiculos = (d.segVehiculos && d.segVehiculos.length > 0) ? [...d.segVehiculos] : [''];
+    cotSegConductores = (d.segConductores && d.segConductores.length > 0) ? [...d.segConductores] : [''];
+    renderCotSegVehiculos();
+    renderCotSegConductores();
+  } else if (d.tipo === 'turismo') {
+    document.getElementById('cot-tour-destino').value = d.tourDestino || '';
+    document.getElementById('cot-tour-desc').value = d.desc || '';
+    document.getElementById('cot-tour-inicio').value = d.fechaIni || '';
+    document.getElementById('cot-tour-fin').value = d.fechaFin2 || '';
+    document.getElementById('cot-tour-personas').value = d.personas || '1';
+    document.getElementById('cot-tour-precio').value = d.precioPP || '';
+    document.getElementById('cot-tour-incluye').value = d.incluye || '';
+  }
+
+  mostrarToast('✏️ Cotización cargada — ajusta lo que necesites y presiona "Generar cotización" para guardar los cambios');
+  document.getElementById('cot-form-titulo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 async function enviarCotizacionPorCorreo() {
@@ -7724,6 +7812,7 @@ function copiarCotizacion() {
 }
 
 function limpiarCotizacion() {
+  cotEditandoId = null;
   ['cot-nombre','cot-email','cot-telefono','cot-notas',
    'cot-fecha-inicio','cot-fecha-fin','cot-hora-inicio','cot-hora-fin',
    'cot-lugar-entrega','cot-tarifa','cot-deposito',
