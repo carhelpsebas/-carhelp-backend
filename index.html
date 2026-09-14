@@ -7678,7 +7678,7 @@ async function generarCotizacion(silencioso = false) {
   // Generar texto plano para el correo
   const bloqueVehiculosTxt = (cotTipo === 'renta' && cotVehiculosResumenTxt) ? 'Vehículos:\n' + cotVehiculosResumenTxt + '\n\n' : '';
   const bloqueSegTxt = (cotTipo === 'seguridad' && cotSegResumenTxt) ? cotSegResumenTxt + '\n\n' : '';
-  cotTextoActual = `COTIZACIÓN CAR HELP - ${subtitulo.toUpperCase()}\n${numCot} · ${fechaHoy}\n\nCliente: ${nombre}${email ? '\nCorreo: ' + email : ''}${telefono ? '\nTeléfono: ' + telefono : ''}\n\n${bloqueVehiculosTxt}${bloqueSegTxt}TOTAL ESTIMADO: ${formatCOP(total)}\n\n${notas ? 'Notas: ' + notas + '\n\n' : ''}${cotFotoVehiculoUrlActual ? 'Foto del vehículo: ' + cotFotoVehiculoUrlActual + '\n\n' : ''}Esta cotización tiene validez de 5 días hábiles.\n\nCar Help S.A.S · 310 743 6082 · reservascarhelp@gmail.com`;
+  cotTextoActual = `COTIZACIÓN CAR HELP - ${subtitulo.toUpperCase()}\n${numCot} · ${fechaHoy}\n\nCliente: ${nombre}${email ? '\nCorreo: ' + email : ''}${telefono ? '\nTeléfono: ' + telefono : ''}\n\n${bloqueVehiculosTxt}${bloqueSegTxt}TOTAL ESTIMADO: ${formatCOP(total)}\n\n${notas ? 'Notas: ' + notas + '\n\n' : ''}Esta cotización tiene validez de 5 días hábiles.\n\nCar Help S.A.S · 310 743 6082 · reservascarhelp@gmail.com`;
 
   if (!silencioso) {
     // Guardar en historial (con snapshot completo para poder editarla después)
