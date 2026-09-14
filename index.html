@@ -1358,18 +1358,18 @@
 
           <!-- Campos de renta -->
           <div id="cot-campos-renta">
-            <div class="seccion-label">Detalles del servicio</div>
-            <div class="campo"><label>Vehículo</label>
-              <select id="cot-vehiculo" onchange="cotVehiculoSeleccionado()">
-                <option value="">Seleccionar vehículo...</option>
-              </select>
-            </div>
+            <div class="seccion-label">Vehículos solicitados</div>
+            <div id="cot-vehiculos-lista"></div>
+            <button type="button" class="btn-secundario" onclick="cotAgregarFilaVehiculo()" style="width:100%;margin-bottom:16px">+ Agregar otro vehículo</button>
+
             <div class="campo">
-              <label>Foto del vehículo para la cotización (opcional)</label>
+              <label>Foto para la cotización (opcional)</label>
               <input type="file" id="cot-foto-vehiculo-file" accept="image/*" onchange="cotPreviewFotoVehiculo(event)">
               <img id="cot-foto-vehiculo-preview" style="display:none;max-width:100%;max-height:160px;border-radius:8px;margin-top:8px;border:1px solid var(--borde)">
-              <div style="font-size:0.7rem;color:var(--blanco-suave);margin-top:4px">Si no subes una, se usa automáticamente la foto guardada del vehículo (si tiene).</div>
+              <div style="font-size:0.7rem;color:var(--blanco-suave);margin-top:4px">Si no subes una, se usa automáticamente la foto guardada del primer vehículo (si tiene).</div>
             </div>
+
+            <div class="seccion-label" style="margin-top:14px">Fechas y lugar (aplican a todos los vehículos)</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
               <div class="campo"><label>Fecha de entrega</label><input type="date" id="cot-fecha-inicio"></div>
               <div class="campo"><label>Fecha de devolución</label><input type="date" id="cot-fecha-fin"></div>
@@ -1379,8 +1379,6 @@
               <div class="campo"><label>Hora devolución</label><input type="time" id="cot-hora-fin" value="12:00"></div>
             </div>
             <div class="campo"><label>Lugar de entrega</label><input type="text" id="cot-lugar-entrega" placeholder="Ej: Aeropuerto, hotel, dirección"></div>
-            <div class="campo"><label>Tarifa por 24h (COP)</label><input type="text" id="cot-tarifa" placeholder="Ej: 320000" oninput="calcularCotizacion()"></div>
-            <div class="campo"><label>Depósito / garantía (COP)</label><input type="text" id="cot-deposito" placeholder="Ej: 500000" oninput="calcularCotizacion()"></div>
           </div>
 
           <!-- Campos de seguridad -->
@@ -1401,6 +1399,15 @@
               <div class="campo"><label>Hora</label><input type="time" id="cot-seg-hora" value="08:00"></div>
             </div>
             <div class="campo"><label>Número de personas</label><input type="number" id="cot-seg-personas" value="1" min="1"></div>
+
+            <div class="seccion-label" style="margin-top:14px">Vehículos asignados</div>
+            <div id="cot-seg-vehiculos-lista"></div>
+            <button type="button" class="btn-secundario" onclick="cotAgregarSegVehiculo()" style="width:100%;margin-bottom:14px">+ Agregar vehículo</button>
+
+            <div class="seccion-label">Conductores asignados</div>
+            <div id="cot-seg-conductores-lista"></div>
+            <button type="button" class="btn-secundario" onclick="cotAgregarSegConductor()" style="width:100%;margin-bottom:14px">+ Agregar conductor</button>
+
             <div class="campo"><label>Valor del servicio (COP)</label><input type="text" id="cot-seg-valor" placeholder="Ej: 800000" oninput="calcularCotizacion()"></div>
           </div>
 
@@ -7328,6 +7335,8 @@ function cotDias(inicio, fin) {
 
 let cotFotoVehiculoArchivo = null;
 let cotFotoVehiculoUrlActual = null;
+let cotVehiculosResumenTxt = '';
+let cotSegResumenTxt = '';
 
 function cotPreviewFotoVehiculo(event) {
   const file = event.target.files[0];
@@ -7342,11 +7351,10 @@ function cotPreviewFotoVehiculo(event) {
   reader.readAsDataURL(file);
 }
 
-// Al elegir un vehículo, si no se ha subido una foto manual, muestra la foto ya guardada del vehículo como referencia
-function cotVehiculoSeleccionado() {
+// Al elegir un vehículo en la primera fila, si no se ha subido una foto manual, muestra la foto ya guardada como referencia
+function cotActualizarFotoDesdeVehiculo(vehId) {
   if (cotFotoVehiculoArchivo) return; // ya hay una foto manual elegida, no la reemplaces
-  const id = document.getElementById('cot-vehiculo').value;
-  const veh = vehiculos.find(v => v.id === id);
+  const veh = vehiculos.find(v => v.id === vehId);
   const img = document.getElementById('cot-foto-vehiculo-preview');
   if (veh && veh.fotos && veh.fotos.length > 0) {
     img.src = veh.fotos[0];
@@ -7354,6 +7362,84 @@ function cotVehiculoSeleccionado() {
   } else {
     img.style.display = 'none';
   }
+}
+
+/* ── Renta: lista dinámica de vehículos solicitados ── */
+let cotVehiculosFilas = [{ vehiculoId: '', tarifa: 0, deposito: 0 }];
+
+function renderCotVehiculosFilas() {
+  const cont = document.getElementById('cot-vehiculos-lista');
+  if (!cont) return;
+  cont.innerHTML = cotVehiculosFilas.map((f, i) => `
+    <div style="border:1px solid var(--borde);border-radius:8px;padding:12px;margin-bottom:10px;position:relative">
+      ${cotVehiculosFilas.length > 1 ? `<button type="button" onclick="cotQuitarFilaVehiculo(${i})" style="position:absolute;top:10px;right:10px;background:none;border:none;color:var(--rojo-alerta);cursor:pointer;font-size:1rem;line-height:1">✕</button>` : ''}
+      <div class="campo"><label>Vehículo ${cotVehiculosFilas.length > 1 ? (i + 1) : ''}</label>
+        <select onchange="cotVehiculoFilaCambio(${i}, this.value)">
+          <option value="">Seleccionar vehículo...</option>
+          ${vehiculos.map(v => `<option value="${v.id}" ${f.vehiculoId === v.id ? 'selected' : ''}>${v.nombre}${v.placa ? ' — ' + v.placa : ''}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fila-2">
+        <div class="campo"><label>Tarifa por 24h (COP)</label><input type="number" value="${f.tarifa || ''}" oninput="cotVehiculosFilas[${i}].tarifa = parseFloat(this.value) || 0"></div>
+        <div class="campo"><label>Depósito (COP)</label><input type="number" value="${f.deposito || ''}" oninput="cotVehiculosFilas[${i}].deposito = parseFloat(this.value) || 0"></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function cotAgregarFilaVehiculo() {
+  cotVehiculosFilas.push({ vehiculoId: '', tarifa: 0, deposito: 0 });
+  renderCotVehiculosFilas();
+}
+
+function cotQuitarFilaVehiculo(idx) {
+  if (cotVehiculosFilas.length <= 1) { mostrarToast('Debe quedar al menos un vehículo', '#C9A84C'); return; }
+  cotVehiculosFilas.splice(idx, 1);
+  renderCotVehiculosFilas();
+}
+
+function cotVehiculoFilaCambio(idx, vehId) {
+  cotVehiculosFilas[idx].vehiculoId = vehId;
+  const veh = vehiculos.find(v => v.id === vehId);
+  if (veh) cotVehiculosFilas[idx].tarifa = veh.tarifa || 0;
+  if (idx === 0) cotActualizarFotoDesdeVehiculo(vehId);
+  renderCotVehiculosFilas();
+}
+
+/* ── Seguridad: listas dinámicas de vehículos y conductores ── */
+let cotSegVehiculos = [''];
+let cotSegConductores = [''];
+
+function renderCotSegVehiculos() {
+  const cont = document.getElementById('cot-seg-vehiculos-lista');
+  if (!cont) return;
+  cont.innerHTML = cotSegVehiculos.map((val, i) => `
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <input type="text" value="${val.replace(/"/g,'&quot;')}" placeholder="Ej. Toyota Prado Blindada — ABC123" oninput="cotSegVehiculos[${i}] = this.value" style="flex:1">
+      ${cotSegVehiculos.length > 1 ? `<button type="button" class="btn-peligro" onclick="cotQuitarSegVehiculo(${i})">✕</button>` : ''}
+    </div>
+  `).join('');
+}
+function cotAgregarSegVehiculo() { cotSegVehiculos.push(''); renderCotSegVehiculos(); }
+function cotQuitarSegVehiculo(idx) {
+  if (cotSegVehiculos.length <= 1) { mostrarToast('Debe quedar al menos un campo', '#C9A84C'); return; }
+  cotSegVehiculos.splice(idx, 1); renderCotSegVehiculos();
+}
+
+function renderCotSegConductores() {
+  const cont = document.getElementById('cot-seg-conductores-lista');
+  if (!cont) return;
+  cont.innerHTML = cotSegConductores.map((val, i) => `
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <input type="text" value="${val.replace(/"/g,'&quot;')}" placeholder="Nombre del conductor" oninput="cotSegConductores[${i}] = this.value" style="flex:1">
+      ${cotSegConductores.length > 1 ? `<button type="button" class="btn-peligro" onclick="cotQuitarSegConductor(${i})">✕</button>` : ''}
+    </div>
+  `).join('');
+}
+function cotAgregarSegConductor() { cotSegConductores.push(''); renderCotSegConductores(); }
+function cotQuitarSegConductor(idx) {
+  if (cotSegConductores.length <= 1) { mostrarToast('Debe quedar al menos un campo', '#C9A84C'); return; }
+  cotSegConductores.splice(idx, 1); renderCotSegConductores();
 }
 
 async function generarCotizacion(silencioso = false) {
@@ -7369,27 +7455,21 @@ async function generarCotizacion(silencioso = false) {
   let subtitulo = '';
 
   if (cotTipo === 'renta') {
-    const vehSel = document.getElementById('cot-vehiculo');
-    const vehId = vehSel?.value;
-    const vehNombre = vehSel?.options[vehSel?.selectedIndex]?.text || 'Vehículo a confirmar';
     const fechaInicio = cotValor('cot-fecha-inicio');
     const fechaFin = cotValor('cot-fecha-fin');
     const horaInicio = cotValor('cot-hora-inicio');
     const horaFin = cotValor('cot-hora-fin');
     const lugar = cotValor('cot-lugar-entrega');
-    const tarifa = cotParseCOP(cotValor('cot-tarifa'));
-    const deposito = cotParseCOP(cotValor('cot-deposito'));
     const dias = cotDias(fechaInicio, fechaFin);
-    const subtotal = tarifa * dias;
-    total = subtotal + deposito;
-    subtitulo = 'Renta de vehículo';
+    subtitulo = 'Renta de vehículo' + (cotVehiculosFilas.length > 1 ? 's' : '');
 
-    // Determinar la foto a usar: la que se subió manualmente, o si no, la ya guardada del vehículo
+    // Determinar la foto a usar: la que se subió manualmente, o si no, la ya guardada del primer vehículo
+    const primerVehId = cotVehiculosFilas[0]?.vehiculoId;
     let fotoVehiculoUrl = null;
     if (cotFotoVehiculoArchivo) {
       try {
         const ext = cotFotoVehiculoArchivo.name.split('.').pop() || 'jpg';
-        const path = `cotizaciones/${vehId || 'general'}-${Date.now()}.${ext}`;
+        const path = `cotizaciones/${primerVehId || 'general'}-${Date.now()}.${ext}`;
         const res = await fetch(`${SB_URL}/storage/v1/object/entregas-fotos/${path}`, {
           method: 'POST',
           headers: {
@@ -7403,15 +7483,32 @@ async function generarCotizacion(silencioso = false) {
         if (res.ok) fotoVehiculoUrl = `${SB_URL}/storage/v1/object/public/entregas-fotos/${path}`;
       } catch(e) { console.warn('Error subiendo la foto del vehículo:', e.message); }
     } else {
-      const veh = vehiculos.find(v => v.id === vehId);
+      const veh = vehiculos.find(v => v.id === primerVehId);
       if (veh && veh.fotos && veh.fotos.length > 0) fotoVehiculoUrl = veh.fotos[0];
     }
     cotFotoVehiculoUrlActual = fotoVehiculoUrl;
 
+    // Una fila de tabla por cada vehículo, sumando el total general
+    let filasVehiculosHtml = '';
+    let filasVehiculosTxt = [];
+    cotVehiculosFilas.forEach((f, i) => {
+      const veh = vehiculos.find(v => v.id === f.vehiculoId);
+      const vehNombre = veh ? `${veh.nombre}${veh.placa ? ' — ' + veh.placa : ''}` : 'Vehículo a confirmar';
+      const subtotal = (f.tarifa || 0) * dias;
+      const totalFila = subtotal + (f.deposito || 0);
+      total += totalFila;
+      filasVehiculosHtml += `
+        <tr><td colspan="2" style="padding-top:${i > 0 ? '10px' : '0'};font-weight:600">${vehNombre}</td></tr>
+        <tr><td>Tarifa por 24h</td><td>${formatCOP(f.tarifa || 0)}</td></tr>
+        <tr><td>Subtotal (${dias} día${dias !== 1 ? 's' : ''})</td><td>${formatCOP(subtotal)}</td></tr>
+        <tr><td>Depósito / garantía</td><td>${formatCOP(f.deposito || 0)}</td></tr>`;
+      filasVehiculosTxt.push(`${vehNombre}: ${formatCOP(f.tarifa || 0)}/día × ${dias} día(s) + depósito ${formatCOP(f.deposito || 0)} = ${formatCOP(totalFila)}`);
+    });
+    cotVehiculosResumenTxt = filasVehiculosTxt.join('\n');
+
     detalle = `
-      <h3>Vehículo</h3>
+      <h3>Vehículo${cotVehiculosFilas.length > 1 ? 's' : ''}</h3>
       ${fotoVehiculoUrl ? `<img src="${fotoVehiculoUrl}" style="width:100%;max-height:220px;object-fit:cover;border-radius:8px;margin-bottom:10px">` : ''}
-      <table><tr><td>Vehículo</td><td>${vehNombre}</td></tr></table>
       <h3>Fechas y lugar</h3>
       <table>
         <tr><td>Entrega</td><td>${fechaInicio ? new Date(fechaInicio + 'T12:00').toLocaleDateString('es-CO') : '—'} a las ${horaInicio}</td></tr>
@@ -7421,9 +7518,7 @@ async function generarCotizacion(silencioso = false) {
       </table>
       <h3>Valores</h3>
       <table>
-        <tr><td>Tarifa por 24h</td><td>${formatCOP(tarifa)}</td></tr>
-        <tr><td>Subtotal (${dias} días)</td><td>${formatCOP(subtotal)}</td></tr>
-        <tr><td>Depósito / garantía</td><td>${formatCOP(deposito)}</td></tr>
+        ${filasVehiculosHtml}
         <tr class="total-row"><td><strong>TOTAL ESTIMADO</strong></td><td><strong>${formatCOP(total)}</strong></td></tr>
       </table>`;
 
@@ -7439,6 +7534,13 @@ async function generarCotizacion(silencioso = false) {
     total = valor;
     subtitulo = 'Seguridad y transporte';
 
+    const vehiculosAsignados = cotSegVehiculos.map(v => v.trim()).filter(Boolean);
+    const conductoresAsignados = cotSegConductores.map(c => c.trim()).filter(Boolean);
+    cotSegResumenTxt = [
+      vehiculosAsignados.length ? 'Vehículos asignados: ' + vehiculosAsignados.join(', ') : '',
+      conductoresAsignados.length ? 'Conductores asignados: ' + conductoresAsignados.join(', ') : ''
+    ].filter(Boolean).join('\n');
+
     detalle = `
       <h3>Servicio</h3>
       <table>
@@ -7447,6 +7549,8 @@ async function generarCotizacion(silencioso = false) {
         <tr><td>Destino</td><td>${destino || '—'}</td></tr>
         <tr><td>Fecha y hora</td><td>${fecha ? new Date(fecha + 'T12:00').toLocaleDateString('es-CO') : '—'} - ${hora}</td></tr>
         <tr><td>Número de personas</td><td>${personas}</td></tr>
+        ${vehiculosAsignados.length ? `<tr><td>Vehículo${vehiculosAsignados.length > 1 ? 's' : ''} asignado${vehiculosAsignados.length > 1 ? 's' : ''}</td><td>${vehiculosAsignados.join('<br>')}</td></tr>` : ''}
+        ${conductoresAsignados.length ? `<tr><td>Conductor${conductoresAsignados.length > 1 ? 'es' : ''} asignado${conductoresAsignados.length > 1 ? 's' : ''}</td><td>${conductoresAsignados.join('<br>')}</td></tr>` : ''}
       </table>
       <h3>Valores</h3>
       <table>
@@ -7520,7 +7624,9 @@ async function generarCotizacion(silencioso = false) {
   document.getElementById('cot-btn-copiar').disabled = false;
 
   // Generar texto plano para el correo
-  cotTextoActual = `COTIZACIÓN CAR HELP - ${subtitulo.toUpperCase()}\n${numCot} · ${fechaHoy}\n\nCliente: ${nombre}${email ? '\nCorreo: ' + email : ''}${telefono ? '\nTeléfono: ' + telefono : ''}\n\nTOTAL ESTIMADO: ${formatCOP(total)}\n\n${notas ? 'Notas: ' + notas + '\n\n' : ''}${cotFotoVehiculoUrlActual ? 'Foto del vehículo: ' + cotFotoVehiculoUrlActual + '\n\n' : ''}Esta cotización tiene validez de 5 días hábiles.\n\nCar Help S.A.S · 310 743 6082 · reservascarhelp@gmail.com`;
+  const bloqueVehiculosTxt = (cotTipo === 'renta' && cotVehiculosResumenTxt) ? 'Vehículos:\n' + cotVehiculosResumenTxt + '\n\n' : '';
+  const bloqueSegTxt = (cotTipo === 'seguridad' && cotSegResumenTxt) ? cotSegResumenTxt + '\n\n' : '';
+  cotTextoActual = `COTIZACIÓN CAR HELP - ${subtitulo.toUpperCase()}\n${numCot} · ${fechaHoy}\n\nCliente: ${nombre}${email ? '\nCorreo: ' + email : ''}${telefono ? '\nTeléfono: ' + telefono : ''}\n\n${bloqueVehiculosTxt}${bloqueSegTxt}TOTAL ESTIMADO: ${formatCOP(total)}\n\n${notas ? 'Notas: ' + notas + '\n\n' : ''}${cotFotoVehiculoUrlActual ? 'Foto del vehículo: ' + cotFotoVehiculoUrlActual + '\n\n' : ''}Esta cotización tiene validez de 5 días hábiles.\n\nCar Help S.A.S · 310 743 6082 · reservascarhelp@gmail.com`;
 
   if (!silencioso) {
     // Guardar en historial
@@ -7607,6 +7713,16 @@ function limpiarCotizacion() {
   if (fotoFileEl) fotoFileEl.value = '';
   const fotoPreviewEl = document.getElementById('cot-foto-vehiculo-preview');
   if (fotoPreviewEl) fotoPreviewEl.style.display = 'none';
+
+  cotVehiculosFilas = [{ vehiculoId: '', tarifa: 0, deposito: 0 }];
+  cotVehiculosResumenTxt = '';
+  renderCotVehiculosFilas();
+
+  cotSegVehiculos = [''];
+  cotSegConductores = [''];
+  cotSegResumenTxt = '';
+  renderCotSegVehiculos();
+  renderCotSegConductores();
 }
 
 function buscarClienteAutocomplete(q, prefijo = 'r') {
@@ -7653,21 +7769,10 @@ function seleccionarClienteAutocomplete(c, prefijo = 'r') {
 }
 
 function poblarVehiculosCotizacion() {
-  const sel = document.getElementById('cot-vehiculo');
   const histSel = document.getElementById('hist-vehiculo-sel');
-  if (sel) {
-    sel.innerHTML = '<option value="">Seleccionar vehículo...</option>';
-    vehiculos.forEach(v => {
-      const op = document.createElement('option');
-      op.value = v.id;
-      op.textContent = v.nombre + (v.placa ? ' · ' + v.placa : '');
-      sel.appendChild(op);
-    });
-    sel.onchange = function() {
-      const veh = vehiculos.find(v => v.id === this.value);
-      if (veh && veh.tarifa) document.getElementById('cot-tarifa').value = veh.tarifa;
-    };
-  }
+  renderCotVehiculosFilas();
+  renderCotSegVehiculos();
+  renderCotSegConductores();
   if (histSel) {
     histSel.innerHTML = '<option value="">Seleccionar vehículo...</option>';
     vehiculos.forEach(v => {
