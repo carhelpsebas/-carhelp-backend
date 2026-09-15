@@ -1920,8 +1920,17 @@
         <div class="campo">
           <label>Categoría</label>
           <select id="v_categoria">
-            <option>SUV</option><option>Camioneta 4x4</option><option>Sedán</option>
-            <option>Van / Microbús</option><option>Blindado</option><option>Pickup</option><option>Otro</option>
+            <option>Eficiente</option>
+            <option>Sedán Ejecutivo</option>
+            <option>SUV Media</option>
+            <option>SUV Premium</option>
+            <option>SUV XL</option>
+            <option>Deportivos & Convertibles</option>
+            <option>Blindados</option>
+            <option>Híbridos & Eléctricos</option>
+            <option>Van / Microbús</option>
+            <option>Pickup</option>
+            <option>Otro</option>
           </select>
         </div>
         <div class="campo"><label>Placa <span class="req">*</span></label><input type="text" id="v_placa" placeholder="ABC-123"></div>
@@ -3620,7 +3629,7 @@ function editarVehiculo(id) {
   document.getElementById('modal-vehiculo-titulo').textContent = 'Editar vehículo';
   document.getElementById('v_id').value = v.id;
   document.getElementById('v_nombre').value = v.nombre;
-  document.getElementById('v_categoria').value = v.categoria || 'SUV';
+  document.getElementById('v_categoria').value = v.categoria || 'Eficiente';
   document.getElementById('v_placa').value = v.placa || '';
   document.getElementById('v_anio').value = v.anio || '';
   document.getElementById('v_color').value = v.color || '';
