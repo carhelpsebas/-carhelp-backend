@@ -2885,6 +2885,38 @@ async function cargarDatos() {
     picoPlacaCiudades = await sbSelect('pico_placa_ciudades', '&order=ciudad.asc');
   } catch(e) { console.warn('Error cargando pico y placa:', e.message); picoPlacaCiudades = []; }
 
+  // Cotizaciones (guardadas en Supabase para que se vean en todos los dispositivos)
+  try {
+    const dataCot = await sbSelect('cotizaciones', '&order=created_at.desc&limit=300');
+    cotizaciones = dataCot.map(c => ({
+      id: c.id, tipo: c.tipo, nombre: c.nombre, total: parseFloat(c.total) || 0,
+      fecha: c.created_at, subtitulo: c.subtitulo, estado: c.estado || 'pendiente', datos: c.datos || null
+    }));
+
+    // Migrar a la nube cualquier cotización que quedó guardada solo en este dispositivo antes de esta actualización
+    const idsEnNube = new Set(cotizaciones.map(c => c.id));
+    const localesViejas = lsGet('carhelp:cotizaciones') || [];
+    const pendientesDeMigrar = localesViejas.filter(c => c && c.id && !idsEnNube.has(c.id));
+    if (pendientesDeMigrar.length > 0) {
+      for (const c of pendientesDeMigrar) {
+        try {
+          await sbInsert('cotizaciones', {
+            id: c.id, tipo: c.tipo, nombre: c.nombre, total: c.total || 0,
+            subtitulo: c.subtitulo, estado: c.estado || 'pendiente', datos: c.datos || {}
+          });
+          cotizaciones.push(c);
+        } catch(eMig) { console.warn('No se pudo migrar la cotización', c.id, eMig.message); }
+      }
+      cotizaciones.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+      mostrarToast(`☁️ Se recuperaron ${pendientesDeMigrar.length} cotización(es) de este dispositivo a la nube`, 'var(--verde-ok)');
+    }
+
+    lsSet('carhelp:cotizaciones', cotizaciones);
+  } catch(e) {
+    console.warn('Error cargando cotizaciones desde Supabase:', e.message);
+    cotizaciones = lsGet('carhelp:cotizaciones') || [];
+  }
+
   // Historial de tramos de vehículo por reserva (para cambios de vehículo)
   try {
     historialVehiculos = await sbSelect('historial_vehiculo_orden', '&order=fecha_inicio.asc');
@@ -7311,7 +7343,7 @@ function mostrarToast(msg, color) {
    MÓDULO DE COTIZACIONES
    ════════════════════════════════════════════ */
 let cotTipo = 'renta';
-let cotizaciones = JSON.parse(localStorage.getItem('carhelp:cotizaciones') || '[]');
+let cotizaciones = [];
 let cotTextoActual = '';
 
 function cambiarTipoCotizacion(tipo, el) {
@@ -7695,9 +7727,26 @@ async function generarCotizacion(silencioso = false) {
     const idFinal = cotEditandoId || numCot;
     const idxExistente = cotizaciones.findIndex(c => c.id === idFinal);
     const estadoPrevio = idxExistente >= 0 ? cotizaciones[idxExistente].estado : 'pendiente';
-    const nuevoRegistro = { id: idFinal, tipo: cotTipo, nombre, total, fecha: new Date().toISOString(), subtitulo, datos: snapshotDatos, estado: estadoPrevio || 'pendiente' };
+    const esActualizacion = !!cotEditandoId;
+    const fechaRegistro = idxExistente >= 0 ? cotizaciones[idxExistente].fecha : new Date().toISOString();
+    const nuevoRegistro = { id: idFinal, tipo: cotTipo, nombre, total, fecha: fechaRegistro, subtitulo, datos: snapshotDatos, estado: estadoPrevio || 'pendiente' };
 
-    if (cotEditandoId) {
+    try {
+      const payloadSB = {
+        id: idFinal, tipo: cotTipo, nombre, total, subtitulo,
+        estado: nuevoRegistro.estado, datos: snapshotDatos
+      };
+      if (esActualizacion) {
+        await sbUpdate('cotizaciones', idFinal, payloadSB);
+      } else {
+        await sbInsert('cotizaciones', payloadSB);
+      }
+    } catch(e) {
+      console.error('Error guardando la cotización en Supabase:', e);
+      mostrarToast('⚠️ La cotización quedó SOLO en este dispositivo — no se guardó en la nube: ' + e.message, 'var(--rojo-alerta)');
+    }
+
+    if (esActualizacion) {
       const idx = cotizaciones.findIndex(c => c.id === cotEditandoId);
       if (idx >= 0) cotizaciones[idx] = nuevoRegistro;
       else cotizaciones.unshift(nuevoRegistro);
@@ -7707,8 +7756,8 @@ async function generarCotizacion(silencioso = false) {
       cotizaciones.unshift(nuevoRegistro);
       mostrarToast('✅ Cotización generada: ' + idFinal);
     }
-    cotizaciones = cotizaciones.slice(0, 50);
-    localStorage.setItem('carhelp:cotizaciones', JSON.stringify(cotizaciones));
+    cotizaciones = cotizaciones.slice(0, 300);
+    lsSet('carhelp:cotizaciones', cotizaciones);
     renderCotizaciones();
   }
 }
@@ -7744,12 +7793,19 @@ function renderCotizaciones() {
   }).join('');
 }
 
-function cambiarEstadoCotizacion(id, estado, silencioso) {
+async function cambiarEstadoCotizacion(id, estado, silencioso) {
   const c = cotizaciones.find(x => x.id === id);
   if (!c) return;
   c.estado = estado;
-  localStorage.setItem('carhelp:cotizaciones', JSON.stringify(cotizaciones));
+  lsSet('carhelp:cotizaciones', cotizaciones);
   renderCotizaciones();
+  try {
+    await sbUpdate('cotizaciones', id, { estado });
+  } catch(e) {
+    console.error('Error actualizando estado en Supabase:', e);
+    mostrarToast('⚠️ El estado no se pudo guardar en la nube: ' + e.message, 'var(--rojo-alerta)');
+    return;
+  }
   if (!silencioso) {
     const labels = { pendiente: 'Pendiente', confirmada: '✅ Confirmada', rechazada: '✖️ Rechazada' };
     mostrarToast('Estado actualizado: ' + (labels[estado] || estado));
@@ -7793,11 +7849,21 @@ function convertirCotizacionEnReserva(id) {
   document.getElementById('panel-nueva-reserva')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function eliminarCotizacion(id) {
+async function eliminarCotizacion(id) {
+  const anterior = cotizaciones;
   cotizaciones = cotizaciones.filter(c => c.id !== id);
-  localStorage.setItem('carhelp:cotizaciones', JSON.stringify(cotizaciones));
+  lsSet('carhelp:cotizaciones', cotizaciones);
   renderCotizaciones();
-  mostrarToast('🗑️ Cotización eliminada');
+  try {
+    await sbDelete('cotizaciones', id);
+    mostrarToast('🗑️ Cotización eliminada');
+  } catch(e) {
+    console.error('Error eliminando cotización en Supabase:', e);
+    cotizaciones = anterior;
+    lsSet('carhelp:cotizaciones', cotizaciones);
+    renderCotizaciones();
+    mostrarToast('⚠️ No se pudo eliminar en la nube, sigue apareciendo: ' + e.message, 'var(--rojo-alerta)');
+  }
 }
 
 function cotIrATab(tipo) {
