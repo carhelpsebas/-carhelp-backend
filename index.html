@@ -2086,6 +2086,11 @@
         <div class="campo"><label>Duración estimada</label><input type="text" id="tour_duracion" placeholder="Ej. 8 horas / Día completo"></div>
       </div>
       <div class="campo"><label>Precio por persona (COP)</label><input type="number" id="tour_precio" placeholder="280000"></div>
+      <div class="seccion-label" style="margin-top:10px">Fotos del tour</div>
+      <div id="tour-fotos-lista" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px"></div>
+      <div class="campo">
+        <input type="file" id="tour_foto_file" accept="image/*" onchange="agregarFotoTour(event)">
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn-secundario" onclick="cerrarModal('modal-tour')">Cancelar</button>
@@ -5404,6 +5409,54 @@ function renderToursSelect() {
     tours.map(t => `<option value="${t.id}">${t.nombre} — ${formatCOP(t.precio)}/persona</option>`).join('');
 }
 
+let tourFotosActuales = [];
+
+function renderFotosTour() {
+  const cont = document.getElementById('tour-fotos-lista');
+  if (!cont) return;
+  if (tourFotosActuales.length === 0) {
+    cont.innerHTML = '<div style="font-size:0.78rem;color:var(--blanco-suave)">Sin fotos agregadas todavía.</div>';
+    return;
+  }
+  cont.innerHTML = tourFotosActuales.map((url, i) => `
+    <div style="position:relative">
+      <img src="${url}" style="width:90px;height:90px;object-fit:cover;border-radius:8px;border:1px solid var(--borde)">
+      <button type="button" onclick="tourFotosActuales.splice(${i},1); renderFotosTour();" style="position:absolute;top:-6px;right:-6px;background:var(--rojo-alerta);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:0.7rem;cursor:pointer;line-height:1">✕</button>
+    </div>
+  `).join('');
+}
+
+async function agregarFotoTour(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  mostrarToast('📤 Subiendo foto...', 'var(--azul-info)');
+  try {
+    const ext = file.name.split('.').pop() || 'jpg';
+    const path = `tours/${Date.now()}.${ext}`;
+    const res = await fetch(`${SB_URL}/storage/v1/object/entregas-fotos/${path}`, {
+      method: 'POST',
+      headers: {
+        'apikey': SB_KEY,
+        'Authorization': `Bearer ${SB_KEY}`,
+        'Content-Type': file.type || 'image/jpeg',
+        'x-upsert': 'true'
+      },
+      body: file
+    });
+    if (res.ok) {
+      tourFotosActuales.push(`${SB_URL}/storage/v1/object/public/entregas-fotos/${path}`);
+      renderFotosTour();
+      mostrarToast('✅ Foto agregada');
+    } else {
+      mostrarToast('⚠️ No se pudo subir la foto', '#E05252');
+    }
+  } catch(e) {
+    console.error(e);
+    mostrarToast('⚠️ No se pudo subir la foto: ' + e.message, '#E05252');
+  }
+  document.getElementById('tour_foto_file').value = '';
+}
+
 function abrirModalTour() {
   document.getElementById('modal-tour-titulo').textContent = 'Agregar tour VIP';
   document.getElementById('tour_id').value = '';
@@ -5412,6 +5465,8 @@ function abrirModalTour() {
   document.getElementById('tour_vehiculo').value = '';
   document.getElementById('tour_duracion').value = '';
   document.getElementById('tour_precio').value = '';
+  tourFotosActuales = [];
+  renderFotosTour();
   abrirModal('modal-tour');
 }
 
@@ -5425,6 +5480,8 @@ function editarTour(id) {
   document.getElementById('tour_vehiculo').value = t.vehiculo_id || '';
   document.getElementById('tour_duracion').value = t.duracion || '';
   document.getElementById('tour_precio').value = t.precio || '';
+  tourFotosActuales = Array.isArray(t.fotos) ? [...t.fotos] : [];
+  renderFotosTour();
   abrirModal('modal-tour');
 }
 
@@ -5441,6 +5498,7 @@ async function guardarTour() {
     vehiculo_nombre: veh ? veh.nombre : '',
     duracion: document.getElementById('tour_duracion').value.trim(),
     precio: parseFloat(document.getElementById('tour_precio').value) || 0,
+    fotos: tourFotosActuales,
     activo: true,
   };
   try {
