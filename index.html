@@ -2266,6 +2266,17 @@
     </div>
     <div class="modal-body">
       <div class="info-banner">Esto corrige el valor de la reserva y también actualiza el movimiento contable asociado, para que la liquidación al propietario/aliado quede correcta.</div>
+      <div class="seccion-label">Fechas reales de la renta</div>
+      <div class="fila-2">
+        <div class="campo"><label>Fecha de entrega</label><input type="date" id="ev_fecha_inicio" oninput="actualizarTotalEditarValores()"></div>
+        <div class="campo"><label>Hora de entrega</label><input type="time" id="ev_hora_inicio" oninput="actualizarTotalEditarValores()"></div>
+      </div>
+      <div class="fila-2">
+        <div class="campo"><label>Fecha de devolución</label><input type="date" id="ev_fecha_fin" oninput="actualizarTotalEditarValores()"></div>
+        <div class="campo"><label>Hora de devolución</label><input type="time" id="ev_hora_fin" oninput="actualizarTotalEditarValores()"></div>
+      </div>
+      <div style="font-size:0.7rem;color:var(--blanco-suave);margin-top:-8px;margin-bottom:10px">Puedes poner cualquier fecha, incluso anterior a hoy — útil para corregir cuándo entró realmente el vehículo.</div>
+      <div class="seccion-label">Valores</div>
       <div class="fila-2">
         <div class="campo"><label>Tarifa por período de 24h (COP)</label><input type="number" id="ev_tarifa" oninput="actualizarTotalEditarValores()"></div>
         <div class="campo"><label>Depósito de garantía (COP)</label><input type="number" id="ev_deposito" oninput="actualizarTotalEditarValores()"></div>
@@ -4724,6 +4735,10 @@ function abrirModalEditarValores(num) {
   }
   evReservaActual = r;
   document.getElementById('ev-num-reserva').textContent = num;
+  document.getElementById('ev_fecha_inicio').value = r.fecha_inicio || '';
+  document.getElementById('ev_hora_inicio').value = r.hora_inicio || '';
+  document.getElementById('ev_fecha_fin').value = r.fecha_fin || '';
+  document.getElementById('ev_hora_fin').value = r.hora_fin || '';
   document.getElementById('ev_tarifa').value = r.tarifa || 0;
   document.getElementById('ev_deposito').value = r.deposito || 0;
   document.getElementById('ev_costo_entrega').value = r.costoEntrega || 0;
@@ -4733,6 +4748,21 @@ function abrirModalEditarValores(num) {
   document.getElementById('ev_abono').value = r.abono || 0;
   actualizarTotalEditarValores();
   abrirModal('modal-editar-valores');
+}
+
+function evCalcularPeriodos() {
+  const r = evReservaActual;
+  const fi = document.getElementById('ev_fecha_inicio').value;
+  const hi = document.getElementById('ev_hora_inicio').value || '00:00';
+  const ff = document.getElementById('ev_fecha_fin').value;
+  const hf = document.getElementById('ev_hora_fin').value || '00:00';
+  if (!fi || !ff) return (r && r.periodos) || 0;
+  try {
+    const calc = calcularPeriodosFacturables(`${fi}T${hi}`, `${ff}T${hf}`);
+    return calc.periodosFacturables;
+  } catch(e) {
+    return (r && r.periodos) || 0;
+  }
 }
 
 function actualizarTotalEditarValores() {
@@ -4745,15 +4775,22 @@ function actualizarTotalEditarValores() {
   const descPP = parseFloat(document.getElementById('ev_descuento_pico_placa').value) || 0;
   const descHoras = parseFloat(document.getElementById('ev_descuento_horas_extra').value) || 0;
   const abono = parseFloat(document.getElementById('ev_abono').value) || 0;
+  const periodos = evCalcularPeriodos();
 
-  const total = Math.max((r.periodos || 0) * tarifa + deposito + costoEntrega + costoRecibido - descPP - descHoras, 0);
+  const total = Math.max(periodos * tarifa + deposito + costoEntrega + costoRecibido - descPP - descHoras, 0);
   const saldo = Math.max(total - abono, 0);
-  document.getElementById('ev-total-preview').innerHTML = `Nuevo total: <strong>${formatCOP(total)}</strong> · Saldo pendiente: <strong>${formatCOP(saldo)}</strong> (${r.periodos || 0} período(s) × tarifa)`;
+  document.getElementById('ev-total-preview').innerHTML = `Nuevo total: <strong>${formatCOP(total)}</strong> · Saldo pendiente: <strong>${formatCOP(saldo)}</strong> (${periodos} período(s) × tarifa)`;
 }
 
 async function guardarValoresReserva() {
   const r = evReservaActual;
   if (!r) return;
+  const fechaInicio = document.getElementById('ev_fecha_inicio').value;
+  const horaInicio = document.getElementById('ev_hora_inicio').value;
+  const fechaFin = document.getElementById('ev_fecha_fin').value;
+  const horaFin = document.getElementById('ev_hora_fin').value;
+  if (!fechaInicio || !fechaFin) { mostrarToast('⚠️ Completa las fechas de entrega y devolución', '#E05252'); return; }
+
   const tarifa = parseFloat(document.getElementById('ev_tarifa').value) || 0;
   const deposito = parseFloat(document.getElementById('ev_deposito').value) || 0;
   const costoEntrega = parseFloat(document.getElementById('ev_costo_entrega').value) || 0;
@@ -4761,11 +4798,14 @@ async function guardarValoresReserva() {
   const descPP = parseFloat(document.getElementById('ev_descuento_pico_placa').value) || 0;
   const descHoras = parseFloat(document.getElementById('ev_descuento_horas_extra').value) || 0;
   const abono = parseFloat(document.getElementById('ev_abono').value) || 0;
+  const periodos = evCalcularPeriodos();
 
-  const nuevoTotal = Math.max((r.periodos || 0) * tarifa + deposito + costoEntrega + costoRecibido - descPP - descHoras, 0);
+  const nuevoTotal = Math.max(periodos * tarifa + deposito + costoEntrega + costoRecibido - descPP - descHoras, 0);
 
   try {
     await sbUpdate('ordenes', r.id, {
+      fecha_salida: `${fechaInicio}T${horaInicio || '00:00'}:00`,
+      fecha_retorno: `${fechaFin}T${horaFin || '00:00'}:00`,
       tarifa_diaria: tarifa,
       deposito: deposito,
       costo_entrega: costoEntrega,
@@ -4782,12 +4822,33 @@ async function guardarValoresReserva() {
         await sbUpdate('movimientos_contables', movs[0].id, { valor: nuevoTotal, notas: `Reserva ${r.num_reserva} · valores corregidos` });
       }
     } catch(e) { console.warn('No se pudo corregir el movimiento contable de la renta:', e.message); }
+
+    // Ajustar también el tramo de ocupación de vehículo para que el calendario refleje la fecha real corregida
+    try {
+      const segmentosOrden = historialVehiculos.filter(h => h.orden_id === r.id).sort((a,b) => a.fecha_inicio.localeCompare(b.fecha_inicio));
+      if (segmentosOrden.length === 1) {
+        // Solo hay un tramo (nunca tuvo cambio de vehículo): se ajusta directo a las nuevas fechas
+        await sbUpdate('historial_vehiculo_orden', segmentosOrden[0].id, { fecha_inicio: fechaInicio, fecha_fin: fechaFin });
+        segmentosOrden[0].fecha_inicio = fechaInicio;
+        segmentosOrden[0].fecha_fin = fechaFin;
+      } else if (segmentosOrden.length > 1) {
+        // Hubo cambios de vehículo: solo se ajusta el último tramo (fecha de devolución) para no romper los tramos intermedios
+        const ultimo = segmentosOrden[segmentosOrden.length - 1];
+        await sbUpdate('historial_vehiculo_orden', ultimo.id, { fecha_fin: fechaFin });
+        ultimo.fecha_fin = fechaFin;
+      }
+    } catch(e) { console.warn('No se pudo ajustar el tramo de vehículo:', e.message); }
   } catch(e) {
     console.error('Error guardando los valores de la reserva:', e);
     mostrarToast('⚠️ No se pudo guardar: ' + e.message, 'var(--rojo-alerta)');
     return;
   }
 
+  r.fecha_inicio = fechaInicio;
+  r.hora_inicio = horaInicio;
+  r.fecha_fin = fechaFin;
+  r.hora_fin = horaFin;
+  r.periodos = periodos;
   r.tarifa = tarifa;
   r.deposito = deposito;
   r.costoEntrega = costoEntrega;
@@ -4800,7 +4861,7 @@ async function guardarValoresReserva() {
   await guardar('carhelp:reservas', reservas);
 
   cerrarModal('modal-editar-valores');
-  renderReservas(); renderStats(); renderProximas(); renderEnCurso();
+  renderReservas(); renderStats(); renderProximas(); renderEnCurso(); renderGanttFlota();
   mostrarToast('✅ Valores actualizados: ' + r.num_reserva);
 }
 
