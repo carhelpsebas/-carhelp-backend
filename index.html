@@ -3291,18 +3291,33 @@ async function actualizarNotificaciones() {
     }
   });
 
-  // Liquidaciones pendientes del período actual (propietarios y aliados)
-  const relevantes = vehiculos.filter(v => v.procedencia === 'propietario' || v.procedencia === 'aliado');
-  if (relevantes.length > 0) {
-    let todasLiq = [];
-    try { todasLiq = await sbSelect('liquidaciones', '&order=periodo_inicio.desc'); } catch(e) {}
-    relevantes.forEach(v => {
-      const ciclo = calcularCicloVehiculo(v.fechaIngreso, liqModoPeriodo, 0);
-      const yaLiquidado = todasLiq.find(l => l.vehiculo_id === v.id && l.periodo_inicio === ciclo.inicio && l.periodo_fin === ciclo.fin);
-      if (!yaLiquidado) {
-        items.push({ texto: `💰 Falta liquidar ${v.nombre} (${fmtFecha(ciclo.inicio)} → ${fmtFecha(ciclo.fin)})`, accion: () => cambiarVistaPorId('contabilidad') });
-      }
-    });
+  // Liquidaciones pendientes reales (propietarios con ingresos reales en el período, y aliados con rentas finalizadas sin liquidar)
+  let todasLiq = [];
+  try { todasLiq = await sbSelect('liquidaciones', '&order=periodo_inicio.desc'); } catch(e) {}
+
+  const propietarios = vehiculos.filter(v => v.procedencia === 'propietario');
+  for (const v of propietarios) {
+    const ciclo = calcularCicloVehiculo(v.fechaIngreso, liqModoPeriodo, 0);
+    let ingresos = 0;
+    try {
+      const movs = await sbSelect('movimientos_contables', `&vehiculo_id=eq.${v.id}&tipo=eq.ingreso&categoria=in.(renta,extension_renta,ajuste_cambio_vehiculo)&fecha=gte.${ciclo.inicio}&fecha=lte.${ciclo.fin}`);
+      ingresos = movs.reduce((s, m) => s + parseFloat(m.valor), 0);
+    } catch(e) {}
+    // Solo avisar si de verdad hubo renta con ingresos en este período; sin actividad, no hay nada que liquidar
+    if (ingresos <= 0) continue;
+    const yaLiquidado = todasLiq.find(l => l.vehiculo_id === v.id && l.periodo_inicio === ciclo.inicio && l.periodo_fin === ciclo.fin);
+    if (!yaLiquidado) {
+      items.push({ texto: `💰 Falta liquidar ${v.nombre} (${fmtFecha(ciclo.inicio)} → ${fmtFecha(ciclo.fin)})`, accion: () => cambiarVistaPorId('contabilidad') });
+    }
+  }
+
+  const aliados = vehiculos.filter(v => v.procedencia === 'aliado');
+  for (const v of aliados) {
+    // Los aliados se liquidan por rentas reales ya finalizadas, no por ciclos de calendario
+    const pend = await obtenerPendientesAliado(v.id);
+    if (pend.detalle.length > 0) {
+      items.push({ texto: `💰 Falta liquidar ${v.nombre} — ${pend.detalle.length} renta(s) sin liquidar`, accion: () => cambiarVistaPorId('contabilidad') });
+    }
   }
 
   notificacionesActuales = items;
@@ -6871,6 +6886,18 @@ async function renderLiquidaciones() {
 
     // Cachear todo el contexto para poder abrir el detalle sin volver a consultar
     liqDatosPeriodo[v.id] = { vehiculo: v, ciclo, periodoLabel, ingresos, gastosPropietario, gastosEmpresa, dias: 0, montoBase, registro: yaLiquidado, gastosListaPropietario };
+
+    // Sin ninguna renta real en el período no hay nada que liquidar, sin importar el tipo de pacto
+    if (ingresos <= 0 && !yaLiquidado) {
+      return `
+      <div class="item-card">
+        <div class="item-info">
+          <div class="item-titulo">${v.nombre} ${v.placa ? '('+v.placa+')' : ''} <span class="num-reserva">Propietario</span></div>
+          <div class="item-detalle">Propietario: <strong>${v.propietarioNombre || 'Sin definir'}</strong> · Período: <strong>${periodoLabel}</strong></div>
+          <div class="item-detalle" style="color:var(--verde-ok)">✅ Sin rentas en este período — no hay nada que liquidar</div>
+        </div>
+      </div>`;
+    }
 
     const montoMostrado = yaLiquidado ? parseFloat(yaLiquidado.monto_final ?? yaLiquidado.monto_liquidado) : montoBase;
     if (!yaLiquidado) totalPendienteGlobal += montoBase;
