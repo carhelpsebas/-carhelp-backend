@@ -2150,7 +2150,7 @@
 <div class="modal-overlay" id="modal-extender">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-titulo">📅 Extender renta <span id="ext-num-reserva" style="color:var(--dorado)"></span></div>
+      <div class="modal-titulo">📅 Extender / ajustar devolución <span id="ext-num-reserva" style="color:var(--dorado)"></span></div>
       <button class="modal-cerrar" onclick="cerrarModal('modal-extender')">✕</button>
     </div>
     <div class="modal-body">
@@ -2188,7 +2188,7 @@
     <div class="modal-footer">
       <button class="btn-secundario" onclick="cerrarModal('modal-extender')">Cancelar</button>
       <button class="btn-secundario" id="ext-btn-cambio-provisional" style="display:none" onclick="cerrarModal('modal-extender'); abrirModalTramosVehiculo(extReservaActual.num_reserva)">🚗 Cambio provisional de vehículo</button>
-      <button class="btn-primario" onclick="confirmarExtensionRenta()">Confirmar extensión</button>
+      <button class="btn-primario" onclick="confirmarExtensionRenta()">Confirmar</button>
     </div>
   </div>
 </div>
@@ -4992,30 +4992,40 @@ function calcularExtension() {
   const inicioISO = `${r.fecha_inicio}T${r.hora_inicio}`;
   const nuevoFinISO = `${nff}T${nhf}`;
   const nuevoCalc = calcularPeriodosFacturables(inicioISO, nuevoFinISO);
-  if (nuevoCalc.periodosFacturables <= r.periodos) {
-    info.innerHTML = '⚠️ La nueva fecha de devolución debe ser posterior a la devolución actual para generar una extensión.';
-    return null;
-  }
+
+  // diasExtra puede ser negativo: eso significa que se está corrigiendo a una fecha ANTERIOR (ej. la renta ya había terminado)
   const diasExtra = nuevoCalc.periodosFacturables - r.periodos;
   const valorExtra = diasExtra * r.tarifa;
-  const nuevoTotal = r.total + valorExtra;
-  info.innerHTML = `➕ Se agregan <strong style="color:var(--dorado)">${diasExtra} día(s)</strong> adicionales · Valor sugerido: <strong style="color:var(--dorado)">${formatCOP(valorExtra)}</strong> (puedes ajustarlo abajo)`;
+  const nuevoTotal = Math.max(r.total + valorExtra, 0);
+
+  if (diasExtra > 0) {
+    info.innerHTML = `➕ Se agregan <strong style="color:var(--dorado)">${diasExtra} día(s)</strong> adicionales · Valor sugerido: <strong style="color:var(--dorado)">${formatCOP(valorExtra)}</strong> (puedes ajustarlo abajo)`;
+  } else if (diasExtra < 0) {
+    info.innerHTML = `➖ Estás corrigiendo la devolución a <strong style="color:var(--dorado)">${Math.abs(diasExtra)} día(s) menos</strong> · Se descuenta: <strong style="color:var(--dorado)">${formatCOP(Math.abs(valorExtra))}</strong> (puedes ajustarlo abajo)`;
+  } else {
+    info.innerHTML = `La nueva fecha no cambia el número de períodos ya facturados.`;
+  }
   document.getElementById('ext_valor_adicional').value = valorExtra;
 
-  // Pico y placa: revisar si algún día del tramo extendido cae en restricción
+  // Pico y placa: solo aplica cuando de verdad se están agregando días nuevos hacia adelante
   const alertaPP = document.getElementById('ext-pico-placa-alerta');
   const btnCambioProvisional = document.getElementById('ext-btn-cambio-provisional');
-  const diaSiguienteActual = new Date(r.fecha_fin + 'T00:00:00');
-  diaSiguienteActual.setDate(diaSiguienteActual.getDate() + 1);
-  const fechasRestringidas = (r.ciudadesDestino && r.ciudadesDestino.length > 0)
-    ? obtenerFechasRestringidasPicoPlaca(soloFecha(diaSiguienteActual), nff, r.ciudadesDestino, r.placa)
-    : [];
-  if (fechasRestringidas.length > 0) {
-    alertaPP.style.display = 'block';
-    alertaPP.innerHTML = `🚦 Dentro de estos días adicionales, el vehículo tiene <strong>pico y placa</strong> el ` +
-      fechasRestringidas.map(f => `<strong>${fmtFecha(f.fecha)}</strong> (${f.ciudad})`).join(', ') +
-      `. Considera ajustar el valor adicional de arriba con un descuento, o usa el botón "Cambio provisional de vehículo" para asignarle otro carro ese día.`;
-    btnCambioProvisional.style.display = 'inline-flex';
+  if (diasExtra > 0) {
+    const diaSiguienteActual = new Date(r.fecha_fin + 'T00:00:00');
+    diaSiguienteActual.setDate(diaSiguienteActual.getDate() + 1);
+    const fechasRestringidas = (r.ciudadesDestino && r.ciudadesDestino.length > 0)
+      ? obtenerFechasRestringidasPicoPlaca(soloFecha(diaSiguienteActual), nff, r.ciudadesDestino, r.placa)
+      : [];
+    if (fechasRestringidas.length > 0) {
+      alertaPP.style.display = 'block';
+      alertaPP.innerHTML = `🚦 Dentro de estos días adicionales, el vehículo tiene <strong>pico y placa</strong> el ` +
+        fechasRestringidas.map(f => `<strong>${fmtFecha(f.fecha)}</strong> (${f.ciudad})`).join(', ') +
+        `. Considera ajustar el valor adicional de arriba con un descuento, o usa el botón "Cambio provisional de vehículo" para asignarle otro carro ese día.`;
+      btnCambioProvisional.style.display = 'inline-flex';
+    } else {
+      alertaPP.style.display = 'none';
+      btnCambioProvisional.style.display = 'none';
+    }
   } else {
     alertaPP.style.display = 'none';
     btnCambioProvisional.style.display = 'none';
@@ -5043,7 +5053,7 @@ async function confirmarExtensionRenta() {
   if (!r) return;
   const calc = calcularExtension();
   if (!calc) {
-    mostrarToast('⚠️ Verifica la nueva fecha de devolución', '#E05252');
+    mostrarToast('⚠️ Selecciona la nueva fecha y hora de devolución', '#E05252');
     return;
   }
   const notasExt = document.getElementById('ext_notas').value.trim();
@@ -5051,14 +5061,16 @@ async function confirmarExtensionRenta() {
   const nff = document.getElementById('ext_fecha_fin').value;
   const nhf = document.getElementById('ext_hora_fin').value;
 
-  // Usa el valor que haya quedado en el campo (puede ser el sugerido o uno ajustado a mano)
+  // Usa el valor que haya quedado en el campo (puede ser el sugerido o uno ajustado a mano).
+  // Puede ser negativo si se está corrigiendo la devolución a una fecha anterior (se descuenta del total).
   const valorExtraFinal = parseFloat(document.getElementById('ext_valor_adicional').value);
-  if (isNaN(valorExtraFinal) || valorExtraFinal < 0) {
+  if (isNaN(valorExtraFinal)) {
     mostrarToast('⚠️ Ingresa un valor adicional válido', '#E05252');
     return;
   }
+  const diasTexto = calc.diasExtra >= 0 ? `+${calc.diasExtra}` : `${calc.diasExtra}`;
   const abonoExtension = parseFloat(document.getElementById('ext_abono').value) || 0;
-  const nuevoTotalFinal = r.total + valorExtraFinal;
+  const nuevoTotalFinal = Math.max(r.total + valorExtraFinal, 0);
   const nuevoAbonoAcumulado = (r.abono || 0) + abonoExtension;
   const saldoPendienteFinal = Math.max(nuevoTotalFinal - nuevoAbonoAcumulado, 0);
 
@@ -5069,14 +5081,14 @@ async function confirmarExtensionRenta() {
         fecha_retorno: calc.nuevoFinISO + ':00',
         abono: nuevoAbonoAcumulado,
         alerta_enviada: false,
-        notas: (r.notas || '') + (notasExt ? ` · Extensión (+${calc.diasExtra} día(s)): ${notasExt}` : ` · Extensión: +${calc.diasExtra} día(s)`) + (abonoExtension > 0 ? ` · Abono recibido en extensión: ${formatCOP(abonoExtension)}` : '')
+        notas: (r.notas || '') + (notasExt ? ` · Ajuste de devolución (${diasTexto} día(s)): ${notasExt}` : ` · Ajuste de devolución: ${diasTexto} día(s)`) + (abonoExtension > 0 ? ` · Abono recibido: ${formatCOP(abonoExtension)}` : '')
       });
     }
     await sbInsert('movimientos_contables', {
       fecha: new Date().toISOString().split('T')[0],
       tipo: 'ingreso',
       categoria: 'extension_renta',
-      concepto: `Extensión renta: ${r.vehiculo} · ${r.nombre} · +${calc.diasExtra} día(s)`,
+      concepto: `Ajuste de devolución: ${r.vehiculo} · ${r.nombre} · ${diasTexto} día(s)`,
       valor: valorExtraFinal,
       notas: `Reserva ${r.num_reserva}` + (abonoExtension > 0 ? ` · Abono recibido: ${formatCOP(abonoExtension)}` : ''),
       vehiculo_id: r.vehiculo_id || null,
@@ -5109,18 +5121,18 @@ async function confirmarExtensionRenta() {
 
   // Enviar correo automático con el resumen actualizado
   if (enviarCorreo && r.email) {
-    const asunto = `📅 Extensión de renta ${r.num_reserva} — Car Help`;
+    const asunto = `📅 Ajuste de devolución ${r.num_reserva} — Car Help`;
     const cuerpo = `Estimado/a ${r.nombre},
 
-Le confirmamos la extensión de su renta con Car Help:
+Le confirmamos el ajuste en la fecha de devolución de su renta con Car Help:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 RESERVA N.° ${r.num_reserva}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 🚗 Vehículo:            ${r.vehiculo}
 📅 Nueva devolución:    ${fmtFechaHora(nff, nhf)}
-➕ Días agregados:      ${calc.diasExtra} día(s)
-💰 Valor adicional:     ${formatCOP(valorExtraFinal)}
+📊 Días ajustados:      ${diasTexto} día(s)
+💰 Valor del ajuste:    ${formatCOP(valorExtraFinal)}
 💰 Nuevo total:         ${formatCOP(r.total)}
 ${abonoExtension > 0 ? `💰 Abono recibido hoy:  ${formatCOP(abonoExtension)}\n` : ''}${nuevoAbonoAcumulado > 0 ? `💰 Total abonado:       ${formatCOP(nuevoAbonoAcumulado)}\n` : ''}💰 Saldo pendiente:     ${formatCOP(r.saldoPendiente)}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -5130,9 +5142,9 @@ Gracias por confiar en Car Help.
 Equipo Car Help — Pereira, Colombia
 📱 WhatsApp: +57 310 743 6082`;
     const enviado = await enviarCorreoDirecto(r.email, asunto, cuerpo);
-    mostrarToast(enviado ? '✅ Renta extendida y correo enviado a ' + r.email : '✅ Renta extendida (no se pudo enviar el correo automático)');
+    mostrarToast(enviado ? '✅ Devolución ajustada y correo enviado a ' + r.email : '✅ Devolución ajustada (no se pudo enviar el correo automático)');
   } else {
-    mostrarToast('✅ Renta extendida: +' + calc.diasExtra + ' día(s)');
+    mostrarToast('✅ Devolución ajustada: ' + diasTexto + ' día(s)');
   }
 
   cerrarModal('modal-extender');
