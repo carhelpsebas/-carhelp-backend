@@ -146,34 +146,38 @@
   .fila-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
   @media (max-width: 640px) { .fila-2, .fila-3 { grid-template-columns: 1fr; } }
 
+  /* ── Estilo "push button": pastilla negra brillante + esfera de color + texto a juego ── */
   .btn-agregar-cuadre {
     width: 100%;
     margin-bottom: 14px;
-    background: var(--verde-ok);
-    color: #0A0A0A;
+    background: linear-gradient(180deg, #3d3d3d 0%, #161616 45%, #000 100%);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -3px 5px rgba(0,0,0,0.55);
+    border: 1px solid #050505;
+    color: var(--verde-ok);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.6);
     font-family: 'Syne', sans-serif;
     font-weight: 700;
     font-size: 0.85rem;
     letter-spacing: 0.03em;
-    border: none;
     border-radius: 999px;
     padding: 12px 20px;
     cursor: pointer;
     transition: filter 0.2s, transform 0.1s;
   }
-  .btn-agregar-cuadre:hover { filter: brightness(1.12); }
+  .btn-agregar-cuadre:hover { filter: brightness(1.18); }
   .btn-agregar-cuadre:active { transform: scale(0.98); }
 
   .btn-primario {
-    background: var(--gradiente-dorado);
-    box-shadow: var(--sombra-metalica);
-    color: var(--negro);
+    background: linear-gradient(180deg, #3d3d3d 0%, #161616 45%, #000 100%);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -3px 5px rgba(0,0,0,0.55);
+    border: 1px solid #050505;
+    color: var(--dorado);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.6);
     font-family: 'Syne', sans-serif;
     font-weight: 700;
     font-size: 0.85rem;
     letter-spacing: 0.05em;
     padding: 13px 22px;
-    border: none;
     border-radius: 999px;
     cursor: pointer;
     transition: filter 0.2s, transform 0.1s;
@@ -182,36 +186,68 @@
     justify-content: center;
     gap: 8px;
   }
-  .btn-primario:hover { filter: brightness(1.1); }
+  .btn-primario:hover { filter: brightness(1.18); }
   .btn-primario:active { transform: scale(0.98); }
   .btn-primario:disabled { opacity: 0.4; cursor: not-allowed; }
   .btn-primario.full { width: 100%; }
 
   .btn-secundario {
-    background: transparent;
-    color: var(--blanco-suave);
-    border: 1px solid var(--borde);
+    background: linear-gradient(180deg, #3d3d3d 0%, #161616 45%, #000 100%);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.14), inset 0 -3px 5px rgba(0,0,0,0.5);
+    color: var(--blanco);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+    border: 1px solid #050505;
     font-family: 'Inter', sans-serif;
     font-size: 0.8rem;
     font-weight: 500;
     padding: 10px 18px;
-    border-radius: 8px;
+    border-radius: 999px;
     cursor: pointer;
-    transition: border-color 0.2s, color 0.2s;
+    transition: filter 0.2s, transform 0.1s;
   }
-  .btn-secundario:hover { border-color: var(--blanco-suave); color: var(--blanco); }
+  .btn-secundario:hover { filter: brightness(1.2); }
+  .btn-secundario:active { transform: scale(0.98); }
 
   .btn-peligro {
-    background: rgba(224,82,82,0.12);
+    background: linear-gradient(180deg, #3d3d3d 0%, #161616 45%, #000 100%);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.14), inset 0 -3px 5px rgba(0,0,0,0.5);
     color: var(--rojo-alerta);
-    border: 1px solid var(--rojo-alerta);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+    border: 1px solid #050505;
     font-size: 0.75rem;
     font-weight: 600;
     padding: 7px 12px;
-    border-radius: 6px;
+    border-radius: 999px;
     cursor: pointer;
+    transition: filter 0.2s, transform 0.1s;
   }
-  .btn-peligro:hover { background: rgba(224,82,82,0.22); }
+  .btn-peligro:hover { filter: brightness(1.2); }
+  .btn-peligro:active { transform: scale(0.98); }
+
+  /* La esfera de color a la izquierda del texto, como en el botón de referencia */
+  .btn-primario::before, .btn-secundario::before, .btn-peligro::before, .btn-agregar-cuadre::before, .nav-tab::before {
+    content: '';
+    display: inline-block;
+    width: 0.95em;
+    height: 0.95em;
+    min-width: 0.95em;
+    border-radius: 50%;
+    margin-right: 0.5em;
+    vertical-align: -0.14em;
+    box-shadow: inset -0.16em -0.16em 0.2em rgba(0,0,0,0.4), inset 0.1em 0.15em 0.15em rgba(255,255,255,0.6), 0 0 3px rgba(0,0,0,0.5);
+  }
+  .btn-primario::before, .btn-agregar-cuadre::before, .nav-tab::before {
+    background: radial-gradient(circle at 35% 28%, #fff4cc 0%, var(--dorado) 55%, #6b4f10 100%);
+  }
+  .btn-peligro::before {
+    background: radial-gradient(circle at 35% 28%, #ffc2c2 0%, var(--rojo-alerta) 55%, #7a1f1f 100%);
+  }
+  .btn-secundario::before {
+    background: radial-gradient(circle at 35% 28%, #ffffff 0%, #b8b8b8 55%, #555 100%);
+  }
+  .btn-agregar-cuadre::before {
+    background: radial-gradient(circle at 35% 28%, #d8ffe0 0%, var(--verde-ok) 55%, #164d2c 100%);
+  }
 
   .btn-icono {
     background: var(--gris-medio);
@@ -290,19 +326,21 @@
     font-size: 0.76rem;
     font-weight: 700;
     letter-spacing: 0.03em;
-    color: var(--negro);
-    background: var(--gradiente-dorado);
-    box-shadow: var(--sombra-metalica);
-    border: none;
+    color: var(--dorado);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+    background: linear-gradient(180deg, #3d3d3d 0%, #161616 45%, #000 100%);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -3px 5px rgba(0,0,0,0.55);
+    border: 1px solid #050505;
     border-radius: 999px;
     padding: 9px 18px;
     cursor: pointer;
     white-space: nowrap;
-    filter: brightness(0.7) saturate(0.85);
+    display: inline-flex;
+    align-items: center;
     transition: filter 0.2s, transform 0.15s;
   }
-  .nav-tab:hover:not(.activo) { filter: brightness(0.88) saturate(0.95); }
-  .nav-tab.activo { filter: brightness(1.12) saturate(1.05); transform: translateY(-1px); }
+  .nav-tab:hover:not(.activo) { filter: brightness(1.15); }
+  .nav-tab.activo { filter: brightness(1.4); transform: translateY(-1px); }
 
   .vista { display: none; max-width: 1200px; margin: 0 auto; padding: 32px 22px 80px; }
   .vista.activa { display: block; }
