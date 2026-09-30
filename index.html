@@ -859,7 +859,7 @@
         </div>
       </div>
       <div class="panel-body" style="display:flex; gap:12px; flex-wrap:wrap;">
-        <button class="btn-primario" onclick="cambiarVistaPorId('reservas')">+ Nueva reserva de vehículo</button>
+        <button class="btn-primario" onclick="abrirSelectorServicioReserva()">+ Nueva reserva</button>
         <button class="btn-secundario" onclick="cambiarVistaPorId('vehiculos')">Gestionar vehículos</button>
         <button class="btn-secundario" onclick="abrirModalLinkCliente()">🔗 Generar link para cliente</button>
       </div>
@@ -878,7 +878,7 @@
   <!-- ═══ VISTA: RESERVAS (Rentacar) ═══ -->
   <div class="vista" id="vista-reservas">
     <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
-      <button class="btn-primario" id="btn-toggle-nueva-reserva" onclick="toggleNuevaReserva()">
+      <button class="btn-primario" id="btn-toggle-nueva-reserva" onclick="manejarClickNuevaReserva()">
         <span id="icono-toggle-nueva-reserva">+</span>&nbsp; Nueva reserva
       </button>
     </div>
@@ -1206,15 +1206,32 @@
         </div>
       </div>
       <div class="panel-body">
-        <div class="seccion-label">Datos del cliente</div>
+        <div class="seccion-label">Datos del cliente <span style="color:var(--blanco-suave); text-transform:none; letter-spacing:0; font-weight:400;">— todos obligatorios</span></div>
+        <div class="campo" style="position:relative">
+          <label>Nombre completo <span class="req">*</span></label>
+          <input type="text" id="t_nombre" placeholder="Nombre del cliente" autocomplete="off" oninput="buscarClienteAutocomplete(this.value, 't')">
+          <div id="t_nombre_sugerencias" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--gris-oscuro);border:1px solid var(--dorado);border-radius:8px;z-index:999;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.4)"></div>
+        </div>
         <div class="fila-2">
-          <div class="campo"><label>Nombre completo <span class="req">*</span></label><input type="text" id="t_nombre" placeholder="Nombre del cliente"></div>
+          <div class="campo">
+            <label>Tipo de documento <span class="req">*</span></label>
+            <select id="t_tipo_doc">
+              <option value="">— Seleccionar —</option>
+              <option>Cédula de ciudadanía</option>
+              <option>Cédula de extranjería</option>
+              <option>Pasaporte</option>
+              <option>PEP</option>
+              <option>NIT</option>
+            </select>
+          </div>
+          <div class="campo"><label>Número de documento <span class="req">*</span></label><input type="text" id="t_num_doc" placeholder="Ej. 1088123456"></div>
+        </div>
+        <div class="fila-2">
+          <div class="campo"><label>Celular <span class="req">*</span></label><input type="text" id="t_celular" placeholder="+57 300 000 0000 (celular del cliente)"></div>
           <div class="campo"><label>Correo <span class="req">*</span></label><input type="email" id="t_email" placeholder="cliente@correo.com"></div>
         </div>
-        <div class="fila-2">
-          <div class="campo"><label>Celular</label><input type="text" id="t_celular" placeholder="+57 300 000 0000 (celular del cliente)"></div>
-          <div class="campo"><label>N.° de personas</label><input type="number" id="t_personas" placeholder="2" min="1"></div>
-        </div>
+        <div class="campo"><label>Dirección en Colombia <span class="req">*</span></label><input type="text" id="t_direccion" placeholder="Ej. Calle 10 # 5-20, Pereira, Risaralda"></div>
+        <div class="campo"><label>N.° de personas</label><input type="number" id="t_personas" placeholder="2" min="1"></div>
         <div class="seccion-label">Tour</div>
         <div class="campo">
           <label>Selecciona el tour <span class="req">*</span></label>
@@ -1225,6 +1242,7 @@
           <div class="campo"><label>Fecha del tour <span class="req">*</span></label><input type="date" id="t_fecha"></div>
         </div>
         <div class="campo"><label>Hora de recogida</label><input type="time" id="t_hora"></div>
+        <div class="campo"><label>Abono / anticipo recibido (COP)</label><input type="number" id="t_abono" placeholder="0"></div>
         <button class="btn-primario full" onclick="generarReservaTour()">✉️ Generar reserva y correo</button>
       </div>
     </div>
@@ -1281,12 +1299,31 @@
         </div>
       </div>
       <div class="panel-body">
-        <div class="seccion-label">Datos del cliente</div>
+        <div class="seccion-label">Datos del cliente <span style="color:var(--blanco-suave); text-transform:none; letter-spacing:0; font-weight:400;">— todos obligatorios</span></div>
+        <div class="campo" style="position:relative">
+          <label>Nombre completo <span class="req">*</span></label>
+          <input type="text" id="s_nombre" placeholder="Nombre del cliente" autocomplete="off" oninput="buscarClienteAutocomplete(this.value, 's')">
+          <div id="s_nombre_sugerencias" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--gris-oscuro);border:1px solid var(--dorado);border-radius:8px;z-index:999;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.4)"></div>
+        </div>
         <div class="fila-2">
-          <div class="campo"><label>Nombre completo <span class="req">*</span></label><input type="text" id="s_nombre" placeholder="Nombre del cliente"></div>
+          <div class="campo">
+            <label>Tipo de documento <span class="req">*</span></label>
+            <select id="s_tipo_doc">
+              <option value="">— Seleccionar —</option>
+              <option>Cédula de ciudadanía</option>
+              <option>Cédula de extranjería</option>
+              <option>Pasaporte</option>
+              <option>PEP</option>
+              <option>NIT</option>
+            </select>
+          </div>
+          <div class="campo"><label>Número de documento <span class="req">*</span></label><input type="text" id="s_num_doc" placeholder="Ej. 1088123456"></div>
+        </div>
+        <div class="fila-2">
+          <div class="campo"><label>Celular <span class="req">*</span></label><input type="text" id="s_celular" placeholder="+57 300 000 0000 (celular del cliente)"></div>
           <div class="campo"><label>Correo <span class="req">*</span></label><input type="email" id="s_email" placeholder="cliente@correo.com"></div>
         </div>
-        <div class="campo"><label>Celular</label><input type="text" id="s_celular" placeholder="+57 300 000 0000 (celular del cliente)"></div>
+        <div class="campo"><label>Dirección en Colombia <span class="req">*</span></label><input type="text" id="s_direccion" placeholder="Ej. Calle 10 # 5-20, Pereira, Risaralda"></div>
 
         <hr class="divider">
         <div class="seccion-label">Tipo de escolta</div>
@@ -1312,7 +1349,10 @@
           <div class="campo"><label>Hora de salida</label><input type="time" id="s_hora"></div>
         </div>
         <div class="campo"><label>Vehículo / tipo de unidad</label><input type="text" id="s_vehiculo" placeholder="Ej. Camioneta blindada nivel III"></div>
-        <div class="campo"><label>Tarifa estimada (COP)</label><input type="number" id="s_tarifa" placeholder="800000"></div>
+        <div class="fila-2">
+          <div class="campo"><label>Tarifa estimada (COP)</label><input type="number" id="s_tarifa" placeholder="800000"></div>
+          <div class="campo"><label>Abono / anticipo recibido (COP)</label><input type="number" id="s_abono" placeholder="0"></div>
+        </div>
         <div class="campo"><label>Notas internas</label><textarea id="s_notas" placeholder="Detalles adicionales del operativo"></textarea></div>
 
         <button class="btn-primario full" onclick="generarSeguridad()">✉️ Generar solicitud y correo</button>
@@ -2180,6 +2220,41 @@
     <div class="modal-footer">
       <button class="btn-secundario" onclick="cerrarModal('modal-link')">Cerrar</button>
       <button class="btn-primario" onclick="generarYCopiarLink2()">Generar y copiar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ MODAL SELECTOR DE SERVICIO PARA NUEVA RESERVA ═══════════════════ -->
+<div class="modal-overlay" id="modal-selector-servicio">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-titulo">¿Qué servicio vas a reservar?</div>
+      <button class="modal-cerrar" onclick="cerrarModal('modal-selector-servicio')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <button type="button" class="btn-secundario" style="width:100%;padding:16px;font-size:0.95rem;text-align:left;display:flex;align-items:center;gap:12px" onclick="seleccionarServicioReserva('renta')">
+          <span style="font-size:1.4rem">🚗</span>
+          <span>
+            <div style="font-weight:700">Alquiler de vehículos</div>
+            <div style="font-size:0.72rem;color:var(--blanco-suave);font-weight:400">Renta de un carro para el cliente</div>
+          </span>
+        </button>
+        <button type="button" class="btn-secundario" style="width:100%;padding:16px;font-size:0.95rem;text-align:left;display:flex;align-items:center;gap:12px" onclick="seleccionarServicioReserva('seguridad')">
+          <span style="font-size:1.4rem">🛡️</span>
+          <span>
+            <div style="font-weight:700">Transporte y seguridad</div>
+            <div style="font-size:0.72rem;color:var(--blanco-suave);font-weight:400">Escolta, traslado o transporte blindado</div>
+          </span>
+        </button>
+        <button type="button" class="btn-secundario" style="width:100%;padding:16px;font-size:0.95rem;text-align:left;display:flex;align-items:center;gap:12px" onclick="seleccionarServicioReserva('turismo')">
+          <span style="font-size:1.4rem">🌄</span>
+          <span>
+            <div style="font-weight:700">Turismo VIP</div>
+            <div style="font-size:0.72rem;color:var(--blanco-suave);font-weight:400">Reserva de un tour</div>
+          </span>
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -3970,6 +4045,40 @@ function toggleNuevaReserva() {
   if (abrir) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+/* ── Selector de servicio al crear una reserva: pregunta primero qué se va a reservar ── */
+function abrirSelectorServicioReserva() {
+  abrirModal('modal-selector-servicio');
+}
+
+// Botón "+ Nueva reserva" dentro de la pestaña Reservas: si el formulario está cerrado, primero
+// pregunta qué servicio se va a reservar; si ya está abierto (dice "Cancelar"), simplemente lo cierra.
+function manejarClickNuevaReserva() {
+  const panel = document.getElementById('panel-nueva-reserva');
+  if (panel && panel.style.display !== 'none') {
+    toggleNuevaReserva();
+  } else {
+    abrirSelectorServicioReserva();
+  }
+}
+
+function seleccionarServicioReserva(tipo) {
+  cerrarModal('modal-selector-servicio');
+  if (tipo === 'renta') {
+    cambiarVistaPorId('reservas');
+    setTimeout(() => {
+      const panel = document.getElementById('panel-nueva-reserva');
+      if (panel && panel.style.display === 'none') toggleNuevaReserva();
+      else panel?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+  } else if (tipo === 'seguridad') {
+    cambiarVistaPorId('seguridad');
+    setTimeout(() => document.getElementById('s_nombre')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  } else if (tipo === 'turismo') {
+    cambiarVistaPorId('turismo');
+    setTimeout(() => document.getElementById('t_nombre')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  }
+}
+
 /* ════════════════════════════════════════════
    PICO Y PLACA POR CIUDAD
    ════════════════════════════════════════════ */
@@ -5668,37 +5777,62 @@ function actualizarVehiculoTour() {
 
 async function generarReservaTour() {
   const nombre = document.getElementById('t_nombre').value.trim();
+  const tipoDoc = document.getElementById('t_tipo_doc').value;
+  const numDoc = document.getElementById('t_num_doc').value.trim();
   const email = document.getElementById('t_email').value.trim();
+  const celular = document.getElementById('t_celular').value.trim();
+  const direccion = document.getElementById('t_direccion').value.trim();
   const tourId = document.getElementById('t_tour').value;
   const fecha = document.getElementById('t_fecha').value;
 
-  if (!nombre || !email || !tourId || !fecha) {
-    mostrarToast('⚠️ Completa nombre, correo, tour y fecha', '#E05252');
+  const faltantes = [];
+  if (!nombre) faltantes.push('Nombre completo');
+  if (!tipoDoc) faltantes.push('Tipo de documento');
+  if (!numDoc) faltantes.push('Número de documento');
+  if (!celular) faltantes.push('Celular');
+  if (!email) faltantes.push('Correo');
+  if (!direccion) faltantes.push('Dirección');
+  if (!tourId) faltantes.push('Tour');
+  if (!fecha) faltantes.push('Fecha');
+  if (faltantes.length > 0) {
+    mostrarToast('⚠️ Faltan campos obligatorios: ' + faltantes.join(', '), '#E05252');
     return;
   }
 
   const tour = tours.find(t => t.id === tourId);
-  const celular = document.getElementById('t_celular').value.trim() || '—';
   const personas = document.getElementById('t_personas').value || '1';
   const hora = document.getElementById('t_hora').value || 'Por confirmar';
+  const abono = parseFloat(document.getElementById('t_abono')?.value) || 0;
 
   const numReserva = generarNumReserva('TOUR');
   const total = (tour.precio || 0) * parseInt(personas);
+  const saldoPendiente = Math.max(total - abono, 0);
 
   const nueva = {
-    num_reserva: numReserva, nombre, email, celular, personas,
+    num_reserva: numReserva, nombre, tipoDoc, numDoc, email, celular, direccion, personas,
     tour_id: tourId, tour_nombre: tour.nombre, vehiculo: tour.vehiculo_nombre || '—',
-    fecha, hora, precio_persona: tour.precio, total, creada: new Date().toISOString(),
+    fecha, hora, precio_persona: tour.precio, total, abono, saldoPendiente, creada: new Date().toISOString(),
   };
   reservasTour.unshift(nueva);
 
-  // Guardar en Supabase
+  // Guardar en Supabase: primero el cliente (para que quede en el directorio de Clientes), luego la reserva
   try {
+    try {
+      await sbInsert('clientes', {
+        nombre, documento: numDoc,
+        tipo_doc: { 'Cédula de ciudadanía':'CC', 'Cédula de extranjería':'CE', 'Pasaporte':'PAS', 'PEP':'PEP', 'NIT':'NIT' }[tipoDoc] || 'CC',
+        telefono: celular, email, direccion,
+      });
+    } catch(eCli) { console.warn('No se pudo guardar el cliente en el directorio:', eCli.message); }
+
     const creado = await sbInsert('reservas_tour', {
       numero: numReserva,
       nombre_cliente: nombre,
+      tipo_doc: tipoDoc,
+      num_documento: numDoc,
       email: email,
       celular: celular,
+      direccion: direccion,
       tour_id: tourId || null,
       tour_nombre: tour.nombre,
       fecha: fecha,
@@ -5706,6 +5840,7 @@ async function generarReservaTour() {
       personas: parseInt(personas),
       precio_persona: tour.precio || 0,
       total: total,
+      abono: abono,
       estado: 'pendiente',
     });
     nueva.id = creado[0]?.id;
@@ -5746,7 +5881,7 @@ PAGO
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 Precio por persona: ${formatCOP(tour.precio)}
 TOTAL:              ${formatCOP(total)}
-
+${abono > 0 ? `Abono recibido:     ${formatCOP(abono)}\nSaldo pendiente:    ${formatCOP(saldoPendiente)}\n` : ''}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Nuestro conductor lo contactará el día anterior para confirmar el punto de recogida.
@@ -5808,22 +5943,37 @@ async function eliminarReservaTour(num) {
    ════════════════════════════════════════════ */
 async function generarSeguridad() {
   const nombre = document.getElementById('s_nombre').value.trim();
+  const tipoDoc = document.getElementById('s_tipo_doc').value;
+  const numDoc = document.getElementById('s_num_doc').value.trim();
   const email = document.getElementById('s_email').value.trim();
+  const celular = document.getElementById('s_celular').value.trim();
+  const direccion = document.getElementById('s_direccion').value.trim();
   const origen = document.getElementById('s_origen').value.trim();
   const destino = document.getElementById('s_destino').value.trim();
   const fecha = document.getElementById('s_fecha').value;
 
-  if (!nombre || !email || !origen || !destino || !fecha) {
-    mostrarToast('⚠️ Completa nombre, correo, origen, destino y fecha', '#E05252');
+  const faltantes = [];
+  if (!nombre) faltantes.push('Nombre completo');
+  if (!tipoDoc) faltantes.push('Tipo de documento');
+  if (!numDoc) faltantes.push('Número de documento');
+  if (!celular) faltantes.push('Celular');
+  if (!email) faltantes.push('Correo');
+  if (!direccion) faltantes.push('Dirección');
+  if (!origen) faltantes.push('Origen');
+  if (!destino) faltantes.push('Destino');
+  if (!fecha) faltantes.push('Fecha');
+  if (faltantes.length > 0) {
+    mostrarToast('⚠️ Faltan campos obligatorios: ' + faltantes.join(', '), '#E05252');
     return;
   }
 
   const escolta = document.querySelector('input[name="s_escolta"]:checked').value;
   const arma = document.querySelector('input[name="s_arma"]:checked').value;
-  const celular = document.getElementById('s_celular').value.trim() || '—';
   const hora = document.getElementById('s_hora').value || 'Por confirmar';
   const vehiculo = document.getElementById('s_vehiculo').value.trim() || 'Por asignar';
   const tarifa = parseFloat(document.getElementById('s_tarifa').value) || 0;
+  const abono = parseFloat(document.getElementById('s_abono')?.value) || 0;
+  const saldoPendiente = Math.max(tarifa - abono, 0);
   const notas = document.getElementById('s_notas').value.trim() || 'Sin notas';
 
   const numReserva = generarNumReserva('SEG');
@@ -5832,18 +5982,29 @@ async function generarSeguridad() {
   const armaTxt = arma === 'con_arma' ? 'Con arma' : 'Sin arma';
 
   const nueva = {
-    num_reserva: numReserva, nombre, email, celular, origen, destino, fecha, hora,
-    escolta, arma, vehiculo, tarifa, notas, creada: new Date().toISOString(),
+    num_reserva: numReserva, nombre, tipoDoc, numDoc, email, celular, direccion, origen, destino, fecha, hora,
+    escolta, arma, vehiculo, tarifa, abono, saldoPendiente, notas, creada: new Date().toISOString(),
   };
   solicitudesSeguridad.unshift(nueva);
 
-  // Guardar en Supabase
+  // Guardar en Supabase: primero el cliente (para que quede en el directorio de Clientes), luego la solicitud
   try {
+    try {
+      await sbInsert('clientes', {
+        nombre, documento: numDoc,
+        tipo_doc: { 'Cédula de ciudadanía':'CC', 'Cédula de extranjería':'CE', 'Pasaporte':'PAS', 'PEP':'PEP', 'NIT':'NIT' }[tipoDoc] || 'CC',
+        telefono: celular, email, direccion,
+      });
+    } catch(eCli) { console.warn('No se pudo guardar el cliente en el directorio:', eCli.message); }
+
     const creado = await sbInsert('solicitudes_seguridad', {
       numero: numReserva,
       nombre_cliente: nombre,
+      tipo_doc: tipoDoc,
+      num_documento: numDoc,
       email: email,
       celular: celular,
+      direccion: direccion,
       origen: origen,
       destino: destino,
       fecha: fecha,
@@ -5852,6 +6013,7 @@ async function generarSeguridad() {
       arma: arma,
       vehiculo: vehiculo,
       tarifa: tarifa,
+      abono: abono,
       notas: notas,
       estado: 'pendiente',
     });
@@ -5895,7 +6057,7 @@ Escolta:  ${escoltaTxt}
 Personal de escolta: ${armaTxt}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
-${tarifa > 0 ? `Tarifa estimada: ${formatCOP(tarifa)}\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n` : ''}
+${tarifa > 0 ? `Tarifa estimada: ${formatCOP(tarifa)}\n${abono > 0 ? `Abono recibido: ${formatCOP(abono)}\nSaldo pendiente: ${formatCOP(saldoPendiente)}\n` : ''}━━━━━━━━━━━━━━━━━━━━━━━━━━\n` : ''}
 Nuestro equipo de operaciones confirmará los detalles finales antes del servicio.
 
 Equipo Car Help — Seguridad y Transporte
@@ -7583,6 +7745,30 @@ let cotVehiculosResumenTxt = '';
 let cotSegResumenTxt = '';
 let cotEditandoId = null;
 let cotNumActual = '';
+let cotPdfData = null; // modelo de datos (sin HTML) para generar el PDF con jsPDF directamente
+
+async function cotUrlADataURL(url) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch(e) { console.warn('No se pudo cargar la imagen para el PDF:', e.message); return null; }
+}
+
+function cotDataURLDimensiones(dataUrl) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve({ w: img.naturalWidth || 4, h: img.naturalHeight || 3 });
+    img.onerror = () => resolve({ w: 4, h: 3 });
+    img.src = dataUrl;
+  });
+}
 
 /* ── Renta: lista dinámica de vehículos solicitados, cada uno con su propia foto ── */
 let cotVehiculosFilas = [{ vehiculoId: '', tarifa: 0, deposito: 0, fotoArchivo: null, fotoPreviewUrl: null }];
@@ -7648,23 +7834,37 @@ function cotSeleccionarFotoFila(idx, event) {
 }
 
 /* ── Seguridad: listas dinámicas de vehículos y conductores ── */
-let cotSegVehiculos = [''];
+let cotSegVehiculos = [{ texto: '', fotoArchivo: null, fotoPreviewUrl: null }];
 let cotSegConductores = [''];
 
 function renderCotSegVehiculos() {
   const cont = document.getElementById('cot-seg-vehiculos-lista');
   if (!cont) return;
-  cont.innerHTML = cotSegVehiculos.map((val, i) => `
-    <div style="display:flex;gap:8px;margin-bottom:8px">
-      <input type="text" value="${val.replace(/"/g,'&quot;')}" placeholder="Ej. Toyota Prado Blindada — ABC123" oninput="cotSegVehiculos[${i}] = this.value" style="flex:1">
-      ${cotSegVehiculos.length > 1 ? `<button type="button" class="btn-peligro" onclick="cotQuitarSegVehiculo(${i})">✕</button>` : ''}
+  cont.innerHTML = cotSegVehiculos.map((v, i) => `
+    <div style="border:1px solid var(--borde);border-radius:8px;padding:10px;margin-bottom:8px;position:relative">
+      ${cotSegVehiculos.length > 1 ? `<button type="button" onclick="cotQuitarSegVehiculo(${i})" style="position:absolute;top:8px;right:8px;background:none;border:none;color:var(--rojo-alerta);cursor:pointer;font-size:1rem;line-height:1">✕</button>` : ''}
+      <input type="text" value="${(v.texto || '').replace(/"/g,'&quot;')}" placeholder="Ej. Toyota Prado Blindada — ABC123" oninput="cotSegVehiculos[${i}].texto = this.value" style="width:100%;margin-bottom:8px">
+      <label style="font-size:0.7rem;color:var(--blanco-suave)">Foto de este vehículo (para que le llegue al cliente)</label>
+      <input type="file" accept="image/*" onchange="cotSegSeleccionarFotoVehiculo(${i}, event)">
+      ${v.fotoPreviewUrl ? `<img src="${v.fotoPreviewUrl}" style="display:block;max-width:100%;max-height:140px;border-radius:8px;margin-top:8px;border:1px solid var(--borde)">` : ''}
     </div>
   `).join('');
 }
-function cotAgregarSegVehiculo() { cotSegVehiculos.push(''); renderCotSegVehiculos(); }
+function cotAgregarSegVehiculo() { cotSegVehiculos.push({ texto: '', fotoArchivo: null, fotoPreviewUrl: null }); renderCotSegVehiculos(); }
 function cotQuitarSegVehiculo(idx) {
   if (cotSegVehiculos.length <= 1) { mostrarToast('Debe quedar al menos un campo', '#C9A84C'); return; }
   cotSegVehiculos.splice(idx, 1); renderCotSegVehiculos();
+}
+function cotSegSeleccionarFotoVehiculo(idx, event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  cotSegVehiculos[idx].fotoArchivo = file;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    cotSegVehiculos[idx].fotoPreviewUrl = e.target.result;
+    renderCotSegVehiculos();
+  };
+  reader.readAsDataURL(file);
 }
 
 function renderCotSegConductores() {
@@ -7695,6 +7895,8 @@ async function generarCotizacion(silencioso = false) {
   let total = 0;
   let subtitulo = '';
   let snapshotDatos = {};
+  let seccionesPdf = [];
+  let vehiculosConFotoPdf = [];
 
   if (cotTipo === 'renta') {
     const fechaInicio = cotValor('cot-fecha-inicio');
@@ -7759,6 +7961,7 @@ async function generarCotizacion(silencioso = false) {
       let dias = calcPeriodo.periodosFacturables;
       let subtotal = tarifa * dias;
       let lineaExtra = '';
+      let lineaExtraPdf = null;
       if (calcPeriodo.cobroExtra && modoCobroHoras !== 'dia_completo') {
         dias = calcPeriodo.periodos24h; // no se cobra el período extra completo
         subtotal = tarifa * dias;
@@ -7768,8 +7971,10 @@ async function generarCotizacion(silencioso = false) {
           const valorExtra = horasRedondeadas * valorHora;
           subtotal += valorExtra;
           lineaExtra = `<tr><td>+${calcPeriodo.horasExtra}h adicionales (por hora)</td><td>${formatCOP(valorExtra)}</td></tr>`;
+          lineaExtraPdf = [`+${calcPeriodo.horasExtra}h adicionales (por hora)`, formatCOP(valorExtra)];
         } else {
           lineaExtra = `<tr><td>+${calcPeriodo.horasExtra}h adicionales</td><td>Cortesía, sin cobro</td></tr>`;
+          lineaExtraPdf = [`+${calcPeriodo.horasExtra}h adicionales`, 'Cortesía, sin cobro'];
         }
         diasParaMostrar = dias;
       }
@@ -7784,6 +7989,17 @@ async function generarCotizacion(silencioso = false) {
         ${lineaExtra}
         <tr><td>Depósito / garantía</td><td>${formatCOP(f.deposito || 0)}</td></tr>`;
       filasVehiculosTxt.push(`${vehNombre}: ${formatCOP(tarifa)}/día × ${dias} día(s)${lineaExtra ? ' + horas adicionales' : ''} + depósito ${formatCOP(f.deposito || 0)} = ${formatCOP(totalFila)}${fotoUrl ? `\n  Foto: ${fotoUrl}` : ''}`);
+
+      vehiculosConFotoPdf.push({
+        nombre: vehNombre,
+        fotoUrl,
+        filas: [
+          ['Tarifa por 24h', formatCOP(tarifa)],
+          [`Subtotal (${dias} día${dias !== 1 ? 's' : ''})`, formatCOP(tarifa * dias)],
+          ...(lineaExtraPdf ? [lineaExtraPdf] : []),
+          ['Depósito / garantía', formatCOP(f.deposito || 0)]
+        ]
+      });
     }
     const dias = diasParaMostrar;
     cotFotoVehiculoUrlActual = primeraFotoUrl;
@@ -7806,6 +8022,17 @@ async function generarCotizacion(silencioso = false) {
         <tr class="total-row"><td><strong>TOTAL ESTIMADO</strong></td><td><strong>${formatCOP(total)}</strong></td></tr>
       </table>`;
 
+    seccionesPdf.push({
+      titulo: 'Fechas y lugar',
+      filas: [
+        ['Entrega', `${fechaInicio ? new Date(fechaInicio + 'T12:00').toLocaleDateString('es-CO') : '—'} a las ${horaInicio}`],
+        ['Devolución', `${fechaFin ? new Date(fechaFin + 'T12:00').toLocaleDateString('es-CO') : '—'} a las ${horaFin}`],
+        ['Lugar de entrega', lugar || '—'],
+        ['Número de días', `${dias} día${dias !== 1 ? 's' : ''}`]
+      ],
+      notaTexto: notaHorasExtra || ''
+    });
+
   } else if (cotTipo === 'seguridad') {
     const tipoSeg = document.getElementById('cot-tipo-seguridad');
     const tipoNombre = tipoSeg?.options[tipoSeg?.selectedIndex]?.text || 'Servicio de seguridad';
@@ -7817,12 +8044,48 @@ async function generarCotizacion(silencioso = false) {
     const valor = cotParseCOP(cotValor('cot-seg-valor'));
     total = valor;
     subtitulo = 'Seguridad y transporte';
-    snapshotDatos = { ...snapshotDatos, tipo: 'seguridad', tipoSeguridad: tipoSeg?.value, origen, destino, fecha, hora, personas, valor: cotValor('cot-seg-valor'), segVehiculos: [...cotSegVehiculos], segConductores: [...cotSegConductores] };
 
-    const vehiculosAsignados = cotSegVehiculos.map(v => v.trim()).filter(Boolean);
+    // Cada vehículo asignado puede llevar su propia foto (se sube a Supabase si es un archivo nuevo)
+    let vehiculosSegSnapshot = [];
+    let filasVehSegHtml = '';
+    let filasVehSegTxt = [];
+    for (let i = 0; i < cotSegVehiculos.length; i++) {
+      const v = cotSegVehiculos[i];
+      const texto = (v.texto || '').trim();
+      if (!texto) continue;
+      let fotoUrl = null;
+      if (v.fotoArchivo) {
+        try {
+          const ext = v.fotoArchivo.name.split('.').pop() || 'jpg';
+          const path = `cotizaciones/seg-${Date.now()}-${i}.${ext}`;
+          const res = await fetch(`${SB_URL}/storage/v1/object/entregas-fotos/${path}`, {
+            method: 'POST',
+            headers: {
+              'apikey': SB_KEY,
+              'Authorization': `Bearer ${SB_KEY}`,
+              'Content-Type': v.fotoArchivo.type || 'image/jpeg',
+              'x-upsert': 'true'
+            },
+            body: v.fotoArchivo
+          });
+          if (res.ok) fotoUrl = `${SB_URL}/storage/v1/object/public/entregas-fotos/${path}`;
+        } catch(e) { console.warn('Error subiendo la foto del vehículo de seguridad:', e.message); }
+      } else if (v.fotoPreviewUrl) {
+        fotoUrl = v.fotoPreviewUrl;
+      }
+      vehiculosSegSnapshot.push({ texto, fotoUrl });
+      filasVehSegHtml += `
+        <tr><td colspan="2" style="padding-top:${i > 0 ? '10px' : '0'};font-weight:600">${texto}</td></tr>
+        ${fotoUrl ? `<tr><td colspan="2"><img src="${fotoUrl}" style="width:100%;max-height:200px;object-fit:cover;border-radius:8px;margin:4px 0 8px"></td></tr>` : ''}`;
+      filasVehSegTxt.push(`${texto}${fotoUrl ? `\n  Foto: ${fotoUrl}` : ''}`);
+      vehiculosConFotoPdf.push({ nombre: texto, fotoUrl, filas: [] });
+    }
+
     const conductoresAsignados = cotSegConductores.map(c => c.trim()).filter(Boolean);
+    snapshotDatos = { ...snapshotDatos, tipo: 'seguridad', tipoSeguridad: tipoSeg?.value, origen, destino, fecha, hora, personas, valor: cotValor('cot-seg-valor'), segVehiculos: vehiculosSegSnapshot, segConductores: [...cotSegConductores] };
+
     cotSegResumenTxt = [
-      vehiculosAsignados.length ? 'Vehículos asignados: ' + vehiculosAsignados.join(', ') : '',
+      filasVehSegTxt.length ? 'Vehículos asignados:\n' + filasVehSegTxt.join('\n') : '',
       conductoresAsignados.length ? 'Conductores asignados: ' + conductoresAsignados.join(', ') : ''
     ].filter(Boolean).join('\n');
 
@@ -7834,13 +8097,25 @@ async function generarCotizacion(silencioso = false) {
         <tr><td>Destino</td><td>${destino || '—'}</td></tr>
         <tr><td>Fecha y hora</td><td>${fecha ? new Date(fecha + 'T12:00').toLocaleDateString('es-CO') : '—'} - ${hora}</td></tr>
         <tr><td>Número de personas</td><td>${personas}</td></tr>
-        ${vehiculosAsignados.length ? `<tr><td>Vehículo${vehiculosAsignados.length > 1 ? 's' : ''} asignado${vehiculosAsignados.length > 1 ? 's' : ''}</td><td>${vehiculosAsignados.join('<br>')}</td></tr>` : ''}
         ${conductoresAsignados.length ? `<tr><td>Conductor${conductoresAsignados.length > 1 ? 'es' : ''} asignado${conductoresAsignados.length > 1 ? 's' : ''}</td><td>${conductoresAsignados.join('<br>')}</td></tr>` : ''}
       </table>
+      ${filasVehSegHtml ? `<h3>Vehículo${vehiculosSegSnapshot.length > 1 ? 's' : ''} asignado${vehiculosSegSnapshot.length > 1 ? 's' : ''}</h3><table>${filasVehSegHtml}</table>` : ''}
       <h3>Valores</h3>
       <table>
         <tr class="total-row"><td><strong>VALOR DEL SERVICIO</strong></td><td><strong>${formatCOP(valor)}</strong></td></tr>
       </table>`;
+
+    seccionesPdf.push({
+      titulo: 'Servicio',
+      filas: [
+        ['Tipo de servicio', tipoNombre],
+        ['Origen', origen || '—'],
+        ['Destino', destino || '—'],
+        ['Fecha y hora', `${fecha ? new Date(fecha + 'T12:00').toLocaleDateString('es-CO') : '—'} - ${hora}`],
+        ['Número de personas', personas],
+        ...(conductoresAsignados.length ? [[`Conductor${conductoresAsignados.length > 1 ? 'es' : ''} asignado${conductoresAsignados.length > 1 ? 's' : ''}`, conductoresAsignados.join(', ')]] : [])
+      ]
+    });
 
   } else if (cotTipo === 'turismo') {
     const destSel = document.getElementById('cot-tour-destino');
@@ -7873,7 +8148,29 @@ async function generarCotizacion(silencioso = false) {
         <tr><td>Personas</td><td>${personas}</td></tr>
         <tr class="total-row"><td><strong>TOTAL ESTIMADO</strong></td><td><strong>${formatCOP(total)}</strong></td></tr>
       </table>`;
+
+    seccionesPdf.push({
+      titulo: 'Tour / Destino',
+      filas: [
+        ['Destino', destino],
+        ['Fecha inicio', fechaIni ? new Date(fechaIni + 'T12:00').toLocaleDateString('es-CO') : '—'],
+        ['Fecha fin', fechaFin2 ? new Date(fechaFin2 + 'T12:00').toLocaleDateString('es-CO') : '—'],
+        ['Duración', `${dias} día${dias !== 1 ? 's' : ''}`],
+        ['Número de personas', personas],
+        ...(incluye ? [['Incluye', incluye]] : []),
+        ...(desc ? [['Itinerario', desc]] : [])
+      ]
+    });
+    seccionesPdf.push({
+      titulo: 'Valores',
+      filas: [
+        ['Precio por persona', formatCOP(precioPP)],
+        ['Personas', String(personas)]
+      ]
+    });
   }
+
+  cotPdfData = { numCot, fechaHoy, subtitulo, nombre, email, telefono, secciones: seccionesPdf, vehiculosConFoto: vehiculosConFotoPdf, total, notas };
 
   const notasHTML = notas ? `<h3>Notas adicionales</h3><p style="font-size:13px;color:#555;margin:0">${notas}</p>` : '';
 
@@ -8101,7 +8398,11 @@ function editarCotizacion(id) {
     document.getElementById('cot-seg-hora').value = d.hora || '08:00';
     document.getElementById('cot-seg-personas').value = d.personas || '1';
     document.getElementById('cot-seg-valor').value = d.valor || '';
-    cotSegVehiculos = (d.segVehiculos && d.segVehiculos.length > 0) ? [...d.segVehiculos] : [''];
+    cotSegVehiculos = (d.segVehiculos && d.segVehiculos.length > 0)
+      ? d.segVehiculos.map(v => typeof v === 'string'
+          ? { texto: v, fotoArchivo: null, fotoPreviewUrl: null }
+          : { texto: v.texto || '', fotoArchivo: null, fotoPreviewUrl: v.fotoUrl || null })
+      : [{ texto: '', fotoArchivo: null, fotoPreviewUrl: null }];
     cotSegConductores = (d.segConductores && d.segConductores.length > 0) ? [...d.segConductores] : [''];
     renderCotSegVehiculos();
     renderCotSegConductores();
@@ -8158,28 +8459,189 @@ function copiarCotizacion() {
   });
 }
 
-// Descarga la vista previa de la cotización como PDF, lista para enviar por WhatsApp
-function descargarCotizacionPDF() {
-  const elemento = document.getElementById('cot-preview-body');
-  if (!elemento || !elemento.querySelector('.cot-preview')) {
+// Descarga la cotización como PDF, generado directamente con jsPDF (texto real, no una foto de la pantalla)
+// Esto evita el bug de "PDF en blanco" que daba la versión anterior (basada en html2canvas), que en varios
+// celulares capturaba un lienzo vacío en vez del contenido.
+async function descargarCotizacionPDF() {
+  if (!cotPdfData) {
     mostrarToast('⚠️ Genera la cotización primero', '#E05252');
     return;
   }
-  if (typeof html2pdf === 'undefined') {
+  const JsPDFCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+  if (!JsPDFCtor) {
     mostrarToast('⚠️ No se pudo cargar el generador de PDF, revisa tu conexión', '#E05252');
     return;
   }
   mostrarToast('📄 Generando PDF...', 'var(--azul-info)');
-  const opciones = {
-    margin: 10,
-    filename: `Cotizacion_${cotNumActual || 'CarHelp'}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, backgroundColor: '#ffffff' },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-  };
-  html2pdf().set(opciones).from(elemento).save()
-    .then(() => mostrarToast('✅ PDF descargado — ya lo puedes enviar por WhatsApp'))
-    .catch((e) => { console.error(e); mostrarToast('⚠️ No se pudo generar el PDF', '#E05252'); });
+
+  try {
+    const doc = new JsPDFCtor({ unit: 'mm', format: 'a4' });
+    const pageW = 210, marginX = 15, contentW = pageW - marginX * 2;
+    let y = 0;
+
+    function nuevaPagina() { doc.addPage(); y = 15; }
+    function asegurarEspacio(alto) { if (y + alto > 282) nuevaPagina(); }
+
+    function encabezado() {
+      doc.setFillColor(10, 10, 10);
+      doc.rect(0, 0, pageW, 24, 'F');
+      doc.setTextColor(201, 168, 76);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(18);
+      doc.text('CAR HELP', pageW / 2, 12, { align: 'center' });
+      doc.setTextColor(170, 170, 170);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text('RENT A CAR · SEGURIDAD · TURISMO VIP', pageW / 2, 18, { align: 'center' });
+      y = 32;
+    }
+    encabezado();
+
+    doc.setTextColor(20, 20, 20);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text(`Cotización ${cotPdfData.subtitulo}`, marginX, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(120, 120, 120);
+    doc.text(`${cotPdfData.numCot} · ${cotPdfData.fechaHoy}`, marginX, y + 5);
+
+    doc.setTextColor(20, 20, 20);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text(cotPdfData.nombre || 'Cliente', pageW - marginX, y, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(120, 120, 120);
+    let yc = y + 5;
+    if (cotPdfData.email) { doc.text(cotPdfData.email, pageW - marginX, yc, { align: 'right' }); yc += 4; }
+    if (cotPdfData.telefono) { doc.text(cotPdfData.telefono, pageW - marginX, yc, { align: 'right' }); yc += 4; }
+    y += 14;
+
+    function tituloSeccion(txt) {
+      asegurarEspacio(12);
+      doc.setDrawColor(201, 168, 76);
+      doc.setLineWidth(0.6);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(20, 20, 20);
+      doc.text(txt, marginX, y);
+      doc.line(marginX, y + 2, pageW - marginX, y + 2);
+      y += 8;
+    }
+
+    function filaValor(label, valor) {
+      const labelW = 55, valorW = contentW - labelW - 4;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      const labelLineas = doc.splitTextToSize(String(label), labelW);
+      const valorLineas = doc.splitTextToSize(String(valor), valorW);
+      const lineas = Math.max(labelLineas.length, valorLineas.length);
+      const alto = lineas * 4.2 + 2;
+      asegurarEspacio(alto);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(110, 110, 110);
+      doc.text(labelLineas, marginX, y + 3.2);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(30, 30, 30);
+      doc.text(valorLineas, marginX + labelW + 4, y + 3.2);
+      doc.setDrawColor(235, 235, 235);
+      doc.setLineWidth(0.2);
+      doc.line(marginX, y + alto, pageW - marginX, y + alto);
+      y += alto + 1.5;
+    }
+
+    async function imagenVehiculo(url) {
+      if (!url) return;
+      const dataUrl = await cotUrlADataURL(url);
+      if (!dataUrl) return;
+      const dim = await cotDataURLDimensiones(dataUrl);
+      const maxW = contentW, maxH = 70;
+      let w = maxW, h = (dim.h / dim.w) * w;
+      if (h > maxH) { h = maxH; w = (dim.w / dim.h) * h; }
+      asegurarEspacio(h + 4);
+      let formato = 'JPEG';
+      if (dataUrl.startsWith('data:image/png')) formato = 'PNG';
+      try { doc.addImage(dataUrl, formato, marginX, y, w, h); } catch(e) { console.warn('No se pudo incrustar imagen en el PDF:', e.message); }
+      y += h + 4;
+    }
+
+    for (const sec of cotPdfData.secciones) {
+      tituloSeccion(sec.titulo);
+      for (const [label, valor] of sec.filas) filaValor(label, valor);
+      if (sec.notaTexto) {
+        asegurarEspacio(8);
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(8);
+        doc.setTextColor(140, 140, 140);
+        const lineas = doc.splitTextToSize(sec.notaTexto, contentW);
+        doc.text(lineas, marginX, y + 3);
+        y += lineas.length * 3.6 + 3;
+      }
+    }
+
+    if (cotPdfData.vehiculosConFoto.length) {
+      tituloSeccion(cotPdfData.vehiculosConFoto.length > 1 ? 'Vehículos' : 'Vehículo');
+      for (const v of cotPdfData.vehiculosConFoto) {
+        asegurarEspacio(8);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9.5);
+        doc.setTextColor(30, 30, 30);
+        doc.text(v.nombre, marginX, y + 3);
+        y += 7;
+        await imagenVehiculo(v.fotoUrl);
+        for (const [label, valor] of (v.filas || [])) filaValor(label, valor);
+        y += 2;
+      }
+    }
+
+    asegurarEspacio(14);
+    doc.setFillColor(249, 245, 236);
+    doc.rect(marginX, y, contentW, 11, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(20, 20, 20);
+    doc.text('TOTAL ESTIMADO', marginX + 3, y + 7);
+    doc.setTextColor(180, 140, 40);
+    doc.setFontSize(12);
+    doc.text(formatCOP(cotPdfData.total), pageW - marginX - 3, y + 7.5, { align: 'right' });
+    y += 16;
+
+    if (cotPdfData.notas) {
+      tituloSeccion('Notas adicionales');
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(80, 80, 80);
+      const lineas = doc.splitTextToSize(cotPdfData.notas, contentW);
+      asegurarEspacio(lineas.length * 4.2 + 4);
+      doc.text(lineas, marginX, y + 3);
+      y += lineas.length * 4.2 + 6;
+    }
+
+    asegurarEspacio(20);
+    doc.setDrawColor(230, 230, 230);
+    doc.line(marginX, y, pageW - marginX, y);
+    y += 5;
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8);
+    doc.setTextColor(130, 130, 130);
+    doc.text('Esta cotización tiene validez de 5 días hábiles a partir de la fecha de emisión.', marginX, y);
+    y += 4;
+    doc.text('Los precios pueden variar según disponibilidad y condiciones del servicio.', marginX, y);
+    y += 6;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text('Car Help S.A.S · NIT 901.697.903-5 · Pereira, Colombia', pageW / 2, y, { align: 'center' });
+    y += 4;
+    doc.text('310 743 6082 · reservascarhelp@gmail.com · carhelp.com.co', pageW / 2, y, { align: 'center' });
+
+    doc.save(`Cotizacion_${cotPdfData.numCot || 'CarHelp'}.pdf`);
+    mostrarToast('✅ PDF descargado — ya lo puedes enviar por WhatsApp');
+  } catch(e) {
+    console.error(e);
+    mostrarToast('⚠️ No se pudo generar el PDF: ' + e.message, '#E05252');
+  }
 }
 
 // Envía una copia exacta de la cotización ya generada a un correo adicional (otra área de la empresa, etc.)
@@ -8220,12 +8682,13 @@ function limpiarCotizacion() {
   cotNumActual = '';
   cotTextoActual = '';
   cotFotoVehiculoUrlActual = null;
+  cotPdfData = null;
 
   cotVehiculosFilas = [{ vehiculoId: '', tarifa: 0, deposito: 0, fotoArchivo: null, fotoPreviewUrl: null }];
   cotVehiculosResumenTxt = '';
   renderCotVehiculosFilas();
 
-  cotSegVehiculos = [''];
+  cotSegVehiculos = [{ texto: '', fotoArchivo: null, fotoPreviewUrl: null }];
   cotSegConductores = [''];
   cotSegResumenTxt = '';
   renderCotSegVehiculos();
@@ -8233,7 +8696,7 @@ function limpiarCotizacion() {
 }
 
 function buscarClienteAutocomplete(q, prefijo = 'r') {
-  const cajaId = prefijo === 'cot' ? 'cot-nombre_sugerencias' : 'r_nombre_sugerencias';
+  const cajaId = prefijo === 'cot' ? 'cot-nombre_sugerencias' : `${prefijo}_nombre_sugerencias`;
   const caja = document.getElementById(cajaId);
   if (!caja) return;
   if (!q || q.length < 3) { caja.style.display = 'none'; return; }
@@ -9251,7 +9714,8 @@ async function guardarCliente() {
   }
 }
 
-// Autocomplete mejorado — llena TODOS los campos
+// Autocomplete mejorado — llena TODOS los campos. Funciona para reservas de renta (r_),
+// seguridad (s_), turismo (t_) y cotizaciones (cot-), reutilizando el mismo directorio de clientes.
 function seleccionarClienteAutocomplete(c, prefijo = 'r') {
   const numDoc = c.num_doc || c.documento || '';
   const celular = c.celular || c.telefono || '';
@@ -9261,20 +9725,22 @@ function seleccionarClienteAutocomplete(c, prefijo = 'r') {
     document.getElementById('cot-email').value = c.email || '';
     document.getElementById('cot-telefono').value = celular;
     document.getElementById('cot-nombre_sugerencias').style.display = 'none';
-  } else {
-    // Reservas — llenar TODOS los campos disponibles
-    const set = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
-    set('r_nombre', c.nombre);
-    set('r_tipo_doc', tipoDoc);
-    set('r_num_doc', numDoc);
-    set('r_celular', celular);
-    set('r_email', c.email);
-    set('r_direccion', c.direccion);
+    return;
+  }
+  const set = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+  set(`${prefijo}_nombre`, c.nombre);
+  set(`${prefijo}_tipo_doc`, tipoDoc);
+  set(`${prefijo}_num_doc`, numDoc);
+  set(`${prefijo}_celular`, celular);
+  set(`${prefijo}_email`, c.email);
+  set(`${prefijo}_direccion`, c.direccion);
+  if (prefijo === 'r') {
     set('r_licencia_num', c.licencia_num);
     set('r_licencia_cat', c.licencia_cat);
     set('r_licencia_vence', c.licencia_vence);
-    document.getElementById('r_nombre_sugerencias').style.display = 'none';
   }
+  const sug = document.getElementById(`${prefijo}_nombre_sugerencias`);
+  if (sug) sug.style.display = 'none';
 }
 
 async function actualizarRentasEnCurso() {
