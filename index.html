@@ -5855,8 +5855,8 @@ async function generarReservaTour() {
     });
     mostrarToast('✅ Tour reservado en Supabase: ' + numReserva);
   } catch(e) {
-    console.warn('Error guardando en Supabase:', e.message);
-    mostrarToast('⚠️ Reserva guardada localmente: ' + numReserva, '#BA7517');
+    console.error('Error guardando en Supabase:', e);
+    mostrarToast('⚠️ ALERTA: esta reserva NO se guardó en la nube, solo en este dispositivo: ' + numReserva + ' — ' + e.message, 'var(--rojo-alerta)');
   }
   lsSet('carhelp:reservas_tour', reservasTour);
 
@@ -6031,8 +6031,8 @@ async function generarSeguridad() {
     }
     mostrarToast('✅ Servicio de seguridad guardado: ' + numReserva);
   } catch(e) {
-    console.warn('Error guardando en Supabase:', e.message);
-    mostrarToast('⚠️ Guardado localmente: ' + numReserva, '#BA7517');
+    console.error('Error guardando en Supabase:', e);
+    mostrarToast('⚠️ ALERTA: esta solicitud NO se guardó en la nube, solo en este dispositivo: ' + numReserva + ' — ' + e.message, 'var(--rojo-alerta)');
   }
   lsSet('carhelp:seguridad', solicitudesSeguridad);
 
