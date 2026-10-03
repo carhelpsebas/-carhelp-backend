@@ -8095,7 +8095,7 @@ async function generarCotizacion(silencioso = false) {
     let filasVehSegTxt = [];
     for (let i = 0; i < cotSegVehiculos.length; i++) {
       const v = cotSegVehiculos[i];
-      const texto = (v.texto || '').trim();
+      const texto = (v.texto || '').trim() || (v.fotoArchivo || v.fotoPreviewUrl ? 'Vehículo asignado' : '');
       if (!texto) continue;
       let fotoUrl = null;
       if (v.fotoArchivo) {
@@ -8503,6 +8503,32 @@ function copiarCotizacion() {
   });
 }
 
+// Carga (o reintenta cargar) la librería jsPDF desde un CDN. Se usa cuando el <script> inicial de la
+// página no alcanzó a cargar (red lenta/inestable al abrir la app) — así no hace falta recargar todo.
+const JSPDF_CDN_URLS = [
+  'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
+  'https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js',
+];
+function cargarScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('No se pudo cargar ' + src));
+    document.head.appendChild(s);
+  });
+}
+async function asegurarJsPDF() {
+  if ((window.jspdf && window.jspdf.jsPDF) || window.jsPDF) return (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+  for (const url of JSPDF_CDN_URLS) {
+    try {
+      await cargarScript(url);
+      if ((window.jspdf && window.jspdf.jsPDF) || window.jsPDF) return (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+    } catch (e) { console.warn('Fallo cargando jsPDF desde', url, e.message); }
+  }
+  return null;
+}
+
 // Descarga la cotización como PDF, generado directamente con jsPDF (texto real, no una foto de la pantalla)
 // Esto evita el bug de "PDF en blanco" que daba la versión anterior (basada en html2canvas), que en varios
 // celulares capturaba un lienzo vacío en vez del contenido.
@@ -8511,9 +8537,13 @@ async function descargarCotizacionPDF() {
     mostrarToast('⚠️ Genera la cotización primero', '#E05252');
     return;
   }
-  const JsPDFCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+  let JsPDFCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
   if (!JsPDFCtor) {
-    mostrarToast('⚠️ No se pudo cargar el generador de PDF, revisa tu conexión', '#E05252');
+    mostrarToast('📄 Cargando generador de PDF, un momento...', 'var(--azul-info)');
+    JsPDFCtor = await asegurarJsPDF();
+  }
+  if (!JsPDFCtor) {
+    mostrarToast('⚠️ No se pudo cargar el generador de PDF, revisa tu conexión e inténtalo de nuevo', '#E05252');
     return;
   }
   mostrarToast('📄 Generando PDF...', 'var(--azul-info)');
