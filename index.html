@@ -1432,6 +1432,7 @@
             <input type="text" id="cot-nombre" placeholder="Nombre del cliente" autocomplete="off" oninput="buscarClienteAutocomplete(this.value, 'cot')">
             <div id="cot-nombre_sugerencias" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--gris-oscuro);border:1px solid var(--dorado);border-radius:8px;z-index:999;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.4)"></div>
           </div>
+          <div class="campo"><label>Número de documento</label><input type="text" id="cot-num-doc" placeholder="Ej. 1088123456"></div>
           <div class="campo"><label>Correo electrónico</label><input type="email" id="cot-email" placeholder="correo@ejemplo.com"></div>
           <div class="campo"><label>Teléfono / WhatsApp</label><input type="text" id="cot-telefono" placeholder="310 000 0000"></div>
 
@@ -7919,11 +7920,20 @@ function cotQuitarSegConductor(idx) {
 
 async function generarCotizacion(silencioso = false) {
   const nombre = cotValor('cot-nombre') || 'Cliente';
+  const numDocCliente = cotValor('cot-num-doc');
   const email = cotValor('cot-email');
   const telefono = cotValor('cot-telefono');
   const notas = cotValor('cot-notas');
   const fechaHoy = new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
   const numCot = 'COT-' + Date.now().toString().slice(-6);
+
+  // Guardar/actualizar el cliente en el directorio (como en Renta/Seguridad/Turismo).
+  // La tabla clientes exige número de documento, así que solo se intenta si se diligenció.
+  if (!silencioso && nombre !== 'Cliente' && numDocCliente) {
+    try {
+      await sbInsert('clientes', { nombre, documento: numDocCliente, telefono, email });
+    } catch(eCli) { console.warn('No se pudo guardar el cliente de la cotización en el directorio:', eCli.message); }
+  }
 
   let detalle = '';
   let total = 0;
@@ -9756,6 +9766,7 @@ function seleccionarClienteAutocomplete(c, prefijo = 'r') {
   const tipoDoc = TIPO_DOC_CODIGO_A_TEXTO[c.tipo_doc] || c.tipo_doc || '';
   if (prefijo === 'cot') {
     document.getElementById('cot-nombre').value = c.nombre || '';
+    if (document.getElementById('cot-num-doc')) document.getElementById('cot-num-doc').value = numDoc;
     document.getElementById('cot-email').value = c.email || '';
     document.getElementById('cot-telefono').value = celular;
     document.getElementById('cot-nombre_sugerencias').style.display = 'none';
