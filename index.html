@@ -3343,6 +3343,21 @@ async function enviarCorreoDirecto(para, asunto, cuerpo) {
   }
 }
 
+// Registra en Supabase (tabla correos_enviados) cada correo que la app genera o envía,
+// para tener trazabilidad real sin depender del Gmail personal de quien lo envíe.
+async function registrarCorreoEnviado(tipo, numReserva, para, asunto, cuerpo, modo, exito, detalleError) {
+  try {
+    await sbInsert('correos_enviados', {
+      tipo, num_reserva: numReserva || null, para: para || null, asunto: asunto || null,
+      cuerpo: cuerpo || null, modo: modo || 'generado',
+      exito: (exito === undefined ? null : exito),
+      detalle_error: detalleError || null,
+    });
+  } catch (e) {
+    console.warn('No se pudo registrar el correo en el historial:', e.message);
+  }
+}
+
 /* ════════════════════════════════════════════
    STATS / INICIO
    ════════════════════════════════════════════ */
@@ -4513,6 +4528,8 @@ async function generarReserva() {
   renderCorreoReserva(0);
   document.getElementById('badge-num-reserva').textContent = numReserva;
   document.getElementById('panel-correos-reserva').style.display = 'block';
+  document.getElementById('panel-correos-reserva').dataset.numReserva = numReserva;
+  correosReservaActual.forEach(c => registrarCorreoEnviado('renta', numReserva, c.para, c.asunto, c.cuerpo, 'generado'));
 
   // Ocultar el formulario para dejar visible el correo generado
   const panelForm = document.getElementById('panel-nueva-reserva');
@@ -4756,6 +4773,7 @@ function renderCorreoReserva(i) {
   document.getElementById('rc-cuerpo').textContent = c.cuerpo;
   const gmailUrl = 'https://mail.google.com/mail/?view=cm&fs=1' +
     '&to=' + encodeURIComponent(c.para) +
+    '&bcc=' + encodeURIComponent(CORREO_EMPRESA_BCC) +
     '&su=' + encodeURIComponent(c.asunto) +
     '&body=' + encodeURIComponent(c.cuerpo);
   document.getElementById('rc-link-gmail').href = gmailUrl;
@@ -4800,7 +4818,9 @@ function reenviarCorreoReserva(num) {
   renderCorreoReserva(0);
   document.getElementById('badge-num-reserva').textContent = r.num_reserva;
   document.getElementById('panel-correos-reserva').style.display = 'block';
+  document.getElementById('panel-correos-reserva').dataset.numReserva = r.num_reserva;
   document.getElementById('panel-correos-reserva').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  correosReservaActual.forEach(c => registrarCorreoEnviado('renta', r.num_reserva, c.para, c.asunto, c.cuerpo, 'generado'));
   mostrarToast('📧 Correo actualizado — listo para ver o reenviar');
 }
 
@@ -5894,8 +5914,10 @@ Equipo Car Help — Turismo VIP
   document.getElementById('tc-para').textContent = email;
   document.getElementById('tc-asunto').textContent = asunto;
   document.getElementById('tc-cuerpo').textContent = cuerpo;
-  document.getElementById('tc-link-gmail').href = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(email) + '&su=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(cuerpo);
+  document.getElementById('tc-link-gmail').href = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(email) + '&bcc=' + encodeURIComponent(CORREO_EMPRESA_BCC) + '&su=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(cuerpo);
   document.getElementById('panel-correo-tour').style.display = 'block';
+  document.getElementById('panel-correo-tour').dataset.numReserva = numReserva;
+  registrarCorreoEnviado('tour', numReserva, email, asunto, cuerpo, 'generado');
 
   renderReservasTour();
   mostrarToast('✅ Tour reservado: ' + numReserva);
@@ -6066,8 +6088,10 @@ Equipo Car Help — Seguridad y Transporte
   document.getElementById('sc-para').textContent = email;
   document.getElementById('sc-asunto').textContent = asunto;
   document.getElementById('sc-cuerpo').textContent = cuerpo;
-  document.getElementById('sc-link-gmail').href = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(email) + '&su=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(cuerpo);
+  document.getElementById('sc-link-gmail').href = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(email) + '&bcc=' + encodeURIComponent(CORREO_EMPRESA_BCC) + '&su=' + encodeURIComponent(asunto) + '&body=' + encodeURIComponent(cuerpo);
   document.getElementById('panel-correo-seguridad').style.display = 'block';
+  document.getElementById('panel-correo-seguridad').dataset.numReserva = numReserva;
+  registrarCorreoEnviado('seguridad', numReserva, email, asunto, cuerpo, 'generado');
 
   renderSeguridad();
   mostrarToast('✅ Solicitud creada: ' + numReserva);
@@ -6276,12 +6300,20 @@ async function eliminarUsuario(idx) {
 
 /* ===== ENVIO AUTOMATICO DE CORREOS VIA RAILWAY ===== */
 const MAIL_API = 'https://carhelp-backend-production.up.railway.app';
+// Copia oculta (BCC) que se agrega automáticamente a todo correo de confirmación que se abre en Gmail,
+// para que siempre quede una copia en el correo de la empresa sin depender de que cada persona se la reenvíe.
+const CORREO_EMPRESA_BCC = 'reservascarhelp@gmail.com';
+
+const PANEL_CORREO_POR_PREFIJO = { rc: { id: 'panel-correos-reserva', tipo: 'renta' }, tc: { id: 'panel-correo-tour', tipo: 'tour' }, sc: { id: 'panel-correo-seguridad', tipo: 'seguridad' } };
 
 async function enviarCorreoAutomatico(prefix) {
   const statusEl = document.getElementById(prefix + '-envio-status');
   const para = document.getElementById(prefix + '-para').textContent.trim();
   const asunto = document.getElementById(prefix + '-asunto').textContent.trim();
   const cuerpo = document.getElementById(prefix + '-cuerpo').textContent.trim();
+  const info = PANEL_CORREO_POR_PREFIJO[prefix] || {};
+  const panelEl = info.id ? document.getElementById(info.id) : null;
+  const numReserva = panelEl?.dataset?.numReserva || document.getElementById('badge-num-reserva')?.textContent || null;
 
   if (!para || !asunto || !cuerpo) {
     mostrarToast('No hay correo generado para enviar', '#E05252');
@@ -6301,9 +6333,11 @@ async function enviarCorreoAutomatico(prefix) {
 
     if (statusEl) statusEl.textContent = 'Enviado a ' + para;
     mostrarToast('Correo enviado automaticamente a ' + para);
+    registrarCorreoEnviado(info.tipo || prefix, numReserva, para, asunto, cuerpo, 'automatico', true);
   } catch (e) {
     if (statusEl) statusEl.textContent = 'Error: usa "Abrir en Gmail"';
     mostrarToast('No se pudo enviar automatico. Usa el boton de Gmail. (' + e.message + ')', '#E05252');
+    registrarCorreoEnviado(info.tipo || prefix, numReserva, para, asunto, cuerpo, 'automatico', false, e.message);
   }
 }
 
